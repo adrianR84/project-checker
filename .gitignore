@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.db
+*.log
+.DS_Store
+.pnpm-store/
+.vscode/
+.idea/
