@@ -72,35 +72,50 @@ async function runCommitTick() {
   }
 }
 
+// Last-known cron expressions — only re-schedule when a value actually changes
+let lastCommitExpr = null, lastWebsiteExpr = null, lastTwitterExpr = null;
+
 // (Re)schedule jobs based on current config values.
-// Reads config fresh on each call so changes via PUT take effect without restart.
+// Only stops/creates a job when its expression has changed since the last call.
 function reschedule() {
-  clearJobs();
   const cfg = db.prepare('SELECT * FROM config WHERE id = 1').get();
   if (!cfg) {
     console.warn(`[${now()}] Scheduler: no config row found, skipping schedule`);
     return;
   }
 
-  const commitExpr = everyNHours(cfg.commit_check_hours);
+  const commitExpr  = everyNHours(cfg.commit_check_hours);
   const websiteExpr = everyNHours(cfg.website_check_hours);
   const twitterExpr = everyNHours(cfg.twitter_check_hours);
+
+  const changed = commitExpr !== lastCommitExpr
+    || websiteExpr !== lastWebsiteExpr
+    || twitterExpr !== lastTwitterExpr;
+
+  if (!changed) return; // nothing to do
+
+  clearJobs(); // stop all existing jobs before recreating any
 
   if (cron.validate(commitExpr)) {
     const j = cron.schedule(commitExpr, () => { runCommitTick().catch(err => console.error(err)); });
     jobs.push(j);
-    console.log(`[${now()}] Scheduler: commit job → "${commitExpr}" (every ${cfg.commit_check_hours}h)`);
   }
+  lastCommitExpr = commitExpr;
+  console.log(`[${now()}] Scheduler: commit job → "${commitExpr}" (every ${cfg.commit_check_hours}h)`);
+
   if (cron.validate(websiteExpr)) {
     const j = cron.schedule(websiteExpr, () => { runWebsiteTick().catch(err => console.error(err)); });
     jobs.push(j);
-    console.log(`[${now()}] Scheduler: website job → "${websiteExpr}" (every ${cfg.website_check_hours}h)`);
   }
+  lastWebsiteExpr = websiteExpr;
+  console.log(`[${now()}] Scheduler: website job → "${websiteExpr}" (every ${cfg.website_check_hours}h)`);
+
   if (cron.validate(twitterExpr)) {
     const j = cron.schedule(twitterExpr, () => { runTwitterTick().catch(err => console.error(err)); });
     jobs.push(j);
-    console.log(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${cfg.twitter_check_hours}h)`);
   }
+  lastTwitterExpr = twitterExpr;
+  console.log(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${cfg.twitter_check_hours}h)`);
 }
 
 // Initialize scheduler; reschedule every 5 minutes to pick up config changes.
