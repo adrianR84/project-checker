@@ -14,13 +14,13 @@ router.get('/', (req, res) => {
 
 // PUT /api/settings — update check intervals
 router.put('/', (req, res) => {
-  const allowed = ['commit_check_hours', 'website_check_hours', 'twitter_check_hours'];
+  const allowed = ['commit_check_minutes', 'website_check_minutes', 'twitter_check_minutes'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
       const v = parseInt(req.body[key], 10);
-      if (!Number.isFinite(v) || v < 1) {
-        return res.status(400).json({ error: `${key} must be a positive integer` });
+      if (!Number.isFinite(v) || v < 1 || v > 10080) {
+        return res.status(400).json({ error: `${key} must be an integer between 1 and 10080 (1 week)` });
       }
       updates[key] = v;
     }

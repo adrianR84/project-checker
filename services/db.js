@@ -224,9 +224,9 @@ async function init() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
-      commit_check_hours INTEGER NOT NULL DEFAULT 6,
-      website_check_hours INTEGER NOT NULL DEFAULT 24,
-      twitter_check_hours INTEGER NOT NULL DEFAULT 24,
+      commit_check_minutes INTEGER NOT NULL DEFAULT 360,
+      website_check_minutes INTEGER NOT NULL DEFAULT 1440,
+      twitter_check_minutes INTEGER NOT NULL DEFAULT 1440,
       github_token TEXT
     );
   `);
@@ -252,9 +252,13 @@ async function init() {
     ON check_logs (project_id, resource_type, checked_at);
   `);
 
+  // Run migrations (idempotent — handles schema changes from older DB files)
+  const { runMigrations } = require('./migrations');
+  runMigrations(db, save);
+
   const existing = db.exec('SELECT id FROM config WHERE id = 1');
   if (!existing.length || !existing[0].values.length) {
-    db.run('INSERT INTO config (id, commit_check_hours, website_check_hours, twitter_check_hours) VALUES (1, 6, 24, 24)');
+    db.run('INSERT INTO config (id, commit_check_minutes, website_check_minutes, twitter_check_minutes) VALUES (1, 360, 1440, 1440)');
     save();
   }
 

@@ -845,21 +845,21 @@
             <!-- Check interval configuration -->
             <section class="card">
               <h2>Check Intervals</h2>
-              <p class="muted">How often each check runs automatically (in hours).</p>
+              <p class="muted">How often each check runs automatically (in minutes). 60 min = 1 hour, 1440 min = 1 day.</p>
 
               <div class="form-row">
-                <label>Commit / GitHub (hours)</label>
-                <input v-model.number="form.commit_interval_hours" type="number" min="1" max="8760" />
+                <label>Commit / GitHub (minutes)</label>
+                <input v-model.number="form.commit_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
               <div class="form-row">
-                <label>Website (hours)</label>
-                <input v-model.number="form.website_interval_hours" type="number" min="1" max="8760" />
+                <label>Website (minutes)</label>
+                <input v-model.number="form.website_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
               <div class="form-row">
-                <label>Twitter (hours)</label>
-                <input v-model.number="form.twitter_interval_hours" type="number" min="1" max="8760" />
+                <label>Twitter (minutes)</label>
+                <input v-model.number="form.twitter_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
               <div class="actions">
@@ -935,9 +935,9 @@
       setup() {
         const settings    = ref(null);
         const form        = ref({
-          commit_interval_hours:  24,
-          website_interval_hours: 24,
-          twitter_interval_hours: 24,
+          commit_interval_minutes:  360,
+          website_interval_minutes: 1440,
+          twitter_interval_minutes: 1440,
         });
         const loading   = ref(true);
         const saving    = ref(false);
@@ -947,18 +947,18 @@
         const savedMsg   = ref('');   // brief "Saved." confirmation
 
         /**
-         * Extract the interval (in hours) for a given check type from the settings object.
+         * Extract the interval (in minutes) for a given check type from the settings object.
          * Tries several possible response shapes for backwards compatibility.
          */
-        function pickHours(s, kind) {
-          if (!s) return 24;
-          // Flat shape: { commit_check_hours: 6, website_check_hours: 24, ... }
-          const d = s[kind + '_check_hours'];
+        function pickMinutes(s, kind) {
+          if (!s) return 360;
+          // Flat shape: { commit_check_minutes: 360, website_check_minutes: 1440, ... }
+          const d = s[kind + '_check_minutes'];
           if (d != null) return d;
-          // Array shape: { configs: [{ resource_type: 'commit', interval_hours: 6 }, ...] }
+          // Array shape: { configs: [{ resource_type: 'commit', interval_minutes: 360 }, ...] }
           const row = s.configs && s.configs.find &&
             s.configs.find(c => c.resource_type === kind || c.type === kind);
-          return row && (row.interval_hours || row.hours) || 24;
+          return (row && row.interval_minutes) || 360;
         }
 
         /** Load settings from GET /api/settings */
@@ -968,9 +968,9 @@
           try {
             settings.value = await api.getSettings();
             form.value = {
-              commit_interval_hours:  pickHours(settings.value, 'commit'),
-              website_interval_hours: pickHours(settings.value, 'website'),
-              twitter_interval_hours: pickHours(settings.value, 'twitter'),
+              commit_interval_minutes:  pickMinutes(settings.value, 'commit'),
+              website_interval_minutes: pickMinutes(settings.value, 'website'),
+              twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
             };
           } catch (e) {
             error.value = e.message;
@@ -986,9 +986,9 @@
           savedMsg.value   = '';
           try {
             await api.updateSettings({
-              commit_check_hours:  Number(form.value.commit_interval_hours),
-              website_check_hours: Number(form.value.website_interval_hours),
-              twitter_check_hours: Number(form.value.twitter_interval_hours),
+              commit_check_minutes:  Number(form.value.commit_interval_minutes),
+              website_check_minutes: Number(form.value.website_interval_minutes),
+              twitter_check_minutes: Number(form.value.twitter_interval_minutes),
             });
             savedMsg.value = 'Saved.';
             await load();
