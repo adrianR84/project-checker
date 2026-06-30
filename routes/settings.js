@@ -1,6 +1,6 @@
 // Settings REST API (config singleton + trigger-all)
 const express = require('express');
-const db = require('../db');
+const db = require('../services/db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../services/checker');
 
 const router = express.Router();

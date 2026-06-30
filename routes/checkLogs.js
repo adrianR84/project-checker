@@ -1,6 +1,6 @@
 // Check logs REST API
 const express = require('express');
-const db = require('../db');
+const db = require('../services/db');
 
 const router = express.Router();
 

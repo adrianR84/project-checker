@@ -1,6 +1,6 @@
 // Cron-based scheduler for periodic checks
 const cron = require('node-cron');
-const db = require('../db');
+const db = require('./db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('./checker');
 
 const now = () => new Date().toISOString();

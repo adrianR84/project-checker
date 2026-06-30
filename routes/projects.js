@@ -1,6 +1,6 @@
 // Projects REST API
 const express = require('express');
-const db = require('../db');
+const db = require('../services/db');
 const { fetchReposForOwner, fetchCommitHistory } = require('../services/github');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../services/checker');
 

@@ -1,921 +1,1398 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Project Checker</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%236c8cff'/><circle cx='50' cy='50' r='25' fill='%2334d399'/></svg>" />
-<style>
-:root {
-  --bg: #0f1115;
-  --bg-elev: #161a22;
-  --bg-elev-2: #1d222c;
-  --border: #262c38;
-  --text: #e6e8ec;
-  --text-dim: #8b93a3;
-  --accent: #6c8cff;
-  --accent-hover: #5577ee;
-  --ok: #34d399;
-  --error: #f87171;
-  --pending: #fbbf24;
-  --shadow: 0 4px 12px rgba(0,0,0,.25);
-  --radius: 10px;
-  --radius-sm: 6px;
-  --transition: 180ms cubic-bezier(.2,.8,.2,1);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-button {
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--text);
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition), border-color var(--transition), transform var(--transition);
-}
-
-button:hover:not(:disabled) { background: var(--bg-elev-2); border-color: #36405a; }
-button:active:not(:disabled) { transform: translateY(1px); }
-button:disabled { opacity: .55; cursor: not-allowed; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-button.danger { border-color: #5a2a2a; color: var(--error); }
-button.danger:hover:not(:disabled) { background: #2a1414; }
-
-input, textarea, select {
-  font-family: inherit;
-  font-size: inherit;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  width: 100%;
-  transition: border-color var(--transition);
-}
-
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
-
-label {
-  display: block;
-  color: var(--text-dim);
-  font-size: 12px;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-h1, h2, h3 { margin: 0 0 12px; font-weight: 600; }
-h1 { font-size: 22px; }
-h2 { font-size: 17px; }
-h3 {
-  font-size: 14px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: .05em;
-}
-
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
-
-.toolbar {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 22px;
-  flex-wrap: wrap;
-}
-
-.toolbar h1 { margin: 0; flex: 1; }
-
-.card, .modal { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.card { padding: 18px; }
-.modal { padding: 22px; max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-}
-
-.badge.ok   { background: rgba(52, 211, 153, .12);  color: var(--ok); }
-.badge.error { background: rgba(248, 113, 113, .12); color: var(--error); }
-.badge.pending { background: rgba(251, 191, 36, .12); color: var(--pending); }
-.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 700ms linear infinite;
-}
-
-.spinner.lg { width: 24px; height: 24px; border-width: 3px; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.center-loader { display: flex; justify-content: center; padding: 60px 0; }
-
-.error-box {
-  background: rgba(248, 113, 113, .08);
-  border: 1px solid rgba(248, 113, 113, .3);
-  color: var(--error);
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 16px;
-}
-
-.muted { color: var(--text-dim); font-size: 12px; }
-
-.fade-enter-active, .fade-leave-active { transition: opacity var(--transition); }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 20px;
-}
-
-.modal {
-  padding: 22px;
-  max-width: 520px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.form-row { margin-bottom: 14px; }
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 18px;
-}
-
-table { width: 100%; border-collapse: collapse; }
-
-th, td {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--text-dim);
-  font-weight: 600;
-}
-
-tr:last-child td { border-bottom: none; }
-
-.icon-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
-}
-
-.icon-btn:hover:not(:disabled) { background: var(--bg-elev-2); color: var(--text); }
-
-.navbar {
-  background: var(--bg-elev);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  backdrop-filter: blur(8px);
-}
-
-.navbar-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  height: 56px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: -.01em;
-}
-
-.logo-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #34d399);
-  box-shadow: 0 0 8px rgba(108, 140, 255, .5);
-}
-
-nav { display: flex; gap: 4px; flex: 1; }
-
-.tab {
-  color: var(--text-dim);
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: 13px;
-  position: relative;
-  transition: color var(--transition), background var(--transition);
-}
-
-.tab:hover { color: var(--text); text-decoration: none; background: var(--bg-elev-2); }
-.tab.active { color: var(--text); }
-.tab.active::after {
-  content: '';
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: -2px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.saved { color: var(--ok); }
-
-.trigger-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.trigger-row:last-of-type { border-bottom: none; }
-
-.trigger-meta h3 {
-  margin: 0 0 2px;
-  color: var(--text);
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 13px;
-}
-
-.small { font-size: 11px; }
-
-.danger-zone { border-color: rgba(248, 113, 113, .3); }
-.danger-zone h2 { color: var(--error); }
-
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-
-@media (max-width: 800px) { .settings-grid { grid-template-columns: 1fr; } }
-
-code { background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
-
-.project-card { display: flex; flex-direction: column; gap: 14px; }
-
-.head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.repos-head { margin-bottom: 8px; }
-.repos-head h3, .trigger-meta h3 { margin: 0 0 2px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; }
-
-.name { font-size: 16px; font-weight: 600; margin: 0; }
-
-.status-row { display: flex; flex-wrap: wrap; gap: 12px; }
-
-.status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-
-.repos-section { border-top: 1px solid var(--border); padding-top: 12px; }
-
-.trigger-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.trigger-row:last-of-type { border-bottom: none; }
-
-.actions-row {
-  display: flex;
-  gap: 8px;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-  flex-wrap: wrap;
-}
-
-.repo-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.repo {
-  padding: 8px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.repo-name { font-weight: 500; font-size: 13px; }
-
-.repo-meta {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.sha {
-  font-family: 'SF Mono', Consolas, monospace;
-  background: var(--bg-elev-2);
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: var(--accent);
-}
-
-.msg {
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 280px;
-}
-
-.detail {
-  color: var(--text-dim);
-  max-width: 360px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Checker</title>
+
+  <!-- Inline SVG favicon: blue circle with green center -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%236c8cff'/><circle cx='50' cy='50' r='25' fill='%2334d399'/></svg>" />
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --bg:          #0f1115;
+      --bg-elev:     #161a22;     /* cards, navbar */
+      --bg-elev-2:   #1d222c;     /* hover states */
+      --border:      #262c38;
+      --text:        #e6e8ec;
+      --text-dim:    #8b93a3;
+      --accent:      #6c8cff;      /* primary buttons, links */
+      --accent-hover:#5577ee;
+      --ok:          #34d399;      /* success / "ok" badge */
+      --error:       #f87171;       /* error badge */
+      --pending:     #fbbf24;      /* pending / unknown badge */
+      --shadow:      0 4px 12px rgba(0,0,0,.25);
+      --radius:      10px;
+      --radius-sm:   6px;
+      --transition:   180ms cubic-bezier(.2,.8,.2,1);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+
+    /* ── Reset & base ──────────────────────────────────────────────────────── */
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Buttons ───────────────────────────────────────────────────────────── */
+    button {
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      transition: background var(--transition),
+                  border-color var(--transition),
+                  transform var(--transition);
+    }
+    button:hover:not(:disabled)  { background: var(--bg-elev-2); border-color: #36405a; }
+    button:active:not(:disabled)  { transform: translateY(1px); }
+    button:disabled               { opacity: .55; cursor: not-allowed; }
+    button.primary                { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.danger                 { border-color: #5a2a2a; color: var(--error); }
+    button.danger:hover:not(:disabled)  { background: #2a1414; }
+
+    /* ── Form controls ────────────────────────────────────────────────────── */
+    input, textarea, select {
+      font-family: inherit;
+      font-size: inherit;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      width: 100%;
+      transition: border-color var(--transition);
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+
+    label {
+      display: block;
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    /* ── Headings ──────────────────────────────────────────────────────────── */
+    h1, h2, h3 { margin: 0 0 12px; font-weight: 600; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 17px; }
+    h3 {
+      font-size: 14px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* Toolbar: title + action buttons on the same row */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .toolbar h1 { margin: 0; flex: 1; }
+
+    /* ── Card & Modal ──────────────────────────────────────────────────────── */
+    /* Both share surface styles; modal adds max-width / overflow */
+    .card, .modal {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card  { padding: 18px; }
+    .modal { padding: 22px; max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+
+    /* ── Grid ──────────────────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── Badge (status pill) ───────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .badge.ok      { background: rgba(52, 211, 153, .12);  color: var(--ok); }
+    .badge.error   { background: rgba(248, 113, 113, .12); color: var(--error); }
+    .badge.pending { background: rgba(251, 191, 36, .12);  color: var(--pending); }
+    .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* ── Spinner (loading indicator) ──────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+    .spinner.lg { width: 24px; height: 24px; border-width: 3px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .center-loader { display: flex; justify-content: center; padding: 60px 0; }
+
+    /* ── Error box ─────────────────────────────────────────────────────────── */
+    .error-box {
+      background: rgba(248, 113, 113, .08);
+      border: 1px solid rgba(248, 113, 113, .3);
+      color: var(--error);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 16px;
+    }
+
+    .muted  { color: var(--text-dim); font-size: 12px; }
+    .small  { font-size: 11px; }
+
+    /* ── Modal transitions ─────────────────────────────────────────────────── */
+    .fade-enter-active, .fade-leave-active { transition: opacity var(--transition); }
+    .fade-enter-from, .fade-leave-to        { opacity: 0; }
+
+    /* Dark overlay behind modals */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, .6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+
+    /* ── Form rows ─────────────────────────────────────────────────────────── */
+    .form-row { margin-bottom: 14px; }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;
+    }
+
+    /* ── Table ─────────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--text-dim); font-weight: 600;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Icon button (toolbar action, no background) ───────────────────────── */
+    .icon-btn {
+      background: transparent; border: 1px solid transparent;
+      padding: 6px 8px; border-radius: var(--radius-sm); color: var(--text-dim);
+    }
+    .icon-btn:hover:not(:disabled) { background: var(--bg-elev-2); color: var(--text); }
+
+    /* ── Navbar ────────────────────────────────────────────────────────────── */
+    .navbar {
+      background: var(--bg-elev); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 50; backdrop-filter: blur(8px);
+    }
+    .navbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; gap: 32px; height: 56px;
+    }
+
+    /* Brand / logo */
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+    .logo-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #34d399);
+      box-shadow: 0 0 8px rgba(108, 140, 255, .5);
+    }
+
+    nav { display: flex; gap: 4px; flex: 1; }
+
+    /* Navigation tab link */
+    .tab {
+      color: var(--text-dim); padding: 8px 14px; border-radius: var(--radius-sm);
+      font-weight: 500; font-size: 13px; position: relative;
+      transition: color var(--transition), background var(--transition);
+    }
+    .tab:hover          { color: var(--text); text-decoration: none; background: var(--bg-elev-2); }
+    .tab.active         { color: var(--text); }
+    /* Bottom accent bar on active tab */
+    .tab.active::after {
+      content: ''; position: absolute; left: 14px; right: 14px;
+      bottom: -2px; height: 2px; background: var(--accent); border-radius: 2px;
+    }
+
+    /* ── Settings helpers ──────────────────────────────────────────────────── */
+    .saved { color: var(--ok); }
+    .trigger-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .trigger-row:last-of-type { border-bottom: none; }
+    /* Override h3 defaults inside trigger-row (h3 is reset to text-dim globally) */
+    .trigger-meta h3 { margin: 0 0 2px; color: var(--text); text-transform: none; letter-spacing: 0; font-size: 13px; }
+
+    .danger-zone { border-color: rgba(248, 113, 113, .3); }
+    .danger-zone h2 { color: var(--error); }
+
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 800px) { .settings-grid { grid-template-columns: 1fr; } }
+
+    code { background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+    /* ── Project card ───────────────────────────────────────────────────────── */
+    .project-card { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Card header: title + action button on opposite sides */
+    .head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .repos-head { margin-bottom: 8px; }
+    /* Reset h3 inside repos-head / trigger-meta (global h3 is styled with text-dim) */
+    .repos-head h3, .trigger-meta h3 { margin: 0 0 2px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; }
+
+    .name { font-size: 16px; font-weight: 600; margin: 0; }
+
+    .status-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .status     { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+
+    .repos-section { border-top: 1px solid var(--border); padding-top: 12px; }
+
+    .actions-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      border-top: 1px solid var(--border); padding-top: 12px;
+    }
+
+    /* ── Repo list ─────────────────────────────────────────────────────────── */
+    .repo-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+    .repo {
+      padding: 8px 10px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+    }
+    .repo-name { font-weight: 500; font-size: 13px; }
+    .repo-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; margin-top: 4px; }
+    .sha {
+      font-family: 'SF Mono', Consolas, monospace;
+      background: var(--bg-elev-2); padding: 1px 6px;
+      border-radius: 4px; font-size: 11px; color: var(--accent);
+    }
+    .msg {
+      color: var(--text-dim); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+    }
+    .detail {
+      color: var(--text-dim); max-width: 360px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+  </style>
 </head>
+
 <body>
-<div id="app"></div>
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script>
-const { createApp, ref, computed, onMounted, watch, Transition } = Vue;
+  <div id="app"></div>
 
-// ── API ─────────────────────────────────────────────────────────────────────────
-const BASE = '/api';
-async function req(path, opts = {}) {
-  const r = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers||{}) },
-    ...opts,
-  });
-  if (!r.ok) {
-    let d = '';
-    try { d = (await r.json()).error || r.statusText; } catch { d = r.statusText; }
-    throw new Error(d);
-  }
-  return r.json();
-}
-const api = {
-  getDashboard: () => req('/dashboard'),
-  listProjects: () => req('/projects'),
-  getProject: (id) => req(`/projects/${id}`),
-  createProject: (d) => req('/projects', { method:'POST', body: JSON.stringify(d) }),
-  updateProject: (id, d) => req(`/projects/${id}`, { method:'PUT', body: JSON.stringify(d) }),
-  deleteProject: (id) => req(`/projects/${id}`, { method:'DELETE' }),
-  refreshRepos: (id) => req(`/projects/${id}/refresh-repos`, { method:'POST' }),
-  checkWebsite: (id) => req(`/projects/${id}/check-website`, { method:'POST' }),
-  checkGithub: (id) => req(`/projects/${id}/check-github`, { method:'POST' }),
-  checkTwitter: (id) => req(`/projects/${id}/check-twitter`, { method:'POST' }),
-  getCheckLogs: (q={}) => req('/check-logs?'+new URLSearchParams(q).toString()),
-  getSettings: () => req('/settings'),
-  updateSettings: (d) => req('/settings', { method:'PUT', body: JSON.stringify(d) }),
-  triggerAll: () => req('/settings/trigger-all', { method:'POST' }),
-  clearData: () => req('/settings/clear-data', { method:'POST' }),
-};
+  <!-- Vue 3 CDN (production build, no dev warnings) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-const RTF = new Intl.RelativeTimeFormat('en', { numeric:'auto' });
-const UNITS = [['year',31536e3],['month',2592e3],['week',604800],['day',86400],['hour',3600],['minute',60],['second',1]];
-function relativeTime(v) {
-  if (!v) return 'never';
-  const d = new Date(v);
-  if (isNaN(d)) return 'never';
-  const diff = (d.getTime() - Date.now()) / 1000;
-  for (const [u,s] of UNITS)
-    if (Math.abs(diff) >= s || u === 'second') return RTF.format(Math.round(diff/s), u);
-  return 'just now';
-}
-function absoluteTime(v) {
-  if (!v) return '—';
-  const d = new Date(v);
-  if (isNaN(d)) return '—';
-  return new Intl.DateTimeFormat('en', { dateStyle:'medium', timeStyle:'short' }).format(d);
-}
-function urlLabel(u) {
-  if (!u) return null;
-  try { return new URL(u).hostname.replace(/^www\./,''); } catch { return u; }
-}
-function statusClass(s) {
-  if (s === 'ok' || s === 'success') return 'ok';
-  if (s === 'error' || s === 'failed') return 'error';
-  return 'pending';
-}
+  <script>
+    /* ─────────────────────────────────────────────────────────────────────────
+       Vue 3 CDN — API is defined at module scope and exposed on window so
+       templates can call api.* directly via the returned `api: window.api`.
+    ───────────────────────────────────────────────────────────────────────── */
 
-// ── NavBar ─────────────────────────────────────────────────────────────────────
-const NavBar = {
-  template: `
-  <header class="navbar">
-    <div class="navbar-inner">
-      <div class="brand"><span class="logo-dot"></span>Project Checker</div>
-      <nav>
-        <a v-for="t in tabs" :key="t.to" :href="'#'+t.to" class="tab" :class="{active: currentRoute===t.to}">{{ t.label }}</a>
-      </nav>
-    </div>
-  </header>`,
-  setup() {
-    const currentRoute = ref(window.location.hash.slice(1) || '/');
-    window.addEventListener('hashchange', () => {
-      currentRoute.value = window.location.hash.slice(1) || '/';
-    });
-    return { tabs: [{to:'/',label:'Activity'},{to:'/projects',label:'Projects'},{to:'/settings',label:'Settings'}], currentRoute };
-  }
-};
+    // Pull only what we need from the global Vue object
+    const { createApp, ref, computed, onMounted, watch, Transition } = Vue;
 
-// ── RepoList ───────────────────────────────────────────────────────────────────
-const RepoList = {
-  props: ['repos'],
-  template: `
-  <div>
-    <div v-if="!repos.length" class="muted">No repositories linked.</div>
-    <ul v-else class="repo-list">
-      <li v-for="r in repos" :key="r.id||r.full_name" class="repo">
-        <div class="repo-name">
-          <a v-if="r.repo_url" :href="r.repo_url" target="_blank" rel="noopener">{{ r.full_name }}</a>
-          <span v-else>{{ r.full_name }}</span>
-        </div>
-        <div class="repo-meta">
-          <template v-if="r.latest_commit_sha">
-            <a v-if="r.repo_url" :href="r.repo_url+'/commit/'+r.latest_commit_sha" target="_blank" rel="noopener" class="sha">{{ r.latest_commit_sha.slice(0,7) }}</a>
-            <span v-else class="sha">{{ r.latest_commit_sha.slice(0,7) }}</span>
-            <span v-if="r.latest_commit_message" class="msg">{{ r.latest_commit_message }}</span>
-            <span v-if="r.latest_commit_date" class="muted">· {{ relativeTime(r.latest_commit_date) }}</span>
-          </template>
-          <span v-else class="muted">no commits yet</span>
-        </div>
-      </li>
-    </ul>
-  </div>`,
-  methods: { relativeTime }
-};
+    /* ── API layer ───────────────────────────────────────────────────────────────
+       Thin wrapper around fetch(). All calls go to /api/* on the same host.
+       live-server proxies /api → Express on port 3000 during development.
+    ───────────────────────────────────────────────────────────────────────── */
+    const BASE = '/api';
 
-// ── CheckLogList ───────────────────────────────────────────────────────────────
-const CheckLogList = {
-  props: ['logs','showProject'],
-  template: `
-  <div>
-    <div v-if="!logs.length" class="muted">No check logs yet.</div>
-    <table v-else>
-      <thead><tr><th>Type</th><th v-if="showProject">Project</th><th>Status</th><th>When</th><th>Detail</th></tr></thead>
-      <tbody>
-        <tr v-for="log in logs" :key="log.id">
-          <td>{{ log.resource_type }}</td>
-          <td v-if="showProject">{{ log.project_name || log.project_id }}</td>
-          <td><span :class="['badge', statusClass(log.status)]"><span class="dot"></span>{{ log.status }}</span></td>
-          <td><span :title="absoluteTime(log.checked_at)">{{ showProject ? absoluteTime(log.checked_at) : relativeTime(log.checked_at) }}</span></td>
-          <td class="detail">{{ log.detail || '—' }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>`,
-  methods: { relativeTime, absoluteTime, statusClass }
-};
-
-// ── ProjectForm ────────────────────────────────────────────────────────────────
-const ProjectForm = {
-  props: ['initial','busy'],
-  emits: ['submit','cancel'],
-  template: `
-  <form class="modal" @submit.prevent="onSubmit">
-    <h2>{{ initial ? 'Edit Project' : 'New Project' }}</h2>
-    <div class="form-row"><label>Name *</label><input v-model="f.name" required placeholder="My Project" /></div>
-    <div class="form-row"><label>Website URL</label><input v-model="f.website_url" type="url" placeholder="https://example.com" /></div>
-    <div class="form-row"><label>GitHub URL <span class="muted">(optional)</span></label><input v-model="f.github_url" type="url" placeholder="https://github.com/org" /></div>
-    <div class="form-row"><label>Twitter URL</label><input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" /></div>
-    <div class="form-row"><label>Telegram URL <span class="muted">(optional)</span></label><input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" /></div>
-    <div class="modal-actions">
-      <button type="button" @click="$emit('cancel')">Cancel</button>
-      <button type="submit" class="primary" :disabled="busy">
-        <span v-if="busy" class="spinner"></span><span v-else>{{ initial ? 'Save' : 'Create' }}</span>
-      </button>
-    </div>
-  </form>`,
-  setup(props, { emit }) {
-    const f = ref({ name:'', website_url:'', github_url:'', twitter_url:'', telegram_url:'' });
-    watch(() => props.initial, v => {
-      if (v) f.value = { name:v.name||'', website_url:v.website_url||'', github_url:v.github_url||'', twitter_url:v.twitter_url||'', telegram_url:v.telegram_url||'' };
-      else f.value = { name:'', website_url:'', github_url:'', twitter_url:'', telegram_url:'' };
-    }, { immediate:true });
-    function onSubmit() {
-      const p = { ...f.value };
-      for (const k of Object.keys(p)) if (p[k]==='') p[k] = null;
-      if (!p.name) { alert('Name is required'); return; }
-      emit('submit', p);
-    }
-    return { f, onSubmit };
-  }
-};
-
-// ── ProjectCard ────────────────────────────────────────────────────────────────
-const ProjectCard = {
-  props: ['project'],
-  emits: ['refreshed'],
-  components: { RepoList },
-  template: `
-  <article class="project-card card">
-    <header class="head">
-      <h2 class="name">{{ project.name }}</h2>
-      <button v-if="project.website_url" class="icon-btn" :disabled="busy==='website'" @click="runCheck('website', ()=>api.checkWebsite(project.id))">
-        <span v-if="busy==='website'" class="spinner"></span><span v-else>↻ Website</span>
-      </button>
-    </header>
-    <section class="status-row">
-      <div class="status" v-if="project.website_url">
-        <span class="muted">Website</span>
-        <span :class="['badge', statusClass(website.status)]"><span class="dot"></span>{{ website.status||'pending' }}</span>
-        <span class="muted small">{{ relativeTime(website.checked_at) }}</span>
-      </div>
-      <div class="status">
-        <span class="muted">GitHub</span>
-        <span :class="['badge', statusClass(github.status)]"><span class="dot"></span>{{ github.status||'pending' }}</span>
-        <span class="muted small">{{ relativeTime(github.checked_at) }}</span>
-      </div>
-      <div class="status" v-if="project.twitter_url">
-        <span class="muted">Twitter</span>
-        <span :class="['badge', statusClass(twitter.status)]"><span class="dot"></span>{{ twitter.status||'pending' }}</span>
-        <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
-      </div>
-    </section>
-    <section class="repos-section">
-      <div class="repos-head"><h3>Repositories</h3>
-        <button v-if="project.github_url" class="icon-btn" :disabled="busy==='repos'" @click="runCheck('repos', ()=>api.refreshRepos(project.id))">
-          <span v-if="busy==='repos'" class="spinner"></span><span v-else>↻ Refresh</span>
-        </button>
-      </div>
-      <RepoList :repos="project.repos||[]" />
-    </section>
-    <section v-if="project.twitter_url" class="actions-row">
-      <button :disabled="busy==='twitter'" @click="runCheck('twitter', ()=>api.checkTwitter(project.id))">
-        <span v-if="busy==='twitter'" class="spinner"></span><span v-else>Check Twitter</span>
-      </button>
-      <button :disabled="busy==='github'" @click="runCheck('github', ()=>api.checkGithub(project.id))">
-        <span v-if="busy==='github'" class="spinner"></span><span v-else>Check GitHub</span>
-      </button>
-    </section>
-  </article>`,
-  setup(props, { emit }) {
-    const busy = ref(null);
-    const website = computed(() => props.project.website_status || {});
-    const github  = computed(() => props.project.github_status  || {});
-    const twitter = computed(() => props.project.twitter_status || {});
-    async function runCheck(kind, fn) {
-      busy.value = kind;
-      try { await fn(); emit('refreshed'); }
-      catch(e) { alert(`${kind} failed: ${e.message}`); }
-      finally { busy.value = null; }
-    }
-    return { busy, website, github, twitter, runCheck, relativeTime, statusClass };
-  }
-};
-
-// ── Activity ───────────────────────────────────────────────────────────────────
-const ActivityPage = {
-  components: { ProjectCard, CheckLogList },
-  template: `
-  <div class="page">
-    <div class="toolbar">
-      <h1>Activity</h1>
-      <button class="icon-btn" @click="showLogs=!showLogs">{{ showLogs?'Hide logs':'Show recent logs' }}</button>
-      <button class="primary" :disabled="checkingAll||loading" @click="checkAll">
-        <span v-if="checkingAll" class="spinner"></span><span v-else>Check All</span>
-      </button>
-    </div>
-    <div v-if="error" class="error-box">{{ error }}</div>
-    <div v-if="loading" class="center-loader"><span class="spinner lg"></span></div>
-    <div v-else-if="!projects.length" class="card empty">No projects yet. Add one in the <a href="#/projects">Projects</a> tab.</div>
-    <div v-else class="grid">
-      <ProjectCard v-for="p in projects" :key="p.id" :project="p" @refreshed="load" />
-    </div>
-    <section v-if="showLogs&&logs.length" class="logs-section">
-      <h2>Recent check logs</h2>
-      <div class="card"><CheckLogList :logs="logs" :show-project="true" /></div>
-    </section>
-  </div>`,
-  setup() {
-    const projects = ref([]), logs = ref([]), loading = ref(true), checkingAll = ref(false), error = ref(''), showLogs = ref(false);
-    async function load() {
-      loading.value = true; error.value = '';
-      try { projects.value = await api.getDashboard(); }
-      catch(e) { error.value = e.message; }
-      finally { loading.value = false; }
-    }
-    async function loadLogs() {
-      try { const r = await api.getCheckLogs({ limit:30 }); logs.value = r.items||r.logs||r||[]; }
-      catch(e) { console.error(e); }
-    }
-    async function checkAll() {
-      checkingAll.value = true;
-      try { await api.triggerAll(); await load(); }
-      catch(e) { error.value = e.message; }
-      finally { checkingAll.value = false; }
-    }
-    onMounted(() => { load(); loadLogs(); });
-    return { projects, logs, loading, checkingAll, error, showLogs, checkAll };
-  }
-};
-
-// ── Projects ───────────────────────────────────────────────────────────────────
-const ProjectsPage = {
-  components: { ProjectForm },
-  template: `
-  <div class="page">
-    <div class="toolbar">
-      <h1>Projects</h1>
-      <button @click="importOpen=true">Import JSON</button>
-      <button class="primary" @click="openCreate">+ Add Project</button>
-    </div>
-    <div v-if="error" class="error-box">{{ error }}</div>
-    <div v-if="loading" class="center-loader"><span class="spinner lg"></span></div>
-    <div v-else-if="!projects.length" class="card empty">No projects yet. Click <strong>+ Add Project</strong> to start.</div>
-    <div v-else class="card">
-      <table>
-        <thead><tr><th>Name</th><th>Website</th><th>GitHub</th><th>Twitter</th><th>Telegram</th><th style="width:110px"></th></tr></thead>
-        <tbody>
-          <tr v-for="p in projects" :key="p.id">
-            <td>{{ p.name }}</td>
-            <td>{{ urlLabel(p.website_url)||'—' }}</td>
-            <td>{{ urlLabel(p.github_url)||'—' }}</td>
-            <td>{{ urlLabel(p.twitter_url)||'—' }}</td>
-            <td>{{ urlLabel(p.telegram_url)||'—' }}</td>
-            <td class="actions">
-              <button class="icon-btn" title="Edit" @click="openEdit(p)">✎</button>
-              <button class="icon-btn danger" title="Delete" @click="onDelete(p)">🗑</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="showForm" class="modal-backdrop" @click.self="showForm=false">
-      <ProjectForm :initial="editing" :busy="submitting" @submit="onSubmit" @cancel="showForm=false" />
-    </div>
-
-    <div v-if="importOpen" class="modal-backdrop" @click.self="importOpen=false">
-      <div class="modal">
-        <h2>Import Projects from JSON</h2>
-        <p class="muted">Paste JSON (object or array). Each item needs <code>name</code>; other fields optional.</p>
-        <div class="form-row"><input type="file" accept="application/json,.json" @change="onFile" /></div>
-        <div class="form-row"><textarea v-model="importText" rows="10" placeholder='[{"name":"Example","website_url":"https://example.com","github_url":"https://github.com/example"}]'></textarea></div>
-        <div class="modal-actions">
-          <button @click="importOpen=false">Cancel</button>
-          <button class="primary" :disabled="importing||!importText.trim()" @click="onImport">
-            <span v-if="importing" class="spinner"></span><span v-else>Import</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>`,
-  setup() {
-    const projects = ref([]), loading = ref(true), error = ref(''), showForm = ref(false), editing = ref(null), submitting = ref(false), importOpen = ref(false), importText = ref(''), importing = ref(false);
-    async function load() {
-      loading.value = true; error.value = '';
-      try { projects.value = await api.listProjects(); }
-      catch(e) { error.value = e.message; }
-      finally { loading.value = false; }
-    }
-    function openCreate() { editing.value = null; showForm.value = true; }
-    function openEdit(p) { editing.value = p; showForm.value = true; }
-    async function onSubmit(payload) {
-      submitting.value = true; error.value = '';
-      try {
-        if (editing.value) await api.updateProject(editing.value.id, payload);
-        else await api.createProject(payload);
-        showForm.value = false; editing.value = null; await load();
-      } catch(e) { error.value = e.message; }
-      finally { submitting.value = false; }
-    }
-    async function onDelete(p) {
-      if (!confirm('Delete "'+p.name+'"? This removes its repos and check logs.')) return;
-      try { await api.deleteProject(p.id); await load(); }
-      catch(e) { error.value = e.message; }
-    }
-    async function onImport() {
-      let parsed;
-      try { parsed = JSON.parse(importText.value); }
-      catch(e) { error.value = 'Invalid JSON: '+e.message; return; }
-      const list = Array.isArray(parsed) ? parsed : [parsed];
-      importing.value = true; error.value = '';
-      let ok = 0, failed = 0;
-      for (const item of list) {
-        try {
-          await api.createProject({ name: item.site_name, website_url: item.url, github_url: item.github, twitter_url: item.twitter, telegram_url: item.telegram });
-          ok++;
-        } catch(e) { failed++; }
+    /**
+     * Make an HTTP request to the Express API.
+     * @param {string} path  - e.g. '/projects' or '/projects/5'
+     * @param {object} opts  - fetch options: { method, headers, body, ... }
+     */
+    async function req(path, opts = {}) {
+      const r = await fetch(BASE + path, {
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts,
+      });
+      if (!r.ok) {
+        // Try to extract { error: "..." } from the JSON body
+        let d = '';
+        try { d = (await r.json()).error || r.statusText; } catch { d = r.statusText; }
+        throw new Error(d);
       }
-      importing.value = false; importOpen.value = false; importText.value = '';
-      if (failed) error.value = 'Imported '+ok+', '+failed+' failed.';
-      await load();
+      return r.json();
     }
-    function onFile(e) {
-      const file = e.target.files&&e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => { importText.value = String(reader.result||''); };
-      reader.readAsText(file);
-    }
-    onMounted(load);
-    return { projects, loading, error, showForm, editing, submitting, importOpen, importText, importing, openCreate, openEdit, onSubmit, onDelete, onImport, onFile, urlLabel };
-  }
-};
 
-// ── Settings ────────────────────────────────────────────────────────────────────
-const SettingsPage = {
-  template: `
-  <div class="page">
-    <div class="toolbar"><h1>Settings</h1></div>
-    <div v-if="error" class="error-box">{{ error }}</div>
-    <div v-if="loading" class="center-loader"><span class="spinner lg"></span></div>
-    <div v-else class="settings-grid">
-      <section class="card">
-        <h2>Check Intervals</h2>
-        <p class="muted">How often each check runs automatically.</p>
-        <div class="form-row"><label>Commit / GitHub (hours)</label>
-          <input v-model.number="form.commit_interval_hours" type="number" min="1" max="8760" /></div>
-        <div class="form-row"><label>Website (hours)</label>
-          <input v-model.number="form.website_interval_hours" type="number" min="1" max="8760" /></div>
-        <div class="form-row"><label>Twitter (hours)</label>
-          <input v-model.number="form.twitter_interval_hours" type="number" min="1" max="8760" /></div>
-        <div class="actions">
-          <span v-if="savedMsg" class="muted saved">{{ savedMsg }}</span>
-          <button class="primary" :disabled="saving" @click="onSave">
-            <span v-if="saving" class="spinner"></span><span v-else>Save</span>
-          </button>
-        </div>
-      </section>
-      <section class="card">
-        <h2>Manual Triggers</h2>
-        <p class="muted">Run all checks of a given type across every project.</p>
-        <div class="trigger-row">
-          <div class="trigger-meta"><h3>Websites</h3><span class="muted">last: {{ relativeTime(lastWebsite) }}</span></div>
-          <button :disabled="triggering==='web'" @click="onTrigger('web', api.triggerAll)">
-            <span v-if="triggering==='web'" class="spinner"></span><span v-else>Run All</span>
-          </button>
-        </div>
-        <div class="trigger-row">
-          <div class="trigger-meta"><h3>GitHub Repos</h3><span class="muted">last: {{ relativeTime(lastCommit) }}</span></div>
-          <button :disabled="triggering==='gh'" @click="onTrigger('gh', api.triggerAll)">
-            <span v-if="triggering==='gh'" class="spinner"></span><span v-else>Run All</span>
-          </button>
-        </div>
-        <div class="trigger-row">
-          <div class="trigger-meta"><h3>Twitter</h3><span class="muted">last: {{ relativeTime(lastTwitter) }}</span></div>
-          <button :disabled="triggering==='tw'" @click="onTrigger('tw', api.triggerAll)">
-            <span v-if="triggering==='tw'" class="spinner"></span><span v-else>Run All</span>
-          </button>
-        </div>
-        <p class="muted small">Falls back to <code>POST /api/settings/trigger-all</code>.</p>
-      </section>
+    /** All API methods — one per backend endpoint */
+    const api = {
+      getDashboard:   ()       => req('/dashboard'),
+      listProjects:   ()       => req('/projects'),
+      getProject:     (id)     => req(`/projects/${id}`),
+      createProject:  (d)      => req('/projects',            { method: 'POST',   body: JSON.stringify(d) }),
+      updateProject:  (id, d)  => req(`/projects/${id}`,     { method: 'PUT',    body: JSON.stringify(d) }),
+      deleteProject:  (id)     => req(`/projects/${id}`,     { method: 'DELETE' }),
+      refreshRepos:   (id)     => req(`/projects/${id}/refresh-repos`, { method: 'POST' }),
+      checkWebsite:   (id)     => req(`/projects/${id}/check-website`,  { method: 'POST' }),
+      checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
+      checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
+      getCheckLogs:   (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
+      getSettings:    ()       => req('/settings'),
+      updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
+      triggerAll:     ()       => req('/settings/trigger-all', { method: 'POST' }),
+      clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
+    };
 
-      <section class="card danger-zone">
-        <h2>Danger Zone</h2>
-        <p class="muted">Delete all projects, repos, and check logs. Config table will be kept.</p>
-        <button class="danger" :disabled="clearing" @click="onClear">
-          <span v-if="clearing" class="spinner"></span><span v-else>Clear All Data</span>
-        </button>
-      </section>
-    </div>
-  </div>`,
-  setup() {
-    const settings = ref(null), form = ref({ commit_interval_hours:24, website_interval_hours:24, twitter_interval_hours:24 }),
-          loading = ref(true), saving = ref(false), triggering = ref(null), clearing = ref(false), error = ref(''), savedMsg = ref('');
-    function pickHours(s, kind) {
-      if (!s) return 24;
-      const d = s[kind+'_check_hours'];
-      if (d != null) return d;
-      const row = s.configs&&s.configs.find&&s.configs.find(c=>c.resource_type===kind||c.type===kind);
-      return row&&(row.interval_hours||row.hours)||24;
+    // Expose globally so the template can call api.* after we return api: window.api
+    window.api = api;
+
+    /* ── Shared helpers ─────────────────────────────────────────────────────────
+       Used directly in templates via Vue's template expression evaluation.
+    ───────────────────────────────────────────────────────────────────────── */
+
+    /** Format a timestamp as a human-readable relative string: "3 hours ago" */
+    const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    const UNITS = [
+      ['year',   31536e3],
+      ['month',  2592e3],
+      ['week',   604800],
+      ['day',    86400],
+      ['hour',   3600],
+      ['minute', 60],
+      ['second', 1],
+    ];
+
+    function relativeTime(v) {
+      if (!v) return 'never';
+      const d = new Date(v);
+      if (isNaN(d)) return 'never';
+      const diff = (d.getTime() - Date.now()) / 1000;
+      for (const [u, s] of UNITS)
+        if (Math.abs(diff) >= s || u === 'second') return RTF.format(Math.round(diff / s), u);
+      return 'just now';
     }
-    async function load() {
-      loading.value = true; error.value = '';
-      try {
-        settings.value = await api.getSettings();
-        form.value = {
-          commit_interval_hours: pickHours(settings.value,'commit'),
-          website_interval_hours: pickHours(settings.value,'website'),
-          twitter_interval_hours: pickHours(settings.value,'twitter'),
-        };
-      } catch(e) { error.value = e.message; }
-      finally { loading.value = false; }
+
+    /** Format a timestamp as an absolute date+time string: "Jun 30, 2026, 5:00 PM" */
+    function absoluteTime(v) {
+      if (!v) return '—';
+      const d = new Date(v);
+      if (isNaN(d)) return '—';
+      return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
     }
-    async function onSave() {
-      saving.value = true; error.value = ''; savedMsg.value = '';
-      try {
-        await api.updateSettings({
-          commit_interval_hours: Number(form.value.commit_interval_hours),
-          website_interval_hours: Number(form.value.website_interval_hours),
-          twitter_interval_hours: Number(form.value.twitter_interval_hours),
+
+    /** Extract the hostname from a URL, stripping leading "www." */
+    function urlLabel(u) {
+      if (!u) return null;
+      try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; }
+    }
+
+    /** Map a raw status string → CSS class name for the badge */
+    function statusClass(s) {
+      if (s === 'ok' || s === 'success') return 'ok';
+      if (s === 'error' || s === 'failed') return 'error';
+      return 'pending';
+    }
+
+    /* ── NavBar component ──────────────────────────────────────────────────────
+       Sticky top bar with a brand mark and navigation tabs.
+       currentRoute is a ref that updates whenever the hash changes,
+       causing Vue to re-evaluate the :class binding on each tab.
+    ───────────────────────────────────────────────────────────────────────── */
+    const NavBar = {
+      template: `
+        <header class="navbar">
+          <div class="navbar-inner">
+            <!-- Brand -->
+            <div class="brand">
+              <span class="logo-dot"></span>
+              Project Checker
+            </div>
+
+            <!-- Hash-based navigation tabs -->
+            <nav>
+              <a
+                v-for="t in tabs"
+                :key="t.to"
+                :href="'#' + t.to"
+                class="tab"
+                :class="{ active: currentRoute === t.to }"
+              >{{ t.label }}</a>
+            </nav>
+          </div>
+        </header>
+      `,
+
+      setup() {
+        // Read initial hash route, e.g. '' → '/', '/projects' → '/projects'
+        const currentRoute = ref(window.location.hash.slice(1) || '/');
+
+        // Re-read hash whenever the URL fragment changes (SPA navigation)
+        window.addEventListener('hashchange', () => {
+          currentRoute.value = window.location.hash.slice(1) || '/';
         });
-        savedMsg.value = 'Saved.'; await load();
-        setTimeout(()=>savedMsg.value='', 2200);
-      } catch(e) { error.value = e.message; }
-      finally { saving.value = false; }
-    }
-    async function onTrigger(kind, fn) {
-      triggering.value = kind;
-      try { await fn(); }
-      catch(e) { error.value = e.message; }
-      finally { triggering.value = null; }
-    }
-    async function onClear() {
-      if (!confirm('Delete all projects, repos and check logs? Config will be kept.')) return;
-      clearing.value = true;
-      try { await api.clearData(); window.location.reload(); }
-      catch(e) { error.value = e.message; clearing.value = false; }
-    }
-    const lastCommit  = computed(() => { const r=settings.value&&settings.value.configs&&settings.value.configs.find&&settings.value.configs.find(c=>c.resource_type==='commit'||c.type==='commit'); return r&&(r.last_checked_at||r.last_run_at)||null; });
-    const lastWebsite = computed(() => { const r=settings.value&&settings.value.configs&&settings.value.configs.find&&settings.value.configs.find(c=>c.resource_type==='website'); return r&&r.last_checked_at||null; });
-    const lastTwitter = computed(() => { const r=settings.value&&settings.value.configs&&settings.value.configs.find&&settings.value.configs.find(c=>c.resource_type==='twitter'); return r&&r.last_checked_at||null; });
-    onMounted(load);
-    return { settings, form, loading, saving, triggering, clearing, error, savedMsg, onSave, onTrigger, onClear, lastCommit, lastWebsite, lastTwitter, relativeTime };
-  }
-};
 
-// ── Router ─────────────────────────────────────────────────────────────────────
-function hashRouter() {
-  const routes = { '/': ActivityPage, '/projects': ProjectsPage, '/settings': SettingsPage };
-  return {
-    render() {
-      const view = routes[window.location.hash.slice(1)||'/'] || routes['/'];
-      return view;
+        return {
+          tabs: [
+            { to: '/',         label: 'Activity'  },
+            { to: '/projects', label: 'Projects'  },
+            { to: '/settings', label: 'Settings'  },
+          ],
+          currentRoute,
+        };
+      },
+    };
+
+    /* ── RepoList component ────────────────────────────────────────────────────
+       Renders a list of GitHub repositories attached to a project.
+       Props: repos (array from project.repos)
+    ───────────────────────────────────────────────────────────────────────── */
+    const RepoList = {
+      props: ['repos'],
+
+      template: `
+        <div>
+          <div v-if="!repos.length" class="muted">No repositories linked.</div>
+
+          <ul v-else class="repo-list">
+            <li v-for="r in repos" :key="r.id || r.full_name" class="repo">
+              <!-- Repo name / link -->
+              <div class="repo-name">
+                <a v-if="r.repo_url" :href="r.repo_url" target="_blank" rel="noopener">
+                  {{ r.full_name }}
+                </a>
+                <span v-else>{{ r.full_name }}</span>
+              </div>
+
+              <!-- Latest commit info row -->
+              <div class="repo-meta">
+                <template v-if="r.latest_commit_sha">
+                  <!-- Short SHA link to commit on GitHub -->
+                  <a
+                    v-if="r.repo_url"
+                    :href="r.repo_url + '/commit/' + r.latest_commit_sha"
+                    target="_blank" rel="noopener" class="sha"
+                  >{{ r.latest_commit_sha.slice(0, 7) }}</a>
+                  <span v-else class="sha">{{ r.latest_commit_sha.slice(0, 7) }}</span>
+
+                  <span v-if="r.latest_commit_message" class="msg">
+                    {{ r.latest_commit_message }}
+                  </span>
+
+                  <span v-if="r.latest_commit_date" class="muted">
+                    · {{ relativeTime(r.latest_commit_date) }}
+                  </span>
+                </template>
+                <span v-else class="muted">no commits yet</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      `,
+
+      // Expose helpers to the template
+      methods: { relativeTime },
+    };
+
+    /* ── CheckLogList component ───────────────────────────────────────────────
+       Renders a table of recent check log entries.
+       Props: logs (array), showProject (bool — show project name column)
+    ───────────────────────────────────────────────────────────────────────── */
+    const CheckLogList = {
+      props: ['logs', 'showProject'],
+
+      template: `
+        <div>
+          <div v-if="!logs.length" class="muted">No check logs yet.</div>
+
+          <table v-else>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th v-if="showProject">Project</th>
+                <th>Status</th>
+                <th>When</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in logs" :key="log.id">
+                <td>{{ log.resource_type }}</td>
+                <td v-if="showProject">{{ log.project_name || log.project_id }}</td>
+                <td>
+                  <span :class="['badge', statusClass(log.status)]">
+                    <span class="dot"></span>{{ log.status }}
+                  </span>
+                </td>
+                <td>
+                  <!-- absolute time on hover, relative in cell -->
+                  <span :title="absoluteTime(log.checked_at)">
+                    {{ showProject ? absoluteTime(log.checked_at) : relativeTime(log.checked_at) }}
+                  </span>
+                </td>
+                <td class="detail">{{ log.detail || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `,
+
+      methods: { relativeTime, absoluteTime, statusClass },
+    };
+
+    /* ── ProjectForm component ─────────────────────────────────────────────────
+       Modal form for creating or editing a project.
+       Props:   initial (project object — null for create)
+                busy    (bool — disable submit while saving)
+       Emits:   submit  (validated project data)
+                cancel  (user clicked Cancel)
+    ───────────────────────────────────────────────────────────────────────── */
+    const ProjectForm = {
+      props: ['initial', 'busy'],
+      emits: ['submit', 'cancel'],
+
+      template: `
+        <form class="modal" @submit.prevent="onSubmit">
+          <h2>{{ initial ? 'Edit Project' : 'New Project' }}</h2>
+
+          <div class="form-row">
+            <label>Name *</label>
+            <input v-model="f.name" required placeholder="My Project" />
+          </div>
+
+          <div class="form-row">
+            <label>Website URL</label>
+            <input v-model="f.website_url" type="url" placeholder="https://example.com" />
+          </div>
+
+          <div class="form-row">
+            <label>GitHub URL <span class="muted">(optional)</span></label>
+            <input v-model="f.github_url" type="url" placeholder="https://github.com/org" />
+          </div>
+
+          <div class="form-row">
+            <label>Twitter URL</label>
+            <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
+          </div>
+
+          <div class="form-row">
+            <label>Telegram URL <span class="muted">(optional)</span></label>
+            <input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" @click="$emit('cancel')">Cancel</button>
+            <button type="submit" class="primary" :disabled="busy">
+              <span v-if="busy" class="spinner"></span>
+              <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
+            </button>
+          </div>
+        </form>
+      `,
+
+      setup(props, { emit }) {
+        // Local form state — starts empty or pre-filled with initial values
+        const f = ref({
+          name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
+        });
+
+        // Sync form fields whenever the `initial` prop changes
+        // (happens when switching from "create" to "edit" mode)
+        watch(
+          () => props.initial,
+          (v) => {
+            if (v) {
+              f.value = {
+                name:         v.name         || '',
+                website_url:   v.website_url   || '',
+                github_url:   v.github_url    || '',
+                twitter_url:  v.twitter_url   || '',
+                telegram_url: v.telegram_url  || '',
+              };
+            } else {
+              f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '' };
+            }
+          },
+          { immediate: true }
+        );
+
+        function onSubmit() {
+          // Convert empty strings → null so the DB gets real NULLs
+          const p = { ...f.value };
+          for (const k of Object.keys(p)) {
+            if (p[k] === '') p[k] = null;
+          }
+          if (!p.name) { alert('Name is required'); return; }
+          emit('submit', p);
+        }
+
+        return { f, onSubmit };
+      },
+    };
+
+    /* ── ProjectCard component ─────────────────────────────────────────────────
+       A single project summary shown on the Activity page.
+       Displays current status for website / GitHub / Twitter and a repo list.
+       Emits 'refreshed' after any manual check completes so the parent can reload.
+    ───────────────────────────────────────────────────────────────────────── */
+    const ProjectCard = {
+      props: ['project'],
+      emits: ['refreshed'],
+      components: { RepoList },
+
+      template: `
+        <article class="project-card card">
+
+          <!-- Card header: project name + website refresh button -->
+          <header class="head">
+            <h2 class="name">{{ project.name }}</h2>
+            <button
+              v-if="project.website_url"
+              class="icon-btn"
+              :disabled="busy === 'website'"
+              @click="runCheck('website', () => api.checkWebsite(project.id))"
+            >
+              <span v-if="busy === 'website'" class="spinner"></span>
+              <span v-else>↻ Website</span>
+            </button>
+          </header>
+
+          <!-- Status badges row: website, GitHub, Twitter -->
+          <section class="status-row">
+            <div class="status" v-if="project.website_url">
+              <span class="muted">Website</span>
+              <span :class="['badge', statusClass(website.status)]">
+                <span class="dot"></span>{{ website.status || 'pending' }}
+              </span>
+              <span class="muted small">{{ relativeTime(website.checked_at) }}</span>
+            </div>
+
+            <div class="status">
+              <span class="muted">GitHub</span>
+              <span :class="['badge', statusClass(github.status)]">
+                <span class="dot"></span>{{ github.status || 'pending' }}
+              </span>
+              <span class="muted small">{{ relativeTime(github.checked_at) }}</span>
+            </div>
+
+            <div class="status" v-if="project.twitter_url">
+              <span class="muted">Twitter</span>
+              <span :class="['badge', statusClass(twitter.status)]">
+                <span class="dot"></span>{{ twitter.status || 'pending' }}
+              </span>
+              <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
+            </div>
+          </section>
+
+          <!-- GitHub repos section with refresh button -->
+          <section class="repos-section">
+            <div class="repos-head">
+              <h3>Repositories</h3>
+              <button
+                v-if="project.github_url"
+                class="icon-btn"
+                :disabled="busy === 'repos'"
+                @click="runCheck('repos', () => api.refreshRepos(project.id))"
+              >
+                <span v-if="busy === 'repos'" class="spinner"></span>
+                <span v-else>↻ Refresh</span>
+              </button>
+            </div>
+            <RepoList :repos="project.repos || []" />
+          </section>
+
+          <!-- Twitter / GitHub manual check buttons -->
+          <section v-if="project.twitter_url" class="actions-row">
+            <button :disabled="busy === 'twitter'" @click="runCheck('twitter', () => api.checkTwitter(project.id))">
+              <span v-if="busy === 'twitter'" class="spinner"></span>
+              <span v-else>Check Twitter</span>
+            </button>
+            <button :disabled="busy === 'github'" @click="runCheck('github', () => api.checkGithub(project.id))">
+              <span v-if="busy === 'github'" class="spinner"></span>
+              <span v-else>Check GitHub</span>
+            </button>
+          </section>
+
+        </article>
+      `,
+
+      setup(props, { emit }) {
+        // busy tracks which check is currently running (used to show spinner + disable button)
+        const busy = ref(null);
+
+        // project.*_status objects come from the dashboard API (latest check result per resource)
+        const website = computed(() => props.project.website_status || {});
+        const github  = computed(() => props.project.github_status  || {});
+        const twitter = computed(() => props.project.twitter_status || {});
+
+        /**
+         * Run a named check and emit 'refreshed' on success so the parent reloads data.
+         * @param {string}   kind  - human-readable name for error messages
+         * @param {Function} fn    - async function that calls one api.* method
+         */
+        async function runCheck(kind, fn) {
+          busy.value = kind;
+          try {
+            await fn();
+            emit('refreshed');
+          } catch (e) {
+            alert(`${kind} failed: ${e.message}`);
+          } finally {
+            busy.value = null;
+          }
+        }
+
+        return {
+          busy, website, github, twitter,
+          runCheck,
+          relativeTime,
+          statusClass,
+          // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
+          api: window.api,
+        };
+      },
+    };
+
+    /* ── Activity page ─────────────────────────────────────────────────────────
+       Shows all projects (via dashboard API) and an optional recent log table.
+       The dashboard endpoint returns projects with their latest status baked in.
+    ───────────────────────────────────────────────────────────────────────── */
+    const ActivityPage = {
+      components: { ProjectCard, CheckLogList },
+
+      template: `
+        <div class="page">
+
+          <div class="toolbar">
+            <h1>Activity</h1>
+            <button class="icon-btn" @click="showLogs = !showLogs">
+              {{ showLogs ? 'Hide logs' : 'Show recent logs' }}
+            </button>
+            <button class="primary" :disabled="checkingAll || loading" @click="checkAll">
+              <span v-if="checkingAll" class="spinner"></span>
+              <span v-else>Check All</span>
+            </button>
+          </div>
+
+          <div v-if="error" class="error-box">{{ error }}</div>
+
+          <div v-if="loading" class="center-loader">
+            <span class="spinner lg"></span>
+          </div>
+
+          <div v-else-if="!projects.length" class="card empty">
+            No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
+          </div>
+
+          <div v-else class="grid">
+            <ProjectCard
+              v-for="p in projects"
+              :key="p.id"
+              :project="p"
+              @refreshed="load"
+            />
+          </div>
+
+          <!-- Optional recent check logs table -->
+          <section v-if="showLogs && logs.length" class="logs-section">
+            <h2>Recent check logs</h2>
+            <div class="card">
+              <CheckLogList :logs="logs" :show-project="true" />
+            </div>
+          </section>
+
+        </div>
+      `,
+
+      setup() {
+        const projects   = ref([]);
+        const logs      = ref([]);
+        const loading   = ref(true);
+        const checkingAll = ref(false);
+        const error     = ref('');
+        const showLogs  = ref(false);
+
+        /** Load dashboard (projects + status) */
+        async function load() {
+          loading.value = true;
+          error.value   = '';
+          try {
+            projects.value = await api.getDashboard();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        /** Load 30 most recent log entries */
+        async function loadLogs() {
+          try {
+            const r = await api.getCheckLogs({ limit: 30 });
+            // API may return items[], logs[], or the array directly
+            logs.value = r.items || r.logs || r || [];
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        /** Trigger all checks across all projects */
+        async function checkAll() {
+          checkingAll.value = true;
+          try {
+            await api.triggerAll();
+            await load();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            checkingAll.value = false;
+          }
+        }
+
+        onMounted(() => { load(); loadLogs(); });
+
+        return { projects, logs, loading, checkingAll, error, showLogs, checkAll, api: window.api };
+      },
+    };
+
+    /* ── Projects page ─────────────────────────────────────────────────────────
+       Table list of all projects with Create / Edit / Delete / JSON Import.
+    ───────────────────────────────────────────────────────────────────────── */
+    const ProjectsPage = {
+      components: { ProjectForm },
+
+      template: `
+        <div class="page">
+
+          <div class="toolbar">
+            <h1>Projects</h1>
+            <button @click="importOpen = true">Import JSON</button>
+            <button class="primary" @click="openCreate">+ Add Project</button>
+          </div>
+
+          <div v-if="error" class="error-box">{{ error }}</div>
+
+          <div v-if="loading" class="center-loader">
+            <span class="spinner lg"></span>
+          </div>
+
+          <div v-else-if="!projects.length" class="card empty">
+            No projects yet. Click <strong>+ Add Project</strong> to start.
+          </div>
+
+          <div v-else class="card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Website</th>
+                  <th>GitHub</th>
+                  <th>Twitter</th>
+                  <th>Telegram</th>
+                  <th style="width:110px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in projects" :key="p.id">
+                  <td>{{ p.name }}</td>
+                  <td>{{ urlLabel(p.website_url) || '—' }}</td>
+                  <td>{{ urlLabel(p.github_url)  || '—' }}</td>
+                  <td>{{ urlLabel(p.twitter_url) || '—' }}</td>
+                  <td>{{ urlLabel(p.telegram_url)|| '—' }}</td>
+                  <td class="actions">
+                    <button class="icon-btn" title="Edit"   @click="openEdit(p)">✎</button>
+                    <button class="icon-btn danger" title="Delete" @click="onDelete(p)">🗑</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Create / Edit modal -->
+          <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
+            <ProjectForm
+              :initial="editing"
+              :busy="submitting"
+              @submit="onSubmit"
+              @cancel="showForm = false"
+            />
+          </div>
+
+          <!-- JSON import modal -->
+          <div v-if="importOpen" class="modal-backdrop" @click.self="importOpen = false">
+            <div class="modal">
+              <h2>Import Projects from JSON</h2>
+              <p class="muted">
+                Paste JSON (object or array). Each item needs <code>name</code>;
+                other fields optional.
+              </p>
+
+              <!-- File picker -->
+              <div class="form-row">
+                <input type="file" accept="application/json,.json" @change="onFile" />
+              </div>
+
+              <!-- Raw textarea -->
+              <div class="form-row">
+                <textarea
+                  v-model="importText"
+                  rows="10"
+                  placeholder='[{"name":"Example","website_url":"https://example.com","github_url":"https://github.com/example"}]'
+                ></textarea>
+              </div>
+
+              <div class="modal-actions">
+                <button @click="importOpen = false">Cancel</button>
+                <button
+                  class="primary"
+                  :disabled="importing || !importText.trim()"
+                  @click="onImport"
+                >
+                  <span v-if="importing" class="spinner"></span>
+                  <span v-else>Import</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      `,
+
+      setup() {
+        const projects   = ref([]);
+        const loading   = ref(true);
+        const error     = ref('');
+        const showForm  = ref(false);  // create/edit modal visibility
+        const editing   = ref(null);    // project being edited (null = create)
+        const submitting = ref(false);
+        const importOpen  = ref(false); // JSON import modal visibility
+        const importText  = ref('');    // raw JSON string in the import textarea
+        const importing   = ref(false);
+
+        /** Fetch all projects from the API */
+        async function load() {
+          loading.value = true;
+          error.value   = '';
+          try {
+            projects.value = await api.listProjects();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        function openCreate() { editing.value = null; showForm.value = true; }
+        function openEdit(p)   { editing.value = p;    showForm.value = true; }
+
+        /** Create or update a project, then reload the list */
+        async function onSubmit(payload) {
+          submitting.value = true;
+          error.value      = '';
+          try {
+            if (editing.value) {
+              await api.updateProject(editing.value.id, payload);
+            } else {
+              await api.createProject(payload);
+            }
+            showForm.value  = false;
+            editing.value    = null;
+            await load();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            submitting.value = false;
+          }
+        }
+
+        /** Delete a project after user confirmation */
+        async function onDelete(p) {
+          const msg = `Delete "${p.name}"? This removes its repos and check logs.`;
+          if (!confirm(msg)) return;
+          try {
+            await api.deleteProject(p.id);
+            await load();
+          } catch (e) {
+            error.value = e.message;
+          }
+        }
+
+        /**
+         * Import one or more projects from the JSON textarea.
+         * Accepts a single object or an array of objects.
+         * Field mapping (API → import format):
+         *   site_name → name,  url → website_url,
+         *   github → github_url,  twitter → twitter_url,  telegram → telegram_url
+         */
+        async function onImport() {
+          let parsed;
+          try {
+            parsed = JSON.parse(importText.value);
+          } catch (e) {
+            error.value = 'Invalid JSON: ' + e.message;
+            return;
+          }
+          const list = Array.isArray(parsed) ? parsed : [parsed];
+
+          importing.value = true;
+          error.value     = '';
+          let ok = 0, failed = 0;
+
+          for (const item of list) {
+            try {
+              await api.createProject({
+                name:         item.site_name,
+                website_url:   item.url,
+                github_url:    item.github,
+                twitter_url:   item.twitter,
+                telegram_url:  item.telegram,
+              });
+              ok++;
+            } catch (e) {
+              failed++;
+            }
+          }
+
+          importing.value   = false;
+          importOpen.value   = false;
+          importText.value    = '';
+          if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
+          await load();
+        }
+
+        /** Read a File into the textarea via FileReader */
+        function onFile(e) {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => { importText.value = String(reader.result || ''); };
+          reader.readAsText(file);
+        }
+
+        onMounted(load);
+
+        return {
+          projects, loading, error, showForm, editing, submitting,
+          importOpen, importText, importing,
+          openCreate, openEdit, onSubmit, onDelete, onImport, onFile,
+          urlLabel,
+          api: window.api,
+        };
+      },
+    };
+
+    /* ── Settings page ─────────────────────────────────────────────────────────
+       Check interval configuration and manual trigger buttons.
+       - Loads current config from GET /api/settings
+       - Saves updates via PUT /api/settings
+       - Trigger buttons call POST /api/settings/trigger-all
+       - Clear Data empties projects/repos/logs tables but keeps config
+    ───────────────────────────────────────────────────────────────────────── */
+    const SettingsPage = {
+      template: `
+        <div class="page">
+          <div class="toolbar"><h1>Settings</h1></div>
+
+          <div v-if="error" class="error-box">{{ error }}</div>
+
+          <div v-if="loading" class="center-loader">
+            <span class="spinner lg"></span>
+          </div>
+
+          <div v-else class="settings-grid">
+
+            <!-- Check interval configuration -->
+            <section class="card">
+              <h2>Check Intervals</h2>
+              <p class="muted">How often each check runs automatically (in hours).</p>
+
+              <div class="form-row">
+                <label>Commit / GitHub (hours)</label>
+                <input v-model.number="form.commit_interval_hours" type="number" min="1" max="8760" />
+              </div>
+
+              <div class="form-row">
+                <label>Website (hours)</label>
+                <input v-model.number="form.website_interval_hours" type="number" min="1" max="8760" />
+              </div>
+
+              <div class="form-row">
+                <label>Twitter (hours)</label>
+                <input v-model.number="form.twitter_interval_hours" type="number" min="1" max="8760" />
+              </div>
+
+              <div class="actions">
+                <span v-if="savedMsg" class="muted saved">{{ savedMsg }}</span>
+                <button class="primary" :disabled="saving" @click="onSave">
+                  <span v-if="saving" class="spinner"></span>
+                  <span v-else>Save</span>
+                </button>
+              </div>
+            </section>
+
+            <!-- Manual triggers -->
+            <section class="card">
+              <h2>Manual Triggers</h2>
+              <p class="muted">Run all checks of a given type across every project.</p>
+
+              <div class="trigger-row">
+                <div class="trigger-meta">
+                  <h3>Websites</h3>
+                  <span class="muted">last: {{ relativeTime(lastWebsite) }}</span>
+                </div>
+                <button :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerAll)">
+                  <span v-if="triggering === 'web'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+              <div class="trigger-row">
+                <div class="trigger-meta">
+                  <h3>GitHub Repos</h3>
+                  <span class="muted">last: {{ relativeTime(lastCommit) }}</span>
+                </div>
+                <button :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerAll)">
+                  <span v-if="triggering === 'gh'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+              <div class="trigger-row">
+                <div class="trigger-meta">
+                  <h3>Twitter</h3>
+                  <span class="muted">last: {{ relativeTime(lastTwitter) }}</span>
+                </div>
+                <button :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerAll)">
+                  <span v-if="triggering === 'tw'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+              <p class="muted small">
+                All three buttons call <code>POST /api/settings/trigger-all</code>
+                which runs all check types in sequence.
+              </p>
+            </section>
+
+            <!-- Danger zone: wipe all data (keeps config) -->
+            <section class="card danger-zone">
+              <h2>Danger Zone</h2>
+              <p class="muted">
+                Delete all projects, repos, and check logs.
+                The config table (check intervals) will be kept.
+              </p>
+              <button class="danger" :disabled="clearing" @click="onClear">
+                <span v-if="clearing" class="spinner"></span>
+                <span v-else>Clear All Data</span>
+              </button>
+            </section>
+
+          </div>
+        </div>
+      `,
+
+      setup() {
+        const settings    = ref(null);
+        const form        = ref({
+          commit_interval_hours:  24,
+          website_interval_hours: 24,
+          twitter_interval_hours: 24,
+        });
+        const loading   = ref(true);
+        const saving    = ref(false);
+        const triggering = ref(null);  // which trigger is running: 'web' | 'gh' | 'tw'
+        const clearing  = ref(false);
+        const error      = ref('');
+        const savedMsg   = ref('');   // brief "Saved." confirmation
+
+        /**
+         * Extract the interval (in hours) for a given check type from the settings object.
+         * Tries several possible response shapes for backwards compatibility.
+         */
+        function pickHours(s, kind) {
+          if (!s) return 24;
+          // Flat shape: { commit_check_hours: 6, website_check_hours: 24, ... }
+          const d = s[kind + '_check_hours'];
+          if (d != null) return d;
+          // Array shape: { configs: [{ resource_type: 'commit', interval_hours: 6 }, ...] }
+          const row = s.configs && s.configs.find &&
+            s.configs.find(c => c.resource_type === kind || c.type === kind);
+          return row && (row.interval_hours || row.hours) || 24;
+        }
+
+        /** Load settings from GET /api/settings */
+        async function load() {
+          loading.value = true;
+          error.value   = '';
+          try {
+            settings.value = await api.getSettings();
+            form.value = {
+              commit_interval_hours:  pickHours(settings.value, 'commit'),
+              website_interval_hours: pickHours(settings.value, 'website'),
+              twitter_interval_hours: pickHours(settings.value, 'twitter'),
+            };
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        /** Save updated intervals via PUT /api/settings */
+        async function onSave() {
+          saving.value    = true;
+          error.value      = '';
+          savedMsg.value   = '';
+          try {
+            await api.updateSettings({
+              commit_check_hours:  Number(form.value.commit_interval_hours),
+              website_check_hours: Number(form.value.website_interval_hours),
+              twitter_check_hours: Number(form.value.twitter_interval_hours),
+            });
+            savedMsg.value = 'Saved.';
+            await load();
+            // Clear the confirmation after 2.2 seconds
+            setTimeout(() => { savedMsg.value = ''; }, 2200);
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            saving.value = false;
+          }
+        }
+
+        /** Run trigger-all for a specific kind (web / gh / tw) */
+        async function onTrigger(kind, fn) {
+          triggering.value = kind;
+          try {
+            await fn();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            triggering.value = null;
+          }
+        }
+
+        /** Delete all projects/repos/logs but keep the config row */
+        async function onClear() {
+          const msg = 'Delete all projects, repos and check logs? Config will be kept.';
+          if (!confirm(msg)) return;
+          clearing.value = true;
+          try {
+            await api.clearData();
+            window.location.reload();
+          } catch (e) {
+            error.value = e.message;
+            clearing.value = false;
+          }
+        }
+
+        // Derived refs: last run timestamp for each check type (from settings.configs)
+        // The dashboard API returns this on the config rows when available.
+        const lastCommit = computed(() => {
+          const r = settings.value?.configs?.find?.(
+            c => c.resource_type === 'commit' || c.type === 'commit'
+          );
+          return r?.last_checked_at || r?.last_run_at || null;
+        });
+        const lastWebsite = computed(() => {
+          const r = settings.value?.configs?.find?.(
+            c => c.resource_type === 'website'
+          );
+          return r?.last_checked_at || null;
+        });
+        const lastTwitter = computed(() => {
+          const r = settings.value?.configs?.find?.(
+            c => c.resource_type === 'twitter'
+          );
+          return r?.last_checked_at || null;
+        });
+
+        onMounted(load);
+
+        return {
+          settings, form, loading, saving, triggering, clearing,
+          error, savedMsg,
+          onSave, onTrigger, onClear,
+          lastCommit, lastWebsite, lastTwitter,
+          relativeTime,
+          api: window.api,
+        };
+      },
+    };
+
+    /* ── Router ─────────────────────────────────────────────────────────────────
+       Simple hash-based SPA router.
+       Hash format: '' or '/' → ActivityPage, '/projects' → ProjectsPage,
+       '/settings' → SettingsPage.
+       Uses Vue's <component :is="..." /> to swap views.
+    ───────────────────────────────────────────────────────────────────────── */
+    const routes = {
+      '/':          ActivityPage,
+      '/projects':  ProjectsPage,
+      '/settings':  SettingsPage,
+    };
+
+    function hashRouter() {
+      return {
+        render() {
+          return routes[window.location.hash.slice(1) || '/'] || routes['/'];
+        },
+      };
     }
-  };
-}
 
-// ── App ─────────────────────────────────────────────────────────────────────────
-const App = {
-  components: { NavBar },
-  template: `<div><NavBar /><transition name="fade" mode="out-in"><component :is="currentView" /></transition></div>`,
-  data() { return { currentView: hashRouter().render() }; },
-  mounted() {
-    window.addEventListener('hashchange', () => {
-      this.currentView = hashRouter().render();
-    });
-  }
-};
+    /* ── Root App component ────────────────────────────────────────────────────
+       Composes NavBar + the current page view, with a fade transition between views.
+    ───────────────────────────────────────────────────────────────────────── */
+    const App = {
+      components: { NavBar },
 
-createApp(App).mount('#app');
-</script>
+      template: `
+        <div>
+          <NavBar />
+          <transition name="fade" mode="out-in">
+            <component :is="currentView" />
+          </transition>
+        </div>
+      `,
+
+      data() {
+        return { currentView: hashRouter().render() };
+      },
+
+      mounted() {
+        // Re-render whenever the hash changes (i.e., user clicked a nav tab)
+        window.addEventListener('hashchange', () => {
+          this.currentView = hashRouter().render();
+        });
+      },
+    };
+
+    /* ── Bootstrap ───────────────────────────────────────────────────────────── */
+    const app = createApp(App);
+    app.mount('#app');
+  </script>
 </body>
 </html>

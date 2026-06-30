@@ -1,5 +1,5 @@
 // Health-check services: website, github, twitter
-const db = require('../db');
+const db = require('./db');
 
 const now = () => new Date().toISOString();
 

@@ -32,7 +32,7 @@ if (fs.existsSync(publicDir)) {
 }
 
 async function start() {
-  const db = require('./db');
+  const db = require('./services/db');
   await db.init(); // db.init exists on the module, not the proxy
 
   // Initialize scheduler after DB is ready
