@@ -1,0 +1,21 @@
+{
+  "name": "project-checker-server",
+  "version": "1.0.0",
+  "description": "Backend for Project Checker app",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "concurrently \"node --watch index.js\" \"live-server --port=3001 --no-browser --proxy=/api:http://localhost:3000/api public\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "node-cron": "^3.0.3",
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "live-server": "^1.2.2"
+  }
+}
