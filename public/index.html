@@ -67,7 +67,10 @@
       getCheckLogs:   (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
-      triggerAll:     ()       => req('/settings/trigger-all', { method: 'POST' }),
+      triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
+      triggerWebsites: ()     => req('/settings/trigger-websites', { method: 'POST' }),
+      triggerGithub:   ()     => req('/settings/trigger-github',  { method: 'POST' }),
+      triggerTwitter:  ()     => req('/settings/trigger-twitter',  { method: 'POST' }),
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
     };
 
@@ -579,7 +582,7 @@
         const loading   = ref(true);
         const checkingAll = ref(false);
         const error     = ref('');
-        const showLogs  = ref(false);
+        const showLogs  = ref(true);
 
         /** Load dashboard (projects + status) */
         async function load() {
@@ -607,6 +610,7 @@
 
         /** Trigger all checks across all projects */
         async function checkAll() {
+          if (!confirm('Run checks for all projects now?')) return;
           checkingAll.value = true;
           try {
             await api.triggerAll();
@@ -910,14 +914,14 @@
             <!-- Manual triggers -->
             <section class="card">
               <h2>Manual Triggers</h2>
-              <p class="muted">Run all checks of a given type across every project.</p>
+              <p class="muted">Run checks for each resource type across all projects.</p>
 
               <div class="trigger-row">
                 <div class="trigger-meta">
                   <h3>Websites</h3>
                   <span class="muted">last: {{ relativeTime(lastWebsite) }}</span>
                 </div>
-                <button :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerAll)">
+                <button :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerWebsites)">
                   <span v-if="triggering === 'web'" class="spinner"></span>
                   <span v-else>Run All</span>
                 </button>
@@ -928,7 +932,7 @@
                   <h3>GitHub Repos</h3>
                   <span class="muted">last: {{ relativeTime(lastCommit) }}</span>
                 </div>
-                <button :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerAll)">
+                <button :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerGithub)">
                   <span v-if="triggering === 'gh'" class="spinner"></span>
                   <span v-else>Run All</span>
                 </button>
@@ -939,16 +943,12 @@
                   <h3>Twitter</h3>
                   <span class="muted">last: {{ relativeTime(lastTwitter) }}</span>
                 </div>
-                <button :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerAll)">
+                <button :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerTwitter)">
                   <span v-if="triggering === 'tw'" class="spinner"></span>
                   <span v-else>Run All</span>
                 </button>
               </div>
 
-              <p class="muted small">
-                All three buttons call <code>POST /api/settings/trigger-all</code>
-                which runs all check types in sequence.
-              </p>
             </section>
 
             <!-- Danger zone: wipe all data (keeps config) -->

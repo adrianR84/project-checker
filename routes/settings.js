@@ -82,6 +82,57 @@ router.post('/trigger-all', async (req, res) => {
   res.json({ ok: true, triggered: allResults.length, results: allResults });
 });
 
+// Trigger a specific resource type across all projects
+async function triggerResourceType(resourceType) {
+  const projects = db.prepare('SELECT * FROM projects').all();
+  const results = [];
+  for (const project of projects) {
+    try {
+      if (resourceType === 'website' && project.website_enabled && project.website_url) {
+        const r = await checkWebsite(project.website_url);
+        logCheck(project.id, 'website', null, r);
+        results.push({ project_id: project.id, name: project.name, result: r });
+      } else if (resourceType === 'twitter' && project.twitter_enabled && project.twitter_url) {
+        const r = await checkTwitter(project.twitter_url);
+        logCheck(project.id, 'twitter', null, r);
+        results.push({ project_id: project.id, name: project.name, result: r });
+      } else if (resourceType === 'github' && project.github_enabled) {
+        const repos = db.prepare('SELECT * FROM repos WHERE project_id = ?').all(project.id);
+        for (const repo of repos) {
+          const r = await checkGithubRepo(repo.full_name, project.id);
+          logCheck(project.id, 'github', repo.full_name, r);
+          results.push({ project_id: project.id, name: project.name, repo: repo.full_name, result: r });
+        }
+      }
+    } catch (err) {
+      console.error(`[${now()}] trigger(${resourceType}) failed for project ${project.id}: ${err.message}`);
+      results.push({ project_id: project.id, name: project.name, error: err.message });
+    }
+  }
+  return results;
+}
+
+// POST /api/settings/trigger-websites
+router.post('/trigger-websites', async (req, res) => {
+  console.log(`[${now()}] Manual trigger: websites`);
+  const results = await triggerResourceType('website');
+  res.json({ ok: true, triggered: results.length, results });
+});
+
+// POST /api/settings/trigger-github
+router.post('/trigger-github', async (req, res) => {
+  console.log(`[${now()}] Manual trigger: github`);
+  const results = await triggerResourceType('github');
+  res.json({ ok: true, triggered: results.length, results });
+});
+
+// POST /api/settings/trigger-twitter
+router.post('/trigger-twitter', async (req, res) => {
+  console.log(`[${now()}] Manual trigger: twitter`);
+  const results = await triggerResourceType('twitter');
+  res.json({ ok: true, triggered: results.length, results });
+});
+
 // POST /api/settings/clear-data — empty all tables except config
 router.post('/clear-data', (req, res) => {
   db.prepare('DELETE FROM check_logs').run();
