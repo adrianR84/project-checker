@@ -18,6 +18,7 @@
 
 <body>
   <div id="app"></div>
+  <div id="toast" aria-live="polite"></div>
 
   <!-- Vue 3 CDN (production build, no dev warnings) -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -81,6 +82,16 @@
 
     // Expose globally so the template can call api.* after we return api: window.api
     window.api = api;
+
+    /** Show a toast notification in the bottom-right corner */
+    function showToast(msg, type = 'ok') {
+      const el = document.createElement('div');
+      el.className = `toast-msg ${type}`;
+      el.textContent = msg;
+      document.getElementById('toast').appendChild(el);
+      setTimeout(() => el.remove(), 2200);
+    }
+    window.showToast = showToast;
 
     /* ── Shared helpers ─────────────────────────────────────────────────────────
        Used directly in templates via Vue's template expression evaluation.
@@ -635,10 +646,15 @@
 
         let pollTimer = null;
 
-        onMounted(() => {
+        onMounted(async () => {
           load();
           loadLogs();
-          pollTimer = setInterval(() => { load(); loadLogs(); }, 60_000);
+          try {
+            const cfg = await api.getSettings();
+            if (cfg.ui_refresh_seconds) {
+              pollTimer = setInterval(() => { load(); loadLogs(); }, cfg.ui_refresh_seconds * 1000);
+            }
+          } catch { /* auto-refresh disabled */ }
         });
 
         onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
@@ -913,16 +929,42 @@
                 <input v-model.number="form.twitter_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
-              <div class="form-group">
-                <label>Delete logs older than (days, 0 = disabled)</label>
-                <input v-model.number="form.log_retention_days" type="number" min="0" max="365" />
-              </div>
-
               <div class="actions">
-                <span v-if="savedMsg" class="muted saved">{{ savedMsg }}</span>
                 <button class="primary" :disabled="saving" @click="onSave">
                   <span v-if="saving" class="spinner"></span>
                   <span v-else>Save</span>
+                </button>
+              </div>
+            </article>
+
+            <!-- App Settings -->
+            <article>
+              <h2>App Settings</h2>
+
+              <fieldset role="group">
+                <label>
+                  <input type="checkbox" v-model="form.log_retention_enabled" />
+                  Delete logs older than 
+                  <input v-show="form.log_retention_enabled" v-model.number="form.log_retention_days" type="number" min="0" max="365" style="width:80px"/> days
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
+                <label>
+                  <input type="checkbox" v-model="form.ui_refresh_enabled" />
+                  Enable auto-refresh 
+                <select v-show="form.ui_refresh_enabled" v-model.number="form.ui_refresh_seconds" style="width:120px">
+                  <option value="30">30 sec</option>
+                  <option value="60">60 sec</option>
+                  <option value="90">90 sec</option>
+                  <option value="120">120 sec</option>
+                </select>
+                </label>
+              </fieldset>
+
+              <button :disabled="saving" @click="saveAppSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
                 </button>
               </div>
             </article>
@@ -993,10 +1035,13 @@
       setup() {
         const settings    = ref(null);
         const form        = ref({
-          commit_interval_minutes:  360,
-          website_interval_minutes: 1440,
-          twitter_interval_minutes: 1440,
-          log_retention_days: 7,
+          commit_interval_minutes:   360,
+          website_interval_minutes:  1440,
+          twitter_interval_minutes:  1440,
+          log_retention_days:        7,
+          log_retention_enabled:     false,
+          ui_refresh_seconds:        60,
+          ui_refresh_enabled:        false,
         });
         const loading   = ref(true);
         const saving    = ref(false);
@@ -1004,7 +1049,6 @@
         const clearing  = ref(false);
         const clearingLogs = ref(false);
         const error      = ref('');
-        const savedMsg   = ref('');   // brief "Saved." confirmation
 
         /**
          * Extract the interval (in minutes) for a given check type from the settings object.
@@ -1031,7 +1075,10 @@
               commit_interval_minutes:  pickMinutes(settings.value, 'commit'),
               website_interval_minutes: pickMinutes(settings.value, 'website'),
               twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
-              log_retention_days: settings.value.log_retention_days || 7,
+              log_retention_days:   settings.value.log_retention_days || 7,
+              log_retention_enabled: !!settings.value.log_retention_days,
+              ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
+              ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
             };
           } catch (e) {
             error.value = e.message;
@@ -1042,20 +1089,37 @@
 
         /** Save updated intervals via PUT /api/settings */
         async function onSave() {
-          saving.value    = true;
-          error.value      = '';
-          savedMsg.value   = '';
+          saving.value = true;
+          error.value = '';
           try {
-            await api.updateSettings({
+            settings.value = await api.updateSettings({
               commit_check_minutes:  Number(form.value.commit_interval_minutes),
               website_check_minutes: Number(form.value.website_interval_minutes),
               twitter_check_minutes: Number(form.value.twitter_interval_minutes),
               log_retention_days:    Number(form.value.log_retention_days),
             });
-            savedMsg.value = 'Saved.';
-            await load();
-            // Clear the confirmation after 2.2 seconds
-            setTimeout(() => { savedMsg.value = ''; }, 2200);
+            showToast('Saved.');
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            saving.value = false;
+          }
+        }
+
+        /** Save App Settings (log retention only) */
+        async function saveAppSettings() {
+          saving.value = true;
+          error.value = '';
+          try {
+            settings.value = await api.updateSettings({
+              log_retention_days: form.value.log_retention_enabled
+                ? Number(form.value.log_retention_days) || 7
+                : 0,
+              ui_refresh_seconds: form.value.ui_refresh_enabled
+                ? Number(form.value.ui_refresh_seconds) || 60
+                : 0,
+            });
+            showToast('Saved.');
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -1127,8 +1191,8 @@
 
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs,
-          error, savedMsg,
-          onSave, onTrigger, onClear, onClearLogs,
+          error,
+          onSave, saveAppSettings, onTrigger, onClear, onClearLogs,
           lastCommit, lastWebsite, lastTwitter,
           relativeTime,
           api: window.api,

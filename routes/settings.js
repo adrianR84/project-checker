@@ -35,6 +35,14 @@ router.put('/', (req, res) => {
     updates.log_retention_days = v;
   }
 
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'ui_refresh_seconds')) {
+    const v = parseInt(req.body.ui_refresh_seconds, 10);
+    if (!Number.isFinite(v) || v < 0 || v > 300) {
+      return res.status(400).json({ error: 'ui_refresh_seconds must be an integer between 0 and 300 (0 = disabled)' });
+    }
+    updates.ui_refresh_seconds = v;
+  }
+
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }

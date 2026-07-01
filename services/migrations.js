@@ -64,12 +64,26 @@ function add_log_retention_days(db, save) {
 }
 
 /**
+ * Add ui_refresh_seconds column to config (default 60 = 1 minute).
+ */
+function add_ui_refresh_seconds(db, save) {
+  const rows = db.exec('SELECT * FROM config WHERE id = 1');
+  if (!rows.length) return;
+  const cols = rows[0].columns;
+  if (cols.includes('ui_refresh_seconds')) return;
+  db.exec('ALTER TABLE config ADD COLUMN ui_refresh_seconds INTEGER NOT NULL DEFAULT 60');
+  save();
+  console.log(`[${now()}] Migration: added ui_refresh_seconds column`);
+}
+
+/**
  * Run all migrations in order. Safe to call on every init.
  */
 function runMigrations(db, save) {
   try { migrate_hours_to_minutes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { drop_old_hours_columns(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_log_retention_days(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_ui_refresh_seconds(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

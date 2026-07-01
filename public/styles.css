@@ -29,7 +29,7 @@
   --pico-muted-color: var(--app-muted);
   --pico-primary: var(--app-primary);
   --pico-primary-hover: color-mix(in srgb, var(--app-primary) 85%, black);
-  --pico-border-radius: 10px;
+  --pico-border-radius: 3px;
   --pico-border-radius-sm: 6px;
 }
 
@@ -117,6 +117,33 @@ nav.navbar a[aria-current="page"] {
 
 /* ── Table helpers ───────────────────────────────────────────────────── */
 .col-actions { width: 110px; display: flex; gap: 4px;}
+
+/* ── Toast notification ─────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.toast-msg {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--pico-border-radius-sm);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--app-text);
+  box-shadow: 0 4px 12px var(--app-shadow);
+  animation: toastIn 200ms ease, toastOut 200ms ease 2s forwards;
+}
+.toast-msg.ok    { border-left: 3px solid var(--app-ok);   }
+.toast-msg.error { border-left: 3px solid var(--app-error); }
+@keyframes toastIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
 .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
