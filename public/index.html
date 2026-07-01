@@ -25,7 +25,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, watch, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition } = Vue;
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -150,10 +150,20 @@
               Project Checker
             </div>
 
-            <!-- Hash-based navigation tabs -->
-            <nav>
+            <!-- Left-aligned tabs -->
+            <nav class="left-tabs">
               <a
-                v-for="t in tabs"
+                v-for="t in leftTabs"
+                :key="t.to"
+                :href="'#' + t.to"
+                class="tab"
+                :class="{ active: currentRoute === t.to }"
+              >{{ t.label }}</a>
+            </nav>
+            <!-- Right-aligned Settings -->
+            <nav class="right-tabs">
+              <a
+                v-for="t in rightTabs"
                 :key="t.to"
                 :href="'#' + t.to"
                 class="tab"
@@ -174,9 +184,11 @@
         });
 
         return {
-          tabs: [
+          leftTabs: [
             { to: '/',         label: 'Activity'  },
             { to: '/projects', label: 'Projects'  },
+          ],
+          rightTabs: [
             { to: '/settings', label: 'Settings'  },
           ],
           currentRoute,
@@ -197,12 +209,11 @@
 
           <ul v-else class="repo-list">
             <li v-for="r in repos" :key="r.id || r.full_name" class="repo">
-              <!-- Repo name / link -->
+              <!-- Repo name / link (use repo_url if set, otherwise build from full_name) -->
               <div class="repo-name">
-                <a v-if="r.repo_url" :href="r.repo_url" target="_blank" rel="noopener">
+                <a :href="r.repo_url || 'https://github.com/' + r.full_name" target="_blank" rel="noopener">
                   {{ r.full_name }}
                 </a>
-                <span v-else>{{ r.full_name }}</span>
               </div>
 
               <!-- Latest commit info row -->
@@ -210,11 +221,9 @@
                 <template v-if="r.latest_commit_sha">
                   <!-- Short SHA link to commit on GitHub -->
                   <a
-                    v-if="r.repo_url"
-                    :href="r.repo_url + '/commit/' + r.latest_commit_sha"
+                    :href="(r.repo_url || 'https://github.com/' + r.full_name) + '/commit/' + r.latest_commit_sha"
                     target="_blank" rel="noopener" class="sha"
                   >{{ r.latest_commit_sha.slice(0, 7) }}</a>
-                  <span v-else class="sha">{{ r.latest_commit_sha.slice(0, 7) }}</span>
 
                   <span v-if="r.latest_commit_message" class="msg">
                     {{ r.latest_commit_message }}
@@ -384,32 +393,27 @@
       template: `
         <article class="project-card card">
 
-          <!-- Card header: project name + website refresh button -->
+          <!-- Card header: project name only -->
           <header class="head">
             <h2 class="name">{{ project.name }}</h2>
-            <button
-              v-if="project.website_url"
-              class="icon-btn"
-              :disabled="busy === 'website'"
-              @click="runCheck('website', () => api.checkWebsite(project.id))"
-            >
-              <span v-if="busy === 'website'" class="spinner"></span>
-              <span v-else>↻ Website</span>
-            </button>
           </header>
 
           <!-- Status badges row: website, GitHub, Twitter -->
           <section class="status-row">
             <div class="status" v-if="project.website_url">
-              <span class="muted">Website</span>
+              <a :href="project.website_url" target="_blank" rel="noopener" class="muted">Website</a>
               <span :class="['badge', statusClass(website.status)]">
                 <span class="dot"></span>{{ website.status || 'pending' }}
               </span>
               <span class="muted small">{{ relativeTime(website.checked_at) }}</span>
             </div>
+            <div class="status" v-else>
+              <span class="muted">Website</span>
+              <span class="muted">Not Set</span>
+            </div>
 
             <div class="status">
-              <span class="muted">GitHub</span>
+              <a :href="project.github_url || 'https://github.com'" target="_blank" rel="noopener" class="muted">GitHub</a>
               <span :class="['badge', statusClass(github.status)]">
                 <span class="dot"></span>{{ github.status || 'pending' }}
               </span>
@@ -417,11 +421,15 @@
             </div>
 
             <div class="status" v-if="project.twitter_url">
-              <span class="muted">Twitter</span>
+              <a :href="project.twitter_url" target="_blank" rel="noopener" class="muted">Twitter</a>
               <span :class="['badge', statusClass(twitter.status)]">
                 <span class="dot"></span>{{ twitter.status || 'pending' }}
               </span>
               <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
+            </div>
+            <div class="status" v-else>
+              <span class="muted">Twitter</span>
+              <span class="muted">Not Set</span>
             </div>
           </section>
 
@@ -442,15 +450,35 @@
             <RepoList :repos="project.repos || []" />
           </section>
 
-          <!-- Twitter / GitHub manual check buttons -->
-          <section v-if="project.twitter_url" class="actions-row">
-            <button :disabled="busy === 'twitter'" @click="runCheck('twitter', () => api.checkTwitter(project.id))">
-              <span v-if="busy === 'twitter'" class="spinner"></span>
-              <span v-else>Check Twitter</span>
+          <!-- Refresh action buttons -->
+          <section class="actions-row">
+            <button
+              v-if="project.website_url"
+              class="icon-btn"
+              :disabled="busy === 'website'"
+              @click="runCheck('website', () => api.checkWebsite(project.id))"
+            >
+              <span v-if="busy === 'website'" class="spinner"></span>
+              <span v-else>↻ Website</span>
             </button>
-            <button :disabled="busy === 'github'" @click="runCheck('github', () => api.checkGithub(project.id))">
+
+            <button
+              class="icon-btn"
+              :disabled="busy === 'github'"
+              @click="runCheck('github', () => api.checkGithub(project.id))"
+            >
               <span v-if="busy === 'github'" class="spinner"></span>
-              <span v-else>Check GitHub</span>
+              <span v-else>↻ GitHub</span>
+            </button>
+
+            <button
+              v-if="project.twitter_url"
+              class="icon-btn"
+              :disabled="busy === 'twitter'"
+              @click="runCheck('twitter', () => api.checkTwitter(project.id))"
+            >
+              <span v-if="busy === 'twitter'" class="spinner"></span>
+              <span v-else>↻ Twitter</span>
             </button>
           </section>
 
@@ -535,7 +563,7 @@
           </div>
 
           <!-- Optional recent check logs table -->
-          <section v-if="showLogs && logs.length" class="logs-section">
+          <section v-if="showLogs && logs.length" class="logs-section" style="margin-top: 2rem;">
             <h2>Recent check logs</h2>
             <div class="card">
               <CheckLogList :logs="logs" :show-project="true" />
@@ -590,7 +618,15 @@
           }
         }
 
-        onMounted(() => { load(); loadLogs(); });
+        let pollTimer = null;
+
+        onMounted(() => {
+          load();
+          loadLogs();
+          pollTimer = setInterval(() => { load(); loadLogs(); }, 60_000);
+        });
+
+        onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 
         return { projects, logs, loading, checkingAll, error, showLogs, checkAll, api: window.api };
       },

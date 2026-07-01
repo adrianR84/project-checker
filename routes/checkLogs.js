@@ -24,13 +24,15 @@ router.get('/', (req, res) => {
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const rows = db.prepare(`
-    SELECT * FROM check_logs
+    SELECT cl.*, p.name AS project_name
+    FROM check_logs cl
+    LEFT JOIN projects p ON p.id = cl.project_id
     ${where}
-    ORDER BY checked_at DESC, id DESC
+    ORDER BY cl.checked_at DESC, cl.id DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM check_logs ${where}`).get(...params);
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl ${where}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 

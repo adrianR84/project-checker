@@ -29,15 +29,25 @@ router.get('/', (req, res) => {
       ORDER BY checked_at DESC, id DESC LIMIT 1
     `).get(p.id);
 
+    // Latest github check (aggregate across all repos for this project)
+    const githubCheck = db.prepare(`
+      SELECT cl.status, cl.checked_at FROM check_logs cl
+      INNER JOIN repos r ON r.project_id = cl.project_id
+      WHERE cl.project_id = ? AND cl.resource_type = 'github'
+      ORDER BY cl.checked_at DESC, cl.id DESC LIMIT 1
+    `).get(p.id);
+
     // Per-repo data
     const repos = db.prepare(`
-      SELECT repo_name, full_name, latest_commit_date, latest_commit_message,
+      SELECT repo_name, full_name, repo_url, latest_commit_date, latest_commit_message,
              latest_commit_sha, total_commits, stars_count, language, pushed_at
       FROM repos
       WHERE project_id = ?
       ORDER BY repo_name
     `).all(p.id);
 
+    // Map: dashboard field name → frontend expected name
+    // Frontend expects: website_status, github_status, twitter_status
     return {
       id: p.id,
       name: p.name,
@@ -47,8 +57,9 @@ router.get('/', (req, res) => {
       website_url: p.website_url,
       github_url: p.github_url,
       twitter_url: p.twitter_url,
-      latest_website_check: websiteCheck || null,
-      latest_twitter_check: twitterCheck || null,
+      website_status: websiteCheck || null,
+      github_status:  githubCheck  || null,
+      twitter_status: twitterCheck || null,
       repos
     };
   });

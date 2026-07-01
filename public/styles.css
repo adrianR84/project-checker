@@ -208,6 +208,7 @@ tr:last-child td { border-bottom: none; }
   max-width: 1200px; margin: 0 auto; padding: 0 24px;
   display: flex; align-items: center; gap: 32px; height: 56px;
 }
+.right-tabs { margin-left: auto; }
 
 /* Brand / logo */
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
@@ -217,7 +218,7 @@ tr:last-child td { border-bottom: none; }
   box-shadow: 0 0 8px rgba(108, 140, 255, .5);
 }
 
-nav { display: flex; gap: 4px; flex: 1; }
+.left-tabs, .right-tabs { display: flex; gap: 4px; }
 
 /* Navigation tab link */
 .tab {
@@ -263,8 +264,8 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 1
 
 .name { font-size: 16px; font-weight: 600; margin: 0; }
 
-.status-row { display: flex; flex-wrap: wrap; gap: 12px; }
-.status     { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.status-row { display: flex; flex-direction: column; gap: 6px; }
+.status     { display: flex; align-items: center; gap: 6px; }
 
 .repos-section { border-top: 1px solid var(--border); padding-top: 12px; }
 
