@@ -76,6 +76,16 @@ async function runCommitTick() {
   }
 }
 
+// Purge check logs older than log_retention_days (run once daily)
+// Skips if log_retention_days is 0 (auto-delete disabled)
+async function purgeOldLogs() {
+  const cfg = db.prepare('SELECT log_retention_days FROM config WHERE id = 1').get();
+  if (!cfg?.log_retention_days) return; // 0 = disabled
+  const cutoff = new Date(Date.now() - cfg.log_retention_days * 86400_000).toISOString();
+  db.prepare('DELETE FROM check_logs WHERE checked_at < ?').run(cutoff);
+  console.log(`[${now()}] Scheduler: purged logs older than ${cfg.log_retention_days} days`);
+}
+
 // Last-known cron expressions — only re-schedule when a value actually changes
 let lastCommitExpr = null, lastWebsiteExpr = null, lastTwitterExpr = null;
 
@@ -120,6 +130,12 @@ function reschedule() {
   }
   lastTwitterExpr = twitterExpr;
   console.log(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${cfg.twitter_check_minutes}min)`);
+
+  // Purge old logs daily at midnight
+  const purgeExpr = '0 0 * * *';
+  const purgeJob = cron.schedule(purgeExpr, () => { purgeOldLogs().catch(err => console.error(err)); });
+  jobs.push(purgeJob);
+  console.log(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
 }
 
 // Initialize scheduler; reschedule every 5 minutes to pick up config changes.
@@ -144,5 +160,6 @@ module.exports = {
   reschedule,
   runCommitTick,
   runWebsiteTick,
-  runTwitterTick
+  runTwitterTick,
+  purgeOldLogs,
 };

@@ -132,10 +132,18 @@
       } catch { return u; }
     }
 
+    /** Format check_logs.details for display */
+    function logDetail(d) {
+      if (!d) return '—';
+      try { const p = typeof d === 'string' ? JSON.parse(d) : d; if (p.content_hash) return 'content changed (' + p.content_hash.slice(0, 8) + '…)'; } catch (_) {}
+      return typeof d === 'string' ? d : JSON.stringify(d);
+    }
+
     /** Map a raw status string → CSS class name for the badge */
     function statusClass(s) {
       if (s === 'ok' || s === 'success') return 'ok';
       if (s === 'error' || s === 'failed') return 'error';
+      if (s === 'changed') return 'changed';
       return 'pending';
     }
 
@@ -284,14 +292,14 @@
                     {{ showProject ? absoluteTime(log.checked_at) : relativeTime(log.checked_at) }}
                   </span>
                 </td>
-                <td class="detail">{{ log.detail || '—' }}</td>
+                <td class="detail">{{ logDetail(log.detail) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       `,
 
-      methods: { relativeTime, absoluteTime, statusClass },
+      methods: { relativeTime, absoluteTime, statusClass, logDetail },
     };
 
     /* ── ProjectForm component ─────────────────────────────────────────────────
@@ -402,8 +410,20 @@
             <h2 class="name">{{ project.name }}</h2>
           </header>
 
-          <!-- Status badges row: website, GitHub, Twitter -->
+          <!-- Status badges row: Twitter, Website, GitHub -->
           <section class="status-row">
+            <div class="status" v-if="project.twitter_url">
+              <a :href="project.twitter_url" target="_blank" rel="noopener" class="muted">Twitter</a>
+              <span :class="['badge', statusClass(twitter.status)]">
+                <span class="dot"></span>{{ twitter.status || 'pending' }}
+              </span>
+              <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
+            </div>
+            <div class="status" v-else>
+              <span class="muted">Twitter</span>
+              <span class="muted">Not Set</span>
+            </div>
+
             <div class="status" v-if="project.website_url">
               <a :href="project.website_url" target="_blank" rel="noopener" class="muted">Website</a>
               <span :class="['badge', statusClass(website.status)]">
@@ -422,18 +442,6 @@
                 <span class="dot"></span>{{ github.status || 'pending' }}
               </span>
               <span class="muted small">{{ relativeTime(github.checked_at) }}</span>
-            </div>
-
-            <div class="status" v-if="project.twitter_url">
-              <a :href="project.twitter_url" target="_blank" rel="noopener" class="muted">Twitter</a>
-              <span :class="['badge', statusClass(twitter.status)]">
-                <span class="dot"></span>{{ twitter.status || 'pending' }}
-              </span>
-              <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
-            </div>
-            <div class="status" v-else>
-              <span class="muted">Twitter</span>
-              <span class="muted">Not Set</span>
             </div>
           </section>
 
@@ -456,8 +464,18 @@
             </div>
           </section>
 
-          <!-- Refresh action buttons -->
+          <!-- Refresh action buttons: Twitter, Website, GitHub -->
           <section class="actions-row">
+            <button
+              v-if="project.twitter_url"
+              class="icon-btn"
+              :disabled="busy === 'twitter'"
+              @click="runCheck('twitter', () => api.checkTwitter(project.id))"
+            >
+              <span v-if="busy === 'twitter'" class="spinner"></span>
+              <span v-else>↻ Twitter</span>
+            </button>
+
             <button
               v-if="project.website_url"
               class="icon-btn"
@@ -475,16 +493,6 @@
             >
               <span v-if="busy === 'github'" class="spinner"></span>
               <span v-else>↻ GitHub</span>
-            </button>
-
-            <button
-              v-if="project.twitter_url"
-              class="icon-btn"
-              :disabled="busy === 'twitter'"
-              @click="runCheck('twitter', () => api.checkTwitter(project.id))"
-            >
-              <span v-if="busy === 'twitter'" class="spinner"></span>
-              <span v-else>↻ Twitter</span>
             </button>
           </section>
 
@@ -905,6 +913,11 @@
                 <input v-model.number="form.twitter_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
+              <div class="form-row">
+                <label>Delete logs older than (days, 0 = disabled)</label>
+                <input v-model.number="form.log_retention_days" type="number" min="0" max="365" />
+              </div>
+
               <div class="actions">
                 <span v-if="savedMsg" class="muted saved">{{ savedMsg }}</span>
                 <button class="primary" :disabled="saving" @click="onSave">
@@ -983,6 +996,7 @@
           commit_interval_minutes:  360,
           website_interval_minutes: 1440,
           twitter_interval_minutes: 1440,
+          log_retention_days: 7,
         });
         const loading   = ref(true);
         const saving    = ref(false);
@@ -1017,6 +1031,7 @@
               commit_interval_minutes:  pickMinutes(settings.value, 'commit'),
               website_interval_minutes: pickMinutes(settings.value, 'website'),
               twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
+              log_retention_days: settings.value.log_retention_days || 7,
             };
           } catch (e) {
             error.value = e.message;
@@ -1035,6 +1050,7 @@
               commit_check_minutes:  Number(form.value.commit_interval_minutes),
               website_check_minutes: Number(form.value.website_interval_minutes),
               twitter_check_minutes: Number(form.value.twitter_interval_minutes),
+              log_retention_days:    Number(form.value.log_retention_days),
             });
             savedMsg.value = 'Saved.';
             await load();

@@ -12,11 +12,12 @@ router.get('/', (req, res) => {
   res.json(cfg);
 });
 
-// PUT /api/settings — update check intervals
+// PUT /api/settings — update check intervals and log retention
 router.put('/', (req, res) => {
-  const allowed = ['commit_check_minutes', 'website_check_minutes', 'twitter_check_minutes'];
+  const intervalKeys = ['commit_check_minutes', 'website_check_minutes', 'twitter_check_minutes'];
   const updates = {};
-  for (const key of allowed) {
+
+  for (const key of intervalKeys) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
       const v = parseInt(req.body[key], 10);
       if (!Number.isFinite(v) || v < 1 || v > 10080) {
@@ -25,6 +26,15 @@ router.put('/', (req, res) => {
       updates[key] = v;
     }
   }
+
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'log_retention_days')) {
+    const v = parseInt(req.body.log_retention_days, 10);
+    if (!Number.isFinite(v) || v < 0 || v > 365) {
+      return res.status(400).json({ error: 'log_retention_days must be an integer between 0 and 365 (0 = disabled)' });
+    }
+    updates.log_retention_days = v;
+  }
+
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }

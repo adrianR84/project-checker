@@ -258,7 +258,7 @@ async function init() {
 
   const existing = db.exec('SELECT id FROM config WHERE id = 1');
   if (!existing.length || !existing[0].values.length) {
-    db.run('INSERT INTO config (id, commit_check_minutes, website_check_minutes, twitter_check_minutes) VALUES (1, 360, 1440, 1440)');
+    db.run('INSERT INTO config (id, commit_check_minutes, website_check_minutes, twitter_check_minutes, log_retention_days) VALUES (1, 360, 1440, 1440, 7)');
     save();
   }
 

@@ -1,6 +1,5 @@
 // Database migrations — runs on every init, idempotent.
 // Each function migrates from one schema version to the next.
-// Current schema: config has *_check_minutes columns.
 
 const now = () => new Date().toISOString();
 
@@ -52,11 +51,25 @@ function drop_old_hours_columns(db, save) {
 }
 
 /**
+ * Add log_retention_days column to config (default 7).
+ */
+function add_log_retention_days(db, save) {
+  const rows = db.exec('SELECT * FROM config WHERE id = 1');
+  if (!rows.length) return;
+  const cols = rows[0].columns;
+  if (cols.includes('log_retention_days')) return;
+  db.exec('ALTER TABLE config ADD COLUMN log_retention_days INTEGER NOT NULL DEFAULT 7');
+  save();
+  console.log(`[${now()}] Migration: added log_retention_days column`);
+}
+
+/**
  * Run all migrations in order. Safe to call on every init.
  */
 function runMigrations(db, save) {
   try { migrate_hours_to_minutes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { drop_old_hours_columns(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_log_retention_days(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

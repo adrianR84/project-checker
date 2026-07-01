@@ -1,5 +1,6 @@
 // Health-check services: website, github, twitter
 const db = require('./db');
+const { createHash } = require('crypto');
 
 const now = () => new Date().toISOString();
 
@@ -20,30 +21,59 @@ function logCheck(projectId, resourceType, resourceId, result) {
   );
 }
 
-// Check a website URL via HEAD request
-async function checkWebsite(url) {
+// Check a website URL: GET + MD5 hash of body, compare with previous run stored in check_logs
+async function checkWebsite(url, projectId) {
   const start = Date.now();
   if (!url) {
-    return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided' };
+    return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided', details: null };
   }
+
+  // Get previous hash from the last check_logs entry for this website
+  let prevHash = null;
+  if (projectId) {
+    const last = db.prepare(`
+      SELECT details FROM check_logs
+      WHERE project_id = ? AND resource_type = 'website'
+      ORDER BY checked_at DESC, id DESC LIMIT 1
+    `).get(projectId);
+    if (last?.details) {
+      try { prevHash = JSON.parse(last.details).content_hash; } catch (_) {}
+    }
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       signal: controller.signal,
       redirect: 'follow',
       headers: { 'User-Agent': 'project-checker/1.0' }
     });
     clearTimeout(timeout);
     const response_time_ms = Date.now() - start;
+
+    let contentHash = null;
     if (res.ok) {
-      return { status: 'ok', http_status: res.status, response_time_ms, error_message: null };
+      try {
+        const bodyText = await res.text();
+        contentHash = createHash('md5').update(bodyText).digest('hex');
+      } catch (_) {}
     }
-    return { status: 'error', http_status: res.status, response_time_ms, error_message: `HTTP ${res.status}` };
+
+    const changed = prevHash && contentHash && prevHash !== contentHash;
+    const status = res.ok ? (changed ? 'changed' : 'ok') : 'error';
+
+    return {
+      status,
+      http_status: res.status,
+      response_time_ms,
+      error_message: res.ok ? null : `HTTP ${res.status}`,
+      details: contentHash ? { content_hash: contentHash } : null,
+    };
   } catch (err) {
     const response_time_ms = Date.now() - start;
-    return { status: 'error', http_status: null, response_time_ms, error_message: err.message };
+    return { status: 'error', http_status: null, response_time_ms, error_message: err.message, details: null };
   }
 }
 
