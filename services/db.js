@@ -189,6 +189,10 @@ async function init() {
       github_enabled INTEGER NOT NULL DEFAULT 1,
       twitter_enabled INTEGER NOT NULL DEFAULT 1,
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
+      website_confirmed_hash TEXT,
+      website_last_changed_at TEXT,
+      github_last_changed_at TEXT,
+      twitter_last_changed_at TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );

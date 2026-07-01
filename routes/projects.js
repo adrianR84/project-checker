@@ -211,6 +211,24 @@ router.post('/:id/check-website', async (req, res) => {
   res.json(result);
 });
 
+// POST /api/projects/:id/confirm-website — confirm current content, clears "changed" state
+router.post('/:id/confirm-website', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.website_url) return res.status(400).json({ error: 'No website URL configured' });
+
+  // Fetch current content and set confirmed_hash to current content hash
+  const result = await checkWebsite(project.website_url, id);
+  const contentHash = result.details?.content_hash || null;
+  if (contentHash) {
+    db.prepare('UPDATE projects SET website_confirmed_hash = ? WHERE id = ?').run(contentHash, id);
+  }
+  // Log the confirmation as a check with "ok" status
+  logCheck(id, 'website', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
+  res.json({ ok: true, confirmed_hash: contentHash });
+});
+
 // POST /api/projects/:id/check-github
 router.post('/:id/check-github', async (req, res) => {
   const id = parseInt(req.params.id, 10);

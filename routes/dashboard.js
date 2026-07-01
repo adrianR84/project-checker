@@ -9,7 +9,8 @@ router.get('/', (req, res) => {
   const projects = db.prepare(`
     SELECT id, name,
            website_enabled, github_enabled, twitter_enabled,
-           website_url, github_url, twitter_url
+           website_url, github_url, twitter_url,
+           website_last_changed_at, github_last_changed_at, twitter_last_changed_at
     FROM projects
     ORDER BY id
   `).all();
@@ -60,6 +61,9 @@ router.get('/', (req, res) => {
       website_status: websiteCheck || null,
       github_status:  githubCheck  || null,
       twitter_status: twitterCheck || null,
+      website_last_changed_at: p.website_last_changed_at || null,
+      github_last_changed_at:  p.github_last_changed_at  || null,
+      twitter_last_changed_at: p.twitter_last_changed_at || null,
       repos
     };
   });

@@ -67,6 +67,7 @@
       deleteProject:  (id)     => req(`/projects/${id}`,     { method: 'DELETE' }),
       refreshRepos:   (id)     => req(`/projects/${id}/refresh-repos`, { method: 'POST' }),
       checkWebsite:   (id)     => req(`/projects/${id}/check-website`,  { method: 'POST' }),
+      confirmWebsite: (id)     => req(`/projects/${id}/confirm-website`,{ method: 'POST' }),
       checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
       checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
       getCheckLogs:   (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
@@ -447,7 +448,7 @@
                 <td><a :href="project.website_url" target="_blank" rel="noopener">Website</a></td>
                 <td><span :class="['badge', statusClass(website.status)]"><span class="dot"></span>{{ website.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(website.checked_at) }}</span></td>
-                <td>—</td>
+                <td><span class="muted">{{ websiteLastChanged ? relativeTime(websiteLastChanged) : '—' }}</span></td>
               </tr>
               <tr v-else>
                 <td>Website</td>
@@ -458,7 +459,7 @@
                 <td><a :href="project.github_url" target="_blank" rel="noopener">GitHub</a></td>
                 <td><span :class="['badge', statusClass(github.status)]"><span class="dot"></span>{{ github.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(github.checked_at) }}</span></td>
-                <td><span class="muted">{{ newestCommit ? relativeTime(newestCommit) : '—' }}</span></td>
+                <td><span class="muted">{{ githubLastChanged ? relativeTime(githubLastChanged) : '—' }}</span></td>
               </tr>
               <tr v-else>
                 <td>GitHub</td>
@@ -509,6 +510,16 @@
             </button>
 
             <button
+              v-if="project.website_url && (website.status === 'changed' || website.status === 'error')"
+              class="contrast"
+              :disabled="busy === 'confirm'"
+              @click="runCheck('confirm', () => api.confirmWebsite(project.id))"
+            >
+              <span v-if="busy === 'confirm'" class="spinner"></span>
+              <span v-else>✓ Confirm</span>
+            </button>
+
+            <button
               class="secondary"
               :disabled="busy === 'github'"
               @click="runCheck('github', () => api.checkGithub(project.id))"
@@ -529,13 +540,14 @@
         const website = computed(() => props.project.website_status || {});
         const github  = computed(() => props.project.github_status  || {});
         const twitter = computed(() => props.project.twitter_status || {});
-        const newestCommit = computed(() => {
-          const dates = (props.project.repos || [])
-            .map(r => r.latest_commit_date)
-            .filter(d => d);
-          if (!dates.length) return null;
-          return dates.reduce((a, b) => a > b ? a : b);
+        const websiteLastChanged = computed(() => props.project.website_last_changed_at || null);
+        // Most recent latest_commit_date across all repos (instead of single project-level timestamp)
+        const githubLastChanged = computed(() => {
+          const repos = props.project.repos || [];
+          const dates = repos.map(r => r.latest_commit_date).filter(Boolean);
+          return dates.length ? dates.reduce((a, b) => a > b ? a : b) : null;
         });
+        const twitterLastChanged = computed(() => props.project.twitter_last_changed_at || null);
 
         /**
          * Run a named check and emit 'refreshed' on success so the parent reloads data.
@@ -555,7 +567,8 @@
         }
 
         return {
-          busy, website, github, twitter, newestCommit,
+          busy, website, github, twitter,
+          websiteLastChanged, githubLastChanged, twitterLastChanged,
           runCheck,
           relativeTime,
           statusClass,
