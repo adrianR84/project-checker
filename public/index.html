@@ -325,7 +325,7 @@
       emits: ['submit', 'cancel'],
 
       template: `
-        <div class="modal" @submit.prevent="onSubmit">
+        <div class="modal">
           <h2>{{ initial ? 'Edit Project' : 'New Project' }}</h2>
 
           <div class="form-group">
@@ -355,7 +355,7 @@
 
           <div class="modal-actions">
             <button type="button" @click="$emit('cancel')">Cancel</button>
-            <button type="submit" class="primary" :disabled="busy">
+            <button type="button" class="primary" :disabled="busy" @click="onSubmit()">
               <span v-if="busy" class="spinner"></span>
               <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
             </button>
@@ -829,7 +829,7 @@
          * Import one or more projects from the JSON textarea.
          * Accepts a single object or an array of objects.
          * Field mapping (API → import format):
-         *   site_name → name,  url → website_url,
+         *   name → name,  url → website_url,
          *   github → github_url,  twitter → twitter_url,  telegram → telegram_url
          */
         async function onImport() {
@@ -849,7 +849,7 @@
           for (const item of list) {
             try {
               await api.createProject({
-                name:         item.site_name,
+                name:         item.name,
                 website_url:   item.url,
                 github_url:    item.github,
                 twitter_url:   item.twitter,
@@ -907,7 +907,7 @@
             <span class="spinner lg"></span>
           </div>
 
-          <div v-else class="settings-grid">
+          <div v-else class="grid">
 
             <!-- Check interval configuration -->
             <article>
@@ -952,21 +952,27 @@
               <fieldset role="group">
                 <label>
                   <input type="checkbox" v-model="form.ui_refresh_enabled" />
-                  Enable auto-refresh 
+                  Enable auto-refresh
+                </label>
                 <select v-show="form.ui_refresh_enabled" v-model.number="form.ui_refresh_seconds" style="width:120px">
                   <option value="30">30 sec</option>
                   <option value="60">60 sec</option>
                   <option value="90">90 sec</option>
                   <option value="120">120 sec</option>
                 </select>
+              </fieldset>
+
+              <fieldset role="group">
+                <label>
+                  <input type="checkbox" v-model="form.showDangerZone" />
+                  Show DB options
                 </label>
               </fieldset>
 
               <button :disabled="saving" @click="saveAppSettings">
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
-                </button>
-              </div>
+              </button>
             </article>
 
             <!-- Manual triggers -->
@@ -977,7 +983,6 @@
               <div class="trigger-row">
                 <div class="trigger-meta">
                   <h3>Websites</h3>
-                  <span class="muted">last: {{ relativeTime(lastWebsite) }}</span>
                 </div>
                 <button :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerWebsites)">
                   <span v-if="triggering === 'web'" class="spinner"></span>
@@ -988,7 +993,6 @@
               <div class="trigger-row">
                 <div class="trigger-meta">
                   <h3>GitHub Repos</h3>
-                  <span class="muted">last: {{ relativeTime(lastCommit) }}</span>
                 </div>
                 <button :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerGithub)">
                   <span v-if="triggering === 'gh'" class="spinner"></span>
@@ -999,7 +1003,6 @@
               <div class="trigger-row">
                 <div class="trigger-meta">
                   <h3>Twitter</h3>
-                  <span class="muted">last: {{ relativeTime(lastTwitter) }}</span>
                 </div>
                 <button :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerTwitter)">
                   <span v-if="triggering === 'tw'" class="spinner"></span>
@@ -1010,11 +1013,10 @@
             </article>
 
             <!-- Danger zone: wipe all data (keeps config) -->
-            <article class="danger-zone">
+            <article v-if="form.showDangerZone" class="danger-zone">
               <h2>Danger Zone</h2>
               <p class="muted">
-                Delete all check logs, or delete everything including projects and repos.
-                Config table (check intervals) is always kept.
+                Delete all check logs, or delete everything including projects and repos. Settings are always kept.
               </p>
               <div class="danger-row">
                 <button class="danger" :disabled="clearingLogs" @click="onClearLogs">
@@ -1042,6 +1044,7 @@
           log_retention_enabled:     false,
           ui_refresh_seconds:        60,
           ui_refresh_enabled:        false,
+          showDangerZone:           false,
         });
         const loading   = ref(true);
         const saving    = ref(false);

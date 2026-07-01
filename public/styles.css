@@ -267,7 +267,4 @@ nav.navbar a[aria-current="page"] {
 .danger-zone h2 { color: var(--app-error); }
 .danger-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media (max-width: 800px) { .settings-grid { grid-template-columns: 1fr; } }
-
 .logs-section { margin-top: 2rem; }
