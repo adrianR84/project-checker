@@ -1,12 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark">
   <title>Project Checker</title>
 
   <!-- Inline SVG favicon: blue circle with green center -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%236c8cff'/><circle cx='50' cy='50' r='25' fill='%2334d399'/></svg>" />
+
+  <!-- Pico.css — custom styles.css overrides it where needed -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
 
   <!-- External CSS (separate file for caching and readability) -->
   <link rel="stylesheet" href="/styles.css" />
@@ -314,30 +318,30 @@
       emits: ['submit', 'cancel'],
 
       template: `
-        <form class="modal" @submit.prevent="onSubmit">
+        <div class="modal" @submit.prevent="onSubmit">
           <h2>{{ initial ? 'Edit Project' : 'New Project' }}</h2>
 
-          <div class="form-row">
+          <div class="form-group">
             <label>Name *</label>
             <input v-model="f.name" required placeholder="My Project" />
           </div>
 
-          <div class="form-row">
+          <div class="form-group">
             <label>Website URL</label>
             <input v-model="f.website_url" type="url" placeholder="https://example.com" />
           </div>
 
-          <div class="form-row">
+          <div class="form-group">
             <label>GitHub URL <span class="muted">(optional)</span></label>
             <input v-model="f.github_url" type="url" placeholder="https://github.com/org" />
           </div>
 
-          <div class="form-row">
+          <div class="form-group">
             <label>Twitter URL</label>
             <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
           </div>
 
-          <div class="form-row">
+          <div class="form-group">
             <label>Telegram URL <span class="muted">(optional)</span></label>
             <input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" />
           </div>
@@ -349,7 +353,7 @@
               <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
             </button>
           </div>
-        </form>
+        </div>
       `,
 
       setup(props, { emit }) {
@@ -403,7 +407,7 @@
       components: { RepoList },
 
       template: `
-        <article class="project-card card">
+        <article class="project-card">
 
           <!-- Card header: project name only -->
           <header class="head">
@@ -451,7 +455,7 @@
               <h3>Repositories</h3>
               <button
                 v-if="project.github_url"
-                class="icon-btn"
+                class="secondary"
                 :disabled="busy === 'repos'"
                 @click="runCheck('repos', () => api.refreshRepos(project.id))"
               >
@@ -468,7 +472,7 @@
           <section class="actions-row">
             <button
               v-if="project.twitter_url"
-              class="icon-btn"
+              class="secondary"
               :disabled="busy === 'twitter'"
               @click="runCheck('twitter', () => api.checkTwitter(project.id))"
             >
@@ -478,7 +482,7 @@
 
             <button
               v-if="project.website_url"
-              class="icon-btn"
+              class="secondary"
               :disabled="busy === 'website'"
               @click="runCheck('website', () => api.checkWebsite(project.id))"
             >
@@ -487,7 +491,7 @@
             </button>
 
             <button
-              class="icon-btn"
+              class="secondary"
               :disabled="busy === 'github'"
               @click="runCheck('github', () => api.checkGithub(project.id))"
             >
@@ -548,7 +552,7 @@
 
           <div class="toolbar">
             <h1>Activity</h1>
-            <button class="icon-btn" @click="showLogs = !showLogs">
+            <button class="secondary" @click="showLogs = !showLogs">
               {{ showLogs ? 'Hide logs' : 'Show recent logs' }}
             </button>
             <button class="primary" :disabled="checkingAll || loading" @click="checkAll">
@@ -557,13 +561,13 @@
             </button>
           </div>
 
-          <div v-if="error" class="error-box">{{ error }}</div>
+          <div v-if="error" class="[role="alert"]">{{ error }}</div>
 
           <div v-if="loading" class="center-loader">
             <span class="spinner lg"></span>
           </div>
 
-          <div v-else-if="!projects.length" class="card empty">
+          <div v-else-if="!projects.length" class="empty">
             No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
           </div>
 
@@ -577,11 +581,11 @@
           </div>
 
           <!-- Optional recent check logs table -->
-          <section v-if="showLogs && logs.length" class="logs-section" style="margin-top: 2rem;">
+          <section v-if="showLogs && logs.length" class="logs-section">
             <h2>Recent check logs</h2>
-            <div class="card">
+            <article>
               <CheckLogList :logs="logs" :show-project="true" />
-            </div>
+            </article>
           </section>
 
         </div>
@@ -662,17 +666,17 @@
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
 
-          <div v-if="error" class="error-box">{{ error }}</div>
+          <div v-if="error" class="[role="alert"]">{{ error }}</div>
 
           <div v-if="loading" class="center-loader">
             <span class="spinner lg"></span>
           </div>
 
-          <div v-else-if="!projects.length" class="card empty">
+          <div v-else-if="!projects.length" class="empty">
             No projects yet. Click <strong>+ Add Project</strong> to start.
           </div>
 
-          <div v-else class="card">
+          <div v-else>
             <table>
               <thead>
                 <tr>
@@ -692,8 +696,8 @@
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
                   <td class="actions">
-                    <button class="icon-btn" title="Edit"   @click="openEdit(p)">✎</button>
-                    <button class="icon-btn danger" title="Delete" @click="onDelete(p)">🗑</button>
+                    <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
+                    <button class="secondary danger" title="Delete" @click="onDelete(p)">🗑</button>
                   </td>
                 </tr>
               </tbody>
@@ -720,12 +724,12 @@
               </p>
 
               <!-- File picker -->
-              <div class="form-row">
+              <div class="form-group">
                 <input type="file" accept="application/json,.json" @change="onFile" />
               </div>
 
               <!-- Raw textarea -->
-              <div class="form-row">
+              <div class="form-group">
                 <textarea
                   v-model="importText"
                   rows="10"
@@ -885,7 +889,7 @@
         <div class="page">
           <div class="toolbar"><h1>Settings</h1></div>
 
-          <div v-if="error" class="error-box">{{ error }}</div>
+          <div v-if="error" class="[role="alert"]">{{ error }}</div>
 
           <div v-if="loading" class="center-loader">
             <span class="spinner lg"></span>
@@ -894,26 +898,26 @@
           <div v-else class="settings-grid">
 
             <!-- Check interval configuration -->
-            <section class="card">
+            <article>
               <h2>Check Intervals</h2>
               <p class="muted">How often each check runs automatically (in minutes). 60 min = 1 hour, 1440 min = 1 day.</p>
 
-              <div class="form-row">
+              <div class="form-group">
                 <label>Commit / GitHub (minutes)</label>
                 <input v-model.number="form.commit_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
-              <div class="form-row">
+              <div class="form-group">
                 <label>Website (minutes)</label>
                 <input v-model.number="form.website_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
-              <div class="form-row">
+              <div class="form-group">
                 <label>Twitter (minutes)</label>
                 <input v-model.number="form.twitter_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
-              <div class="form-row">
+              <div class="form-group">
                 <label>Delete logs older than (days, 0 = disabled)</label>
                 <input v-model.number="form.log_retention_days" type="number" min="0" max="365" />
               </div>
@@ -925,10 +929,10 @@
                   <span v-else>Save</span>
                 </button>
               </div>
-            </section>
+            </article>
 
             <!-- Manual triggers -->
-            <section class="card">
+            <article>
               <h2>Manual Triggers</h2>
               <p class="muted">Run checks for each resource type across all projects.</p>
 
@@ -965,10 +969,10 @@
                 </button>
               </div>
 
-            </section>
+            </article>
 
             <!-- Danger zone: wipe all data (keeps config) -->
-            <section class="card danger-zone">
+            <article class="danger-zone">
               <h2>Danger Zone</h2>
               <p class="muted">
                 Delete all check logs, or delete everything including projects and repos.
@@ -984,7 +988,7 @@
                   <span v-else>Clear All Data</span>
                 </button>
               </div>
-            </section>
+            </article>
 
           </div>
         </div>
