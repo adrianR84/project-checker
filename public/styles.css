@@ -115,6 +115,11 @@ nav.navbar a[aria-current="page"] {
   box-shadow: 0 0 8px color-mix(in srgb, var(--app-primary) 60%, transparent);
 }
 
+/* ── Table helpers ───────────────────────────────────────────────────── */
+.col-actions { width: 110px; }
+.actions .grid { display: flex; gap: 4px; }
+.col-actions { width: 110px; }
+
 /* ── Layout ───────────────────────────────────────────────────────────── */
 .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
 

@@ -681,7 +681,7 @@
                   <th>GitHub</th>
                   <th>Twitter</th>
                   <th>Telegram</th>
-                  <th style="width:110px"></th>
+                  <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody>
@@ -692,8 +692,10 @@
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
                   <td class="actions">
-                    <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
-                    <button class="secondary danger" title="Delete" @click="onDelete(p)">🗑</button>
+                    <div class="grid">
+                      <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
+                      <button class="secondary" title="Delete" @click="onDelete(p)">🗑</button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
