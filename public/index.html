@@ -422,44 +422,50 @@
           </header>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
-          <section class="status-row">
-            <div class="status" v-if="project.twitter_url">
-              <a :href="project.twitter_url" target="_blank" rel="noopener" class="muted">Twitter</a>
-              <span :class="['badge', statusClass(twitter.status)]">
-                <span class="dot"></span>{{ twitter.status || 'pending' }}
-              </span>
-              <span class="muted small">{{ relativeTime(twitter.checked_at) }}</span>
-            </div>
-            <div class="status" v-else>
-              <span class="muted">Twitter</span>
-              <span class="muted">Not Set</span>
-            </div>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Resource</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last Checked</th>
+                <th scope="col">Last Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="project.twitter_url">
+                <td><a :href="project.twitter_url" target="_blank" rel="noopener">Twitter</a></td>
+                <td><span :class="['badge', statusClass(twitter.status)]"><span class="dot"></span>{{ twitter.status || 'pending' }}</span></td>
+                <td><span class="muted">{{ relativeTime(twitter.checked_at) }}</span></td>
+                <td>—</td>
+              </tr>
+              <tr v-else>
+                <td>Twitter</td>
+                <td colspan="3"><span class="muted">Not Set</span></td>
+              </tr>
 
-            <div class="status" v-if="project.website_url">
-              <a :href="project.website_url" target="_blank" rel="noopener" class="muted">Website</a>
-              <span :class="['badge', statusClass(website.status)]">
-                <span class="dot"></span>{{ website.status || 'pending' }}
-              </span>
-              <span class="muted small">{{ relativeTime(website.checked_at) }}</span>
-            </div>
-            <div class="status" v-else>
-              <span class="muted">Website</span>
-              <span class="muted">Not Set</span>
-            </div>
+              <tr v-if="project.website_url">
+                <td><a :href="project.website_url" target="_blank" rel="noopener">Website</a></td>
+                <td><span :class="['badge', statusClass(website.status)]"><span class="dot"></span>{{ website.status || 'pending' }}</span></td>
+                <td><span class="muted">{{ relativeTime(website.checked_at) }}</span></td>
+                <td>—</td>
+              </tr>
+              <tr v-else>
+                <td>Website</td>
+                <td colspan="3"><span class="muted">Not Set</span></td>
+              </tr>
 
-            <div class="status" v-if="project.github_url">
-              <a :href="project.github_url || 'https://github.com'" target="_blank" rel="noopener" class="muted">GitHub</a>
-              <span :class="['badge', statusClass(github.status)]">
-                <span class="dot"></span>{{ github.status || 'pending' }}
-              </span>
-              <span class="muted small">{{ relativeTime(github.checked_at) }}</span>
-              <span v-if="newestCommit" class="muted small">· {{ relativeTime(newestCommit) }}</span>
-            </div>
-            <div class="status" v-else>
-              <span class="muted">GitHub</span>
-              <span class="muted">Not Set</span>
-            </div>
-          </section>
+              <tr v-if="project.github_url">
+                <td><a :href="project.github_url" target="_blank" rel="noopener">GitHub</a></td>
+                <td><span :class="['badge', statusClass(github.status)]"><span class="dot"></span>{{ github.status || 'pending' }}</span></td>
+                <td><span class="muted">{{ relativeTime(github.checked_at) }}</span></td>
+                <td><span class="muted">{{ newestCommit ? relativeTime(newestCommit) : '—' }}</span></td>
+              </tr>
+              <tr v-else>
+                <td>GitHub</td>
+                <td colspan="3"><span class="muted">Not Set</span></td>
+              </tr>
+            </tbody>
+          </table>
 
           <!-- GitHub repos section with refresh button -->
           <section class="repos-section">
@@ -590,7 +596,7 @@
             No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
           </div>
 
-          <div v-else class="grid">
+          <div v-else class="grid cols-2">
             <ProjectCard
               v-for="p in projects"
               :key="p.id"

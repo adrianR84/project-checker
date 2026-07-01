@@ -162,6 +162,7 @@ nav.navbar a[aria-current="page"] {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;
 }
+.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .modal {
@@ -226,9 +227,6 @@ nav.navbar a[aria-current="page"] {
 .repos-head { margin-bottom: 8px; }
 
 .name { font-size: 16px; font-weight: 600; margin: 0; }
-
-.status-row { display: flex; flex-direction: column; gap: 6px; }
-.status     { display: flex; align-items: center; gap: 6px; }
 
 .repos-section { border-top: 1px solid var(--app-border); padding-top: 12px; }
 .repos-scroll  { max-height: 200px; overflow-y: auto; }
