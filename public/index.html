@@ -158,36 +158,32 @@
     ───────────────────────────────────────────────────────────────────────── */
     const NavBar = {
       template: `
-        <header class="navbar">
-          <div class="navbar-inner">
-            <!-- Brand -->
-            <div class="brand">
-              <span class="logo-dot"></span>
-              Project Checker
-            </div>
-
-            <!-- Left-aligned tabs -->
-            <nav class="left-tabs">
+        <nav class="navbar">
+          <ul>
+            <li>
+              <span class="brand">
+                <span class="logo-dot"></span>
+                Project Checker
+              </span>
+            </li>
+          </ul>
+          <ul>
+            <li v-for="t in leftTabs" :key="t.to">
               <a
-                v-for="t in leftTabs"
-                :key="t.to"
                 :href="'#' + t.to"
-                class="tab"
-                :class="{ active: currentRoute === t.to }"
+                :aria-current="currentRoute === t.to ? 'page' : undefined"
               >{{ t.label }}</a>
-            </nav>
-            <!-- Right-aligned Settings -->
-            <nav class="right-tabs">
+            </li>
+          </ul>
+          <ul>
+            <li v-for="t in rightTabs" :key="t.to">
               <a
-                v-for="t in rightTabs"
-                :key="t.to"
                 :href="'#' + t.to"
-                class="tab"
-                :class="{ active: currentRoute === t.to }"
+                :aria-current="currentRoute === t.to ? 'page' : undefined"
               >{{ t.label }}</a>
-            </nav>
-          </div>
-        </header>
+            </li>
+          </ul>
+        </nav>
       `,
 
       setup() {
