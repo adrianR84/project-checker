@@ -141,5 +141,11 @@ router.post('/clear-data', (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/settings/clear-logs — delete all check logs only
+router.post('/clear-logs', (req, res) => {
+  db.prepare('DELETE FROM check_logs').run();
+  res.json({ ok: true });
+});
+
 module.exports = router;
 module.exports.runChecksForProject = runChecksForProject;

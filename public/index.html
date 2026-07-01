@@ -72,6 +72,7 @@
       triggerGithub:   ()     => req('/settings/trigger-github',  { method: 'POST' }),
       triggerTwitter:  ()     => req('/settings/trigger-twitter',  { method: 'POST' }),
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
+      clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
     };
 
     // Expose globally so the template can call api.* after we return api: window.api
@@ -450,7 +451,9 @@
                 <span v-else>↻ Refresh</span>
               </button>
             </div>
-            <RepoList :repos="project.repos || []" />
+            <div class="repos-scroll">
+              <RepoList :repos="project.repos || []" />
+            </div>
           </section>
 
           <!-- Refresh action buttons -->
@@ -955,13 +958,19 @@
             <section class="card danger-zone">
               <h2>Danger Zone</h2>
               <p class="muted">
-                Delete all projects, repos, and check logs.
-                The config table (check intervals) will be kept.
+                Delete all check logs, or delete everything including projects and repos.
+                Config table (check intervals) is always kept.
               </p>
-              <button class="danger" :disabled="clearing" @click="onClear">
-                <span v-if="clearing" class="spinner"></span>
-                <span v-else>Clear All Data</span>
-              </button>
+              <div class="danger-row">
+                <button class="danger" :disabled="clearingLogs" @click="onClearLogs">
+                  <span v-if="clearingLogs" class="spinner"></span>
+                  <span v-else>Clear Logs</span>
+                </button>
+                <button class="danger" :disabled="clearing" @click="onClear">
+                  <span v-if="clearing" class="spinner"></span>
+                  <span v-else>Clear All Data</span>
+                </button>
+              </div>
             </section>
 
           </div>
@@ -979,6 +988,7 @@
         const saving    = ref(false);
         const triggering = ref(null);  // which trigger is running: 'web' | 'gh' | 'tw'
         const clearing  = ref(false);
+        const clearingLogs = ref(false);
         const error      = ref('');
         const savedMsg   = ref('');   // brief "Saved." confirmation
 
@@ -1049,6 +1059,19 @@
           }
         }
 
+        /** Clear check logs only, keep projects and repos */
+        async function onClearLogs() {
+          if (!confirm('Delete all check logs?')) return;
+          clearingLogs.value = true;
+          try {
+            await api.clearLogs();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            clearingLogs.value = false;
+          }
+        }
+
         /** Delete all projects/repos/logs but keep the config row */
         async function onClear() {
           const msg = 'Delete all projects, repos and check logs? Config will be kept.';
@@ -1087,9 +1110,9 @@
         onMounted(load);
 
         return {
-          settings, form, loading, saving, triggering, clearing,
+          settings, form, loading, saving, triggering, clearing, clearingLogs,
           error, savedMsg,
-          onSave, onTrigger, onClear,
+          onSave, onTrigger, onClear, onClearLogs,
           lastCommit, lastWebsite, lastTwitter,
           relativeTime,
           api: window.api,
