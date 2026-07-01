@@ -691,11 +691,9 @@
                   <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
-                  <td class="actions">
-                    <div class="grid">
-                      <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
-                      <button class="secondary" title="Delete" @click="onDelete(p)">🗑</button>
-                    </div>
+                  <td class="col-actions">
+                    <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
+                    <button class="secondary" title="Delete" @click="onDelete(p)">🗑</button>
                   </td>
                 </tr>
               </tbody>

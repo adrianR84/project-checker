@@ -116,9 +116,7 @@ nav.navbar a[aria-current="page"] {
 }
 
 /* ── Table helpers ───────────────────────────────────────────────────── */
-.col-actions { width: 110px; }
-.actions .grid { display: flex; gap: 4px; }
-.col-actions { width: 110px; }
+.col-actions { width: 110px; display: flex; gap: 4px;}
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
 .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
