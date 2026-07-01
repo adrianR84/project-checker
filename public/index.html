@@ -447,12 +447,17 @@
               <span class="muted">Not Set</span>
             </div>
 
-            <div class="status">
+            <div class="status" v-if="project.github_url">
               <a :href="project.github_url || 'https://github.com'" target="_blank" rel="noopener" class="muted">GitHub</a>
               <span :class="['badge', statusClass(github.status)]">
                 <span class="dot"></span>{{ github.status || 'pending' }}
               </span>
               <span class="muted small">{{ relativeTime(github.checked_at) }}</span>
+              <span v-if="newestCommit" class="muted small">· {{ relativeTime(newestCommit) }}</span>
+            </div>
+            <div class="status" v-else>
+              <span class="muted">GitHub</span>
+              <span class="muted">Not Set</span>
             </div>
           </section>
 
@@ -518,6 +523,13 @@
         const website = computed(() => props.project.website_status || {});
         const github  = computed(() => props.project.github_status  || {});
         const twitter = computed(() => props.project.twitter_status || {});
+        const newestCommit = computed(() => {
+          const dates = (props.project.repos || [])
+            .map(r => r.latest_commit_date)
+            .filter(d => d);
+          if (!dates.length) return null;
+          return dates.reduce((a, b) => a > b ? a : b);
+        });
 
         /**
          * Run a named check and emit 'refreshed' on success so the parent reloads data.
@@ -537,7 +549,7 @@
         }
 
         return {
-          busy, website, github, twitter,
+          busy, website, github, twitter, newestCommit,
           runCheck,
           relativeTime,
           statusClass,
