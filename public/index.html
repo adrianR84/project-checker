@@ -70,6 +70,7 @@
       confirmWebsite: (id)     => req(`/projects/${id}/confirm-website`,{ method: 'POST' }),
       checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
       checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
+      confirmTwitter: (id)     => req(`/projects/${id}/confirm-twitter`,{ method: 'POST' }),
       getCheckLogs:   (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
@@ -437,7 +438,7 @@
                 <td><a :href="project.twitter_url" target="_blank" rel="noopener">Twitter</a></td>
                 <td><span :class="['badge', statusClass(twitter.status)]"><span class="dot"></span>{{ twitter.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(twitter.checked_at) }}</span></td>
-                <td>—</td>
+                <td><span class="muted">{{ twitterLastChanged ? relativeTime(twitterLastChanged) : '—' }}</span></td>
               </tr>
               <tr v-else>
                 <td>Twitter</td>
@@ -497,6 +498,16 @@
             >
               <span v-if="busy === 'twitter'" class="spinner"></span>
               <span v-else>↻ Twitter</span>
+            </button>
+
+            <button
+              v-if="project.twitter_url && (twitter.status === 'changed' || twitter.status === 'error')"
+              class="contrast"
+              :disabled="busy === 'confirm'"
+              @click="runCheck('confirm', () => api.confirmTwitter(project.id))"
+            >
+              <span v-if="busy === 'confirm'" class="spinner"></span>
+              <span v-else>✓ Confirm</span>
             </button>
 
             <button
