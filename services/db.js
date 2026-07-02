@@ -189,10 +189,6 @@ async function init() {
       github_enabled INTEGER NOT NULL DEFAULT 1,
       twitter_enabled INTEGER NOT NULL DEFAULT 1,
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
-      website_confirmed_hash TEXT,
-      website_last_changed_at TEXT,
-      github_last_changed_at TEXT,
-      twitter_last_changed_at TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
@@ -254,6 +250,23 @@ async function init() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_check_logs_project_resource_date
     ON check_logs (project_id, resource_type, checked_at);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resource_status_changes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+      event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed')),
+      value TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_rsc_project_resource
+    ON resource_status_changes (project_id, resource_type, created_at DESC);
   `);
 
   // Run migrations (idempotent — handles schema changes from older DB files)

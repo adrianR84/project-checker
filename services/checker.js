@@ -23,19 +23,21 @@ function logCheck(projectId, resourceType, resourceId, result) {
 
 // Check a website URL: GET + MD5 hash of body, compare with the confirmed hash.
 // Status is "changed" if content differs from the confirmed hash (sticky until manually confirmed).
-// Status is "error" if the request fails (sticky until manually confirmed).
-// Manual confirm updates confirmed_hash to current content → next check returns "ok".
+// Status is "error" if the request fails.
+// Manual confirm inserts a 'confirmed' event into resource_status_changes.
 async function checkWebsite(url, projectId) {
   const start = Date.now();
   if (!url) {
     return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided', details: null };
   }
 
-  // Get confirmed hash from project row (set on manual confirm)
+  // Get last confirmed hash from resource_status_changes (most recent 'confirmed' event)
   let confirmedHash = null;
   if (projectId) {
-    const proj = db.prepare('SELECT website_confirmed_hash FROM projects WHERE id = ?').get(projectId);
-    confirmedHash = proj?.website_confirmed_hash || null;
+    const row = db.prepare(
+      "SELECT value FROM resource_status_changes WHERE project_id = ? AND resource_type = 'website' AND event_type = 'confirmed' ORDER BY created_at DESC LIMIT 1"
+    ).get(projectId);
+    confirmedHash = row?.value || null;
   }
 
   try {
@@ -62,9 +64,11 @@ async function checkWebsite(url, projectId) {
     const changed = confirmedHash && contentHash && confirmedHash !== contentHash;
     const status = res.ok ? (changed ? 'changed' : 'ok') : 'error';
 
-    // Update last_changed_at whenever content differs from confirmed (arms alert system)
+    // Insert 'changed' event whenever content differs from confirmed (arms alert system)
     if (contentHash !== confirmedHash && projectId) {
-      db.prepare('UPDATE projects SET website_last_changed_at = ? WHERE id = ?').run(now(), projectId);
+      db.prepare(
+        "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
+      ).run(projectId, 'website', 'changed', contentHash || '', now());
     }
 
     return {
@@ -111,8 +115,11 @@ async function checkGithubRepo(fullName, projectId) {
         repo.id
       );
       details = { changed: true, previous_sha: repo.latest_commit_sha, new_sha: history.latest_commit_sha };
+      // Insert 'changed' event for github (arms alert system)
       if (projectId) {
-        db.prepare('UPDATE projects SET github_last_changed_at = ? WHERE id = ?').run(now(), projectId);
+        db.prepare(
+          "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
+        ).run(projectId, 'github', 'changed', history.latest_commit_sha || '', now());
       }
     } else if (!repo) {
       details = { note: 'Repo not in local DB, no update' };
@@ -125,17 +132,20 @@ async function checkGithubRepo(fullName, projectId) {
 }
 
 // Check Twitter profile page.
-// Uses sticky confirm pattern: error sticks until manually confirmed.
+// Uses sticky confirm pattern: status sticks at 'changed' until manually confirmed.
 async function checkTwitter(url, projectId) {
   const start = Date.now();
   if (!url) {
     return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided' };
   }
 
-  let confirmedHash = null;
+  // Get last confirmed status from resource_status_changes
+  let confirmedStatus = null;
   if (projectId) {
-    const proj = db.prepare('SELECT twitter_confirmed_hash FROM projects WHERE id = ?').get(projectId);
-    confirmedHash = proj?.twitter_confirmed_hash || null;
+    const row = db.prepare(
+      "SELECT value FROM resource_status_changes WHERE project_id = ? AND resource_type = 'twitter' AND event_type = 'confirmed' ORDER BY created_at DESC LIMIT 1"
+    ).get(projectId);
+    confirmedStatus = row?.value || null;
   }
 
   try {
@@ -151,14 +161,16 @@ async function checkTwitter(url, projectId) {
     const response_time_ms = Date.now() - start;
     const newStatus = res.ok ? 'ok' : 'error';
 
-    // Sticky confirm pattern: if new status differs from confirmed, return 'changed'
-    // until user confirms. The confirmed_hash is only updated on manual confirm.
-    const changed = confirmedHash !== null && newStatus !== confirmedHash;
-    const status = changed ? 'changed' : (confirmedHash || newStatus);
+    // Sticky confirm: if new status differs from confirmed, return 'changed'
+    // until user confirms. The confirmed status is only set on manual confirm.
+    const changed = confirmedStatus !== null && newStatus !== confirmedStatus;
+    const status = changed ? 'changed' : (confirmedStatus || newStatus);
 
-    // Update last_changed_at whenever status differs from confirmed (arms the alert system)
-    if (newStatus !== confirmedHash && projectId) {
-      db.prepare('UPDATE projects SET twitter_last_changed_at = ? WHERE id = ?').run(now(), projectId);
+    // Insert 'changed' event whenever status differs from confirmed (arms the alert system)
+    if (newStatus !== confirmedStatus && projectId) {
+      db.prepare(
+        "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
+      ).run(projectId, 'twitter', 'changed', newStatus, now());
     }
 
     return {

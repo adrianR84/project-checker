@@ -552,12 +552,7 @@
         const github  = computed(() => props.project.github_status  || {});
         const twitter = computed(() => props.project.twitter_status || {});
         const websiteLastChanged = computed(() => props.project.website_last_changed_at || null);
-        // Most recent latest_commit_date across all repos (instead of single project-level timestamp)
-        const githubLastChanged = computed(() => {
-          const repos = props.project.repos || [];
-          const dates = repos.map(r => r.latest_commit_date).filter(Boolean);
-          return dates.length ? dates.reduce((a, b) => a > b ? a : b) : null;
-        });
+        const githubLastChanged  = computed(() => props.project.github_last_changed_at  || null);
         const twitterLastChanged = computed(() => props.project.twitter_last_changed_at || null);
 
         /**

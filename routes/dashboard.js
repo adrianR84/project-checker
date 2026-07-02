@@ -9,8 +9,7 @@ router.get('/', (req, res) => {
   const projects = db.prepare(`
     SELECT id, name,
            website_enabled, github_enabled, twitter_enabled,
-           website_url, github_url, twitter_url,
-           website_last_changed_at, github_last_changed_at, twitter_last_changed_at
+           website_url, github_url, twitter_url
     FROM projects
     ORDER BY id
   `).all();
@@ -38,6 +37,14 @@ router.get('/', (req, res) => {
       ORDER BY cl.checked_at DESC, cl.id DESC LIMIT 1
     `).get(p.id);
 
+    // Latest 'changed' event per resource from resource_status_changes
+    const latestChanged = (resourceType) => {
+      const row = db.prepare(
+        "SELECT created_at FROM resource_status_changes WHERE project_id = ? AND resource_type = ? AND event_type = 'changed' ORDER BY created_at DESC LIMIT 1"
+      ).get(p.id, resourceType);
+      return row?.created_at || null;
+    };
+
     // Per-repo data
     const repos = db.prepare(`
       SELECT repo_name, full_name, repo_url, latest_commit_date, latest_commit_message,
@@ -61,9 +68,9 @@ router.get('/', (req, res) => {
       website_status: websiteCheck || null,
       github_status:  githubCheck  || null,
       twitter_status: twitterCheck || null,
-      website_last_changed_at: p.website_last_changed_at || null,
-      github_last_changed_at:  p.github_last_changed_at  || null,
-      twitter_last_changed_at: p.twitter_last_changed_at || null,
+      website_last_changed_at: latestChanged('website'),
+      github_last_changed_at:  latestChanged('github'),
+      twitter_last_changed_at: latestChanged('twitter'),
       repos
     };
   });

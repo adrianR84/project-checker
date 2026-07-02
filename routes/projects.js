@@ -218,11 +218,13 @@ router.post('/:id/confirm-website', async (req, res) => {
   if (!project) return res.status(404).json({ error: 'Project not found' });
   if (!project.website_url) return res.status(400).json({ error: 'No website URL configured' });
 
-  // Fetch current content and set confirmed_hash to current content hash
+  // Fetch current content and insert confirmed event
   const result = await checkWebsite(project.website_url, id);
   const contentHash = result.details?.content_hash || null;
   if (contentHash) {
-    db.prepare('UPDATE projects SET website_confirmed_hash = ? WHERE id = ?').run(contentHash, id);
+    db.prepare(
+      "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, 'website', 'confirmed', contentHash, now());
   }
   // Log the confirmation as a check with "ok" status
   logCheck(id, 'website', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
@@ -278,10 +280,12 @@ router.post('/:id/confirm-twitter', async (req, res) => {
 
   const result = await checkTwitter(project.twitter_url, id);
   // Normalize 'changed' to 'ok' on confirm — user is confirming the recovered state
-  const confirmedHash = result.status === 'changed' ? 'ok' : result.status;
-  db.prepare('UPDATE projects SET twitter_confirmed_hash = ? WHERE id = ?').run(confirmedHash, id);
+  const confirmedValue = result.status === 'changed' ? 'ok' : result.status;
+  db.prepare(
+    "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(id, 'twitter', 'confirmed', confirmedValue, now());
   logCheck(id, 'twitter', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
-  res.json({ ok: true, confirmed_hash: confirmedHash });
+  res.json({ ok: true, confirmed_hash: confirmedValue });
 });
 
 module.exports = router;
