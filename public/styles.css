@@ -22,7 +22,7 @@
 
 /* ── Pico dark overrides ─ */
 [data-theme="dark"] {
-  --pico-font-size: 14px;
+  --pico-font-size: 100%;
   --pico-background-color: var(--app-bg);
   --pico-card-background-color: var(--app-surface);
   --pico-card-border-color: var(--app-border);
@@ -36,7 +36,7 @@
 /* ── Smaller buttons ───────────────────────────────────────────────────── */
 button, .btn {
   padding: 4px 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* ── Badge (status pill) ──────────────────────────────────────────────── */
@@ -46,7 +46,7 @@ button, .btn {
   gap: 6px;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -86,11 +86,11 @@ nav.navbar {
 }
 nav.navbar .brand {
   display: flex; align-items: center; gap: 8px;
-  font-weight: 600; font-size: 15px;
+  font-weight: 600; font-size: 0.9375rem;
   color: var(--app-text);
 }
 nav.navbar a {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--app-muted);
   text-decoration: none;
@@ -135,7 +135,7 @@ nav.navbar a[aria-current="page"] {
   border: 1px solid var(--app-border);
   border-radius: var(--pico-border-radius-sm);
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-text);
   box-shadow: 0 4px 12px var(--app-shadow);
   animation: toastIn 200ms ease, toastOut 200ms ease 2s forwards;
@@ -209,7 +209,7 @@ nav.navbar a[aria-current="page"] {
   background: var(--app-surface);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-primary);
 }
 .msg {
@@ -226,7 +226,7 @@ nav.navbar a[aria-current="page"] {
 .head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .repos-head { margin-bottom: 8px; }
 
-.name { font-size: 16px; font-weight: 600; margin: 0; }
+.name { font-size: 1rem; font-weight: 600; margin: 0; }
 
 .repos-section { border-top: 1px solid var(--app-border); padding-top: 12px; }
 .repos-scroll  { max-height: 200px; overflow-y: auto; }
@@ -247,7 +247,7 @@ nav.navbar a[aria-current="page"] {
   border: 1px solid var(--app-border);
   border-radius: var(--pico-border-radius-sm);
 }
-.repo-name { font-weight: 500; font-size: 13px; }
+.repo-name { font-weight: 500; font-size: 0.8125rem; }
 .repo-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
 
 /* ── Settings ─────────────────────────────────────────────────────────── */

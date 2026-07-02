@@ -227,7 +227,9 @@ async function init() {
       commit_check_minutes INTEGER NOT NULL DEFAULT 360,
       website_check_minutes INTEGER NOT NULL DEFAULT 1440,
       twitter_check_minutes INTEGER NOT NULL DEFAULT 1440,
-      github_token TEXT
+      github_token TEXT,
+      log_retention_days INTEGER NOT NULL DEFAULT 7,
+      ui_refresh_seconds INTEGER NOT NULL DEFAULT 60
     );
   `);
 
@@ -275,7 +277,7 @@ async function init() {
 
   const existing = db.exec('SELECT id FROM config WHERE id = 1');
   if (!existing.length || !existing[0].values.length) {
-    db.run('INSERT INTO config (id, commit_check_minutes, website_check_minutes, twitter_check_minutes, log_retention_days) VALUES (1, 360, 1440, 1440, 7)');
+    db.run('INSERT INTO config (id, commit_check_minutes, website_check_minutes, twitter_check_minutes, log_retention_days, ui_refresh_seconds) VALUES (1, 360, 1440, 1440, 7, 60)');
     save();
   }
 
