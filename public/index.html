@@ -71,7 +71,8 @@
       checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
       checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
       confirmTwitter: (id)     => req(`/projects/${id}/confirm-twitter`,{ method: 'POST' }),
-      getCheckLogs:   (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
+      getCheckLogs:       (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
+      getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
       triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
@@ -313,6 +314,50 @@
       `,
 
       methods: { relativeTime, absoluteTime, statusClass, logDetail },
+    };
+
+    /* ── StatusChangeList component ────────────────────────────────────────────
+       Renders resource_status_changes entries.
+       Props: logs (array), showProject (bool)
+    ───────────────────────────────────────────────────────────────────────── */
+    const StatusChangeList = {
+      props: ['logs', 'showProject'],
+
+      template: `
+        <div>
+          <div v-if="!logs.length" class="muted">No status changes yet.</div>
+          <table v-else>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th v-if="showProject">Project</th>
+                <th>Event</th>
+                <th>Value</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in logs" :key="log.id">
+                <td>{{ log.resource_type }}</td>
+                <td v-if="showProject">{{ log.project_name || log.project_id }}</td>
+                <td>
+                  <span :class="['badge', log.event_type === 'confirmed' ? 'badge-ok' : 'badge-error']">
+                    {{ log.event_type }}
+                  </span>
+                </td>
+                <td class="detail">{{ log.value || '—' }}</td>
+                <td>
+                  <span :title="absoluteTime(log.created_at)">
+                    {{ showProject ? absoluteTime(log.created_at) : relativeTime(log.created_at) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `,
+
+      methods: { relativeTime, absoluteTime },
     };
 
     /* ── ProjectForm component ─────────────────────────────────────────────────
@@ -589,7 +634,7 @@
        The dashboard endpoint returns projects with their latest status baked in.
     ───────────────────────────────────────────────────────────────────────── */
     const ActivityPage = {
-      components: { ProjectCard, CheckLogList },
+      components: { ProjectCard, CheckLogList, StatusChangeList },
 
       template: `
         <div class="page">
@@ -624,11 +669,15 @@
             />
           </div>
 
-          <!-- Optional recent check logs table -->
-          <section v-if="showLogs && logs.length" class="logs-section">
-            <h2>Recent check logs</h2>
+          <!-- Optional recent logs table -->
+          <section v-if="showLogs" class="logs-section">
+            <div class="tabs">
+              <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
+              <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Status Changes</button>
+            </div>
             <article>
-              <CheckLogList :logs="logs" :show-project="true" />
+              <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true" />
+              <StatusChangeList v-else :logs="statusChanges" :show-project="true" />
             </article>
           </section>
 
@@ -636,12 +685,14 @@
       `,
 
       setup() {
-        const projects   = ref([]);
-        const logs      = ref([]);
-        const loading   = ref(true);
-        const checkingAll = ref(false);
-        const error     = ref('');
-        const showLogs  = ref(true);
+        const projects      = ref([]);
+        const logs         = ref([]);
+        const statusChanges = ref([]);
+        const loading      = ref(true);
+        const checkingAll  = ref(false);
+        const error        = ref('');
+        const showLogs     = ref(true);
+        const logTab       = ref('check-logs');
 
         /** Load dashboard (projects + status) */
         async function load() {
@@ -660,8 +711,17 @@
         async function loadLogs() {
           try {
             const r = await api.getCheckLogs({ limit: 30 });
-            // API may return items[], logs[], or the array directly
             logs.value = r.items || r.logs || r || [];
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        /** Load 30 most recent status-change entries */
+        async function loadStatusChanges() {
+          try {
+            const r = await api.getStatusChanges({ limit: 30 });
+            statusChanges.value = r.items || r.logs || r || [];
           } catch (e) {
             console.error(e);
           }
@@ -686,17 +746,18 @@
         onMounted(async () => {
           load();
           loadLogs();
+          loadStatusChanges();
           try {
             const cfg = await api.getSettings();
             if (cfg.ui_refresh_seconds) {
-              pollTimer = setInterval(() => { load(); loadLogs(); }, cfg.ui_refresh_seconds * 1000);
+              pollTimer = setInterval(() => { load(); loadLogs(); loadStatusChanges(); }, cfg.ui_refresh_seconds * 1000);
             }
           } catch { /* auto-refresh disabled */ }
         });
 
         onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 
-        return { projects, logs, loading, checkingAll, error, showLogs, checkAll, api: window.api };
+        return { projects, logs, statusChanges, loading, checkingAll, error, showLogs, logTab, checkAll, api: window.api };
       },
     };
 
