@@ -197,7 +197,6 @@ nav.navbar a[aria-current="page"] {
 }
 
 /* ── Text helpers ─────────────────────────────────────────────────────── */
-.saved { color: var(--app-ok); }
 .detail {
   color: var(--app-muted);
   max-width: 360px;
@@ -206,7 +205,6 @@ nav.navbar a[aria-current="page"] {
   white-space: nowrap;
 }
 .sha {
-  font-family: 'SF Mono', Consolas, monospace;
   background: var(--app-surface);
   padding: 1px 6px;
   border-radius: 4px;
