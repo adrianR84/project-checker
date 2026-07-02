@@ -68,7 +68,7 @@ async function checkWebsite(url, projectId) {
     if (changed && projectId) {
       db.prepare(
         "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-      ).run(projectId, 'website', 'changed', contentHash, now());
+      ).run(projectId, 'website', 'changed', JSON.stringify({ content_hash: contentHash }), now());
     }
 
     return {
@@ -119,7 +119,7 @@ async function checkGithubRepo(fullName, projectId) {
       if (projectId) {
         db.prepare(
           "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-        ).run(projectId, 'github', 'changed', history.latest_commit_sha || '', now());
+        ).run(projectId, 'github', 'changed', JSON.stringify({ repo_name: fullName, sha: history.latest_commit_sha }), now());
       }
     } else if (!repo) {
       details = { note: 'Repo not in local DB, no update' };
@@ -168,7 +168,7 @@ async function checkTwitter(url, projectId) {
     if (changed && projectId) {
       db.prepare(
         "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-      ).run(projectId, 'twitter', 'changed', newStatus, now());
+      ).run(projectId, 'twitter', 'changed', JSON.stringify({ status: newStatus }), now());
     }
 
     return {

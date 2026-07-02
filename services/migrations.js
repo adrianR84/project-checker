@@ -126,7 +126,7 @@ function runMigrations(db, save) {
   try { add_log_retention_days(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_ui_refresh_seconds(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_resource_status_changes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { backfill_resource_status_changes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  //try { backfill_resource_status_changes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   }
 
 module.exports = { runMigrations };
