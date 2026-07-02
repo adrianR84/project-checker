@@ -153,14 +153,16 @@ router.post('/trigger-twitter', async (req, res) => {
 
 // POST /api/settings/clear-data — empty all tables except config
 router.post('/clear-data', (req, res) => {
+  db.prepare('DELETE FROM resource_status_changes').run();
   db.prepare('DELETE FROM check_logs').run();
   db.prepare('DELETE FROM repos').run();
   db.prepare('DELETE FROM projects').run();
   res.json({ ok: true });
 });
 
-// POST /api/settings/clear-logs — delete all check logs only
+// POST /api/settings/clear-logs — delete all check logs and status changes
 router.post('/clear-logs', (req, res) => {
+  db.prepare('DELETE FROM resource_status_changes').run();
   db.prepare('DELETE FROM check_logs').run();
   res.json({ ok: true });
 });

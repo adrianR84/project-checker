@@ -17,7 +17,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Resource | What it checks |
 |----------|----------------|
 | **Website** | HTTP status, response time, detects content changes via content hash |
-| **GitHub repo** | Latest commit SHA, commit count, stars, last push time |
+| **GitHub org** | All public repos under a GitHub org URL — tracks latest commit SHA, commit count, stars, last push time |
 | **Twitter** | Account accessibility and error states |
 
 Each resource has a **sticky confirm** pattern: after confirming, the app tracks whether the status has changed since that confirmation. "Last changed" timestamps are recorded in the `resource_status_changes` table.
@@ -43,7 +43,7 @@ project-checker/
 
 ## Database
 
-SQLite via sql.js. The database file (`project-checker.db`) is created on first run. Migrations run automatically on every startup and are idempotent.
+SQLite via sql.js. The database file (`data/project-checker.db`) is created on first run. Migrations run automatically on every startup and are idempotent.
 
 Key tables:
 - `projects` — enabled flags and URLs for each resource
