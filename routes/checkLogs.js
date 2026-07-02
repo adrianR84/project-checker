@@ -54,7 +54,7 @@ router.get('/status-changes', (req, res) => {
     params.push(resourceType);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type = 'changed'` : "WHERE rsc.event_type = 'changed'";
   const rows = db.prepare(`
     SELECT rsc.*, p.name AS project_name
     FROM resource_status_changes rsc
@@ -64,7 +64,8 @@ router.get('/status-changes', (req, res) => {
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM resource_status_changes rsc ${where}`).get(...params);
+  const countWhere = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type = 'changed'` : "WHERE rsc.event_type = 'changed'";
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM resource_status_changes rsc ${countWhere}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 

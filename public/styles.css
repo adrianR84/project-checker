@@ -2,7 +2,7 @@
 :root {
   --app-bg:       #0f1115;
   --app-surface:  #161a22;
-  --app-border:   #262c38;
+  --app-border:   #495163;
   --app-muted:    #8b93a3;
   --app-primary:  #6c8cff;
   --app-text:     #e6e8ec;
@@ -83,14 +83,16 @@ nav.navbar {
   top: 0;
   z-index: 50;
   padding: 0 24px;
+  max-width: 1200px;
+  margin:0pc auto;
 }
 nav.navbar .brand {
   display: flex; align-items: center; gap: 8px;
-  font-weight: 600; font-size: 0.9375rem;
+  font-weight: 600; font-size: 1.2rem;
   color: var(--app-text);
 }
 nav.navbar a {
-  font-size: 0.9375rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--app-muted);
   text-decoration: none;
@@ -107,7 +109,6 @@ nav.navbar a:hover {
 nav.navbar a[aria-current="page"] {
   color: var(--app-text);
   background: color-mix(in srgb, var(--app-primary) 12%, transparent);
-  font-weight: 500;
 }
 .logo-dot {
   width: 10px; height: 10px; border-radius: 50%;
@@ -146,7 +147,7 @@ nav.navbar a[aria-current="page"] {
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+.page { max-width: 1200px; margin: 0 auto; padding: 28px 0px; }
 
 .toolbar {
   display: flex;
@@ -257,7 +258,8 @@ nav.navbar a[aria-current="page"] {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--app-border);
+  border-bottom: 2px solid var(--app-border);
+  font-size: 1rem;
 }
 .trigger-row:last-of-type { border-bottom: none; }
 
