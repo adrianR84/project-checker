@@ -264,9 +264,24 @@ router.post('/:id/check-twitter', async (req, res) => {
     logCheck(id, 'twitter', null, result);
     return res.json(result);
   }
-  const result = await checkTwitter(project.twitter_url);
+  const result = await checkTwitter(project.twitter_url, id);
   logCheck(id, 'twitter', null, result);
   res.json(result);
+});
+
+// POST /api/projects/:id/confirm-twitter — confirm current status, clears sticky error
+router.post('/:id/confirm-twitter', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.twitter_url) return res.status(400).json({ error: 'No Twitter URL configured' });
+
+  const result = await checkTwitter(project.twitter_url, id);
+  // Normalize 'changed' to 'ok' on confirm — user is confirming the recovered state
+  const confirmedHash = result.status === 'changed' ? 'ok' : result.status;
+  db.prepare('UPDATE projects SET twitter_confirmed_hash = ? WHERE id = ?').run(confirmedHash, id);
+  logCheck(id, 'twitter', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
+  res.json({ ok: true, confirmed_hash: confirmedHash });
 });
 
 module.exports = router;

@@ -119,6 +119,20 @@ function drop_github_confirmed_hash(db, save) {
 }
 
 /**
+ * Add twitter_confirmed_hash to projects table.
+ * Used to make Twitter errors sticky — error persists until manually confirmed.
+ */
+function add_twitter_confirmed_hash(db, save) {
+  const rows = db.exec("SELECT * FROM projects LIMIT 1");
+  if (!rows.length) return;
+  const cols = rows[0].columns;
+  if (cols.includes('twitter_confirmed_hash')) return;
+  db.exec('ALTER TABLE projects ADD COLUMN twitter_confirmed_hash TEXT');
+  save();
+  console.log(`[${now()}] Migration: added twitter_confirmed_hash to projects`);
+}
+
+/**
  * Drop website_content_hash column (not used — content hash lives in check_logs).
  */
 function drop_website_content_hash(db, save) {
@@ -143,6 +157,7 @@ function runMigrations(db, save) {
   try { add_confirmed_hashes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { drop_github_confirmed_hash(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { drop_website_content_hash(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_twitter_confirmed_hash(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

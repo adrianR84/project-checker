@@ -62,7 +62,8 @@ async function checkWebsite(url, projectId) {
     const changed = confirmedHash && contentHash && confirmedHash !== contentHash;
     const status = res.ok ? (changed ? 'changed' : 'ok') : 'error';
 
-    if (changed && projectId) {
+    // Update last_changed_at whenever content differs from confirmed (arms alert system)
+    if (contentHash !== confirmedHash && projectId) {
       db.prepare('UPDATE projects SET website_last_changed_at = ? WHERE id = ?').run(now(), projectId);
     }
 
@@ -123,12 +124,20 @@ async function checkGithubRepo(fullName, projectId) {
   }
 }
 
-// Check Twitter profile page
-async function checkTwitter(url) {
+// Check Twitter profile page.
+// Uses sticky confirm pattern: error sticks until manually confirmed.
+async function checkTwitter(url, projectId) {
   const start = Date.now();
   if (!url) {
     return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided' };
   }
+
+  let confirmedHash = null;
+  if (projectId) {
+    const proj = db.prepare('SELECT twitter_confirmed_hash FROM projects WHERE id = ?').get(projectId);
+    confirmedHash = proj?.twitter_confirmed_hash || null;
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -140,10 +149,24 @@ async function checkTwitter(url) {
     });
     clearTimeout(timeout);
     const response_time_ms = Date.now() - start;
-    if (res.ok) {
-      return { status: 'ok', http_status: res.status, response_time_ms, error_message: null };
+    const newStatus = res.ok ? 'ok' : 'error';
+
+    // Sticky confirm pattern: if new status differs from confirmed, return 'changed'
+    // until user confirms. The confirmed_hash is only updated on manual confirm.
+    const changed = confirmedHash !== null && newStatus !== confirmedHash;
+    const status = changed ? 'changed' : (confirmedHash || newStatus);
+
+    // Update last_changed_at whenever status differs from confirmed (arms the alert system)
+    if (newStatus !== confirmedHash && projectId) {
+      db.prepare('UPDATE projects SET twitter_last_changed_at = ? WHERE id = ?').run(now(), projectId);
     }
-    return { status: 'error', http_status: res.status, response_time_ms, error_message: `HTTP ${res.status}` };
+
+    return {
+      status,
+      http_status: res.status,
+      response_time_ms,
+      error_message: res.ok ? null : `HTTP ${res.status}`,
+    };
   } catch (err) {
     const response_time_ms = Date.now() - start;
     return { status: 'error', http_status: null, response_time_ms, error_message: err.message };
