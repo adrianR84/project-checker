@@ -1368,12 +1368,15 @@
 
           for (const item of list) {
             try {
+              const hasWebsite = !!item.website;
               const created = await api.createProject({
-                name:         item.name,
-                website_url:   item.website,
-                github_url:    item.github,
-                twitter_url:   item.twitter,
-                telegram_url:  item.telegram,
+                name:                   item.name,
+                website_url:            item.website,
+                github_url:             item.github,
+                twitter_url:            item.twitter,
+                telegram_url:           item.telegram,
+                website_enabled:        hasWebsite,      // enable if URL present
+                website_content_check:  hasWebsite,      // enable content check if URL present
               });
               ok++;
               if (item.github) lastGithubImport.value = created;

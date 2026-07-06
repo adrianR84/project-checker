@@ -104,6 +104,21 @@ router.post('/', async (req, res) => {
 
   const projectId = result.lastInsertRowid;
 
+  // Await checks and log results so Activity shows real status immediately (not "pending")
+  try {
+    if (website_url) {
+      const r = await checkWebsite(website_url, projectId, !!website_content_check);
+      await logCheck(projectId, 'website', null, r);
+    }
+    if (twitter_url) {
+      const r = await checkTwitter(twitter_url, projectId);
+      await logCheck(projectId, 'twitter', null, r);
+    }
+  } catch (err) {
+    console.error(`[${now()}] post-create checks failed for project ${projectId}: ${err.message}`);
+  }
+  // github repos are added separately via add-repos; skip here
+
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
   const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ?').all(projectId);
   res.status(201).json({ ...project, repos });
@@ -252,6 +267,12 @@ router.post('/:id/add-repos', async (req, res) => {
 
   for (const repo of req.body.repos) {
     await storeRepo(id, repo);
+    try {
+      const r = await checkGithubRepo(repo.full_name, id);
+      await logCheck(id, 'github', null, r);
+    } catch (err) {
+      console.error(`[${now()}] initial github check failed for ${repo.full_name}: ${err.message}`);
+    }
   }
 
   const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
