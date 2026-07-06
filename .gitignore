@@ -1,6 +1,7 @@
 node_modules/
 .env
 *.db
+*.db-*
 *.log
 .DS_Store
 .pnpm-store/
