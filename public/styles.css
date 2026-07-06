@@ -117,7 +117,34 @@ nav.navbar a[aria-current="page"] {
 }
 
 /* ── Table helpers ───────────────────────────────────────────────────── */
-.col-actions { width: 110px; display: flex; gap: 4px;}
+.col-actions { width: 110px; display: flex; gap: 4px; overflow: visible; }
+
+/* ── Settings grid helpers ──────────────────────────────────────────── */
+/* Force a settings article to span 2 columns in Pico's auto-fit grid */
+article.force-wide {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+/* ── Form row: label left + Enable right, input below ─────────────── */
+.form-row { display: flex; flex-direction: column; gap: 4px; }
+.form-row-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.form-row-header label { margin: 0; padding: 0; border: none; background: none; box-shadow: none; white-space: nowrap; }
+
+/* ── Compact table ───────────────────────────────────────────────────── */
+table.compact { table-layout: fixed; font-size: 0.85rem; margin-bottom:0px; width: 100%;}
+table.compact th, table.compact td { padding: 4px 8px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+table.compact th[data-tooltip] { overflow: visible; }
+table.compact td:has([data-tooltip]) { overflow: visible; }
+
+table.compact .project_cell{ min-width: 150px; max-width: 300px; }
+table.compact .project_cell.alert  { width: 250px; }
+table.compact .resource_cell { min-width: 70px;  width: 80px;  }
+table.compact .type_cell     { min-width: 70px;  width: 90px;  }
+table.compact .time_cell     { min-width: 150px; width: 150px; }
+table.compact .status_cell   { min-width: 70px;  width: 90px;  }
+table.compact .action_cell   { min-width: 40px;  width: 40px;  }
+table.compact .details_cell   { min-width: 140px; }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */
 #toast {
@@ -155,6 +182,7 @@ nav.navbar a[aria-current="page"] {
   align-items: center;
   margin-bottom: 22px;
   flex-wrap: wrap;
+  padding: 0 20px 0 20px;
 }
 .toolbar h1 { margin: 0; flex: 1; }
 
@@ -196,6 +224,12 @@ nav.navbar a[aria-current="page"] {
   margin-top: 18px;
 }
 
+.error-msg {
+  font-size: 0.75rem;
+  color: var(--app-error);
+  margin-left: 8px;
+}
+
 /* ── Text helpers ─────────────────────────────────────────────────────── */
 .detail {
   color: var(--app-muted);
@@ -219,11 +253,20 @@ nav.navbar a[aria-current="page"] {
   max-width: 280px;
 }
 
-/* ── Project card ────────────────────────────────────────────────────── */
-.project-card { display: flex; flex-direction: column; gap: 14px; }
 
-.head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.repos-head { margin-bottom: 8px; }
+
+/* ── Project card ────────────────────────────────────────────────────── */
+
+.project-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 900px) {
+  .project-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+
+.project-card { display: flex; flex-direction: column; gap: 14px; overflow: visible; }
+
+.head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 0px; }
+.repos-head { margin-bottom: 8px; overflow: visible; }
 
 .name { font-size: 1rem; font-weight: 600; margin: 0; }
 
@@ -261,13 +304,13 @@ nav.navbar a[aria-current="page"] {
 }
 .trigger-row:last-of-type { border-bottom: none; }
 
-.danger-zone { border-color: color-mix(in srgb, var(--app-error) 30%, transparent); }
-.danger-zone h2 { color: var(--app-error); }
+.danger-zone { border-color: var(--app-error); background: color-mix(in srgb, var(--app-error) 5%, var(--app-surface)); }
+.danger-zone h3 { color: var(--app-error); }
 .danger-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-.logs-section { margin-top: 2rem; }
+.logs-section { margin-top: 1rem; }
 
-.tabs { display: flex; gap: 2px; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border); }
+.tabs { display: flex; gap: 2px; margin: 0 20px 0 20px; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border);}
 .tab {
   padding: 8px 16px;
   background: none;
@@ -275,8 +318,19 @@ nav.navbar a[aria-current="page"] {
   border-bottom: 2px solid transparent;
   color: var(--app-muted);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 1rem; font-weight: bold;
   transition: color 0.15s, border-color 0.15s;
 }
 .tab:hover { color: var(--app-text); }
 .tab.active { color: var(--app-primary); border-bottom-color: var(--app-primary); }
+
+/* ── Pagination ────────────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}

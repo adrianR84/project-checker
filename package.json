@@ -3,16 +3,20 @@
   "version": "1.0.0",
   "description": "Backend for Project Checker app",
   "main": "index.js",
+  "pnpm": {},
   "scripts": {
     "start": "node index.js",
-    "dev": "node services/kill-ports.js && concurrently \"node --watch index.js\" \"live-server --port=3001 --no-browser --proxy=/api:http://localhost:3000/api public\""
+    "dev": "node utils/kill-ports.js && concurrently \"node --watch index.js\" \"live-server --port=3001 --no-browser --proxy=/api:http://localhost:3000/api public\"",
+    "dev:log": "node utils/kill-ports.js && node utils/dev-log.js",
+    "log:pipe": "node utils/log-pipe.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "defuddle": "^1.0.3",
     "dotenv": "^17.4.2",
     "express": "^4.21.0",
-    "node-cron": "^3.0.3",
-    "sql.js": "^1.11.0"
+    "jsdom": "^29.1.1",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",

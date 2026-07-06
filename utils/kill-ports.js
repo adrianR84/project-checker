@@ -6,10 +6,12 @@ const { execSync } = require('child_process');
 
 const PORTS = [3000, 3001];
 
+/** Returns true when running on Windows. */
 function isWindows() {
   return process.platform === 'win32';
 }
 
+/** Returns the PID of the process listening on the given port on Windows, or null. */
 function getPortPidWindows(port) {
   try {
     const output = execSync(
@@ -23,6 +25,7 @@ function getPortPidWindows(port) {
   }
 }
 
+/** Returns the PID of the process listening on the given port on Unix, or null. */
 function getPortPidUnix(port) {
   try {
     const output = execSync(`lsof -ti:${port}`, { encoding: 'utf8' });
@@ -33,10 +36,12 @@ function getPortPidUnix(port) {
   }
 }
 
+/** Platform-aware wrapper returning the PID listening on a port, or null. */
 function getPortPid(port) {
   return isWindows() ? getPortPidWindows(port) : getPortPidUnix(port);
 }
 
+/** Force-kills a PID on Windows via taskkill; returns true on success. */
 function killPidWindows(pid) {
   try {
     execSync(`taskkill /F /PID ${pid}`, { windowsHide: true });
@@ -46,6 +51,7 @@ function killPidWindows(pid) {
   }
 }
 
+/** Force-kills a PID on Unix via kill; returns true on success. */
 function killPidUnix(pid) {
   try {
     execSync(`kill -f ${pid}`);
@@ -55,6 +61,7 @@ function killPidUnix(pid) {
   }
 }
 
+/** Platform-aware wrapper to force-kill a PID; returns true on success. */
 function killPid(pid) {
   return isWindows() ? killPidWindows(pid) : killPidUnix(pid);
 }

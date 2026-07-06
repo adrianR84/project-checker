@@ -1,17 +1,17 @@
 // Projects REST API
 const express = require('express');
 const db = require('../services/db');
-const { fetchReposForOwner, fetchCommitHistory } = require('../services/github');
-const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../services/checker');
+const { fetchReposForOwner, fetchCommitHistory, fetchLatestTag } = require('../services/github');
+const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange } = require('../services/checker');
 
 const router = express.Router();
 const now = () => new Date().toISOString();
 
 // GET /api/projects — list all projects
-router.get('/', (req, res) => {
-  const projects = db.prepare(`
+router.get('/', async (req, res) => {
+  const projects = await db.prepare(`
     SELECT id, name, website_url, github_url, twitter_url, telegram_url,
-           website_enabled, github_enabled, twitter_enabled, telegram_enabled,
+           website_enabled, website_content_check, github_enabled, twitter_enabled, telegram_enabled,
            created_at, updated_at
     FROM projects
     ORDER BY id DESC
@@ -20,15 +20,14 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/projects/:id — single project with repos + latest check_logs
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
-  const repos = db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
 
-  // Latest check log per resource_type
-  const latestLogs = db.prepare(`
+  const latestLogs = await db.prepare(`
     SELECT * FROM check_logs
     WHERE project_id = ?
       AND id IN (
@@ -43,38 +42,47 @@ router.get('/:id', (req, res) => {
 });
 
 // Helper: store repo with commit history — upsert without ON CONFLICT
-async function storeRepo(projectId, repoInfo, history) {
-  const existing = db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(projectId, repoInfo.full_name);
+/** Upserts a repo row (insert or update by project_id + full_name). */
+async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
+  const existing = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(projectId, repoInfo.full_name);
   const ts = now();
+  const h = {
+    first_commit_date: null,
+    latest_commit_date: null,
+    total_commits: 0,
+    latest_commit_sha: null,
+    latest_commit_message: null,
+    ...history,
+  };
 
   if (existing) {
-    db.prepare(`
+    await db.prepare(`
       UPDATE repos SET
         repo_name = ?, repo_url = ?, description = ?, default_branch = ?,
         first_commit_date = ?, latest_commit_date = ?, total_commits = ?,
         latest_commit_sha = ?, latest_commit_message = ?, pushed_at = ?,
-        stars_count = ?, language = ?, updated_at = ?
+        stars_count = ?, language = ?, latest_tag = ?, updated_at = ?
       WHERE id = ?
     `).run(
       repoInfo.repo_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
-      history.first_commit_date, history.latest_commit_date, history.total_commits,
-      history.latest_commit_sha, history.latest_commit_message, repoInfo.pushed_at,
-      repoInfo.stars_count, repoInfo.language, ts,
+      h.first_commit_date, h.latest_commit_date, h.total_commits,
+      h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
+      repoInfo.stars_count, repoInfo.language, latestTag, ts,
       existing.id
     );
   } else {
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO repos (
         project_id, repo_name, full_name, repo_url, description, default_branch,
         first_commit_date, latest_commit_date, total_commits, latest_commit_sha,
-        latest_commit_message, pushed_at, stars_count, language, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        latest_commit_message, pushed_at, stars_count, language, latest_tag, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       projectId,
       repoInfo.repo_name, repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
-      history.first_commit_date, history.latest_commit_date, history.total_commits,
-      history.latest_commit_sha, history.latest_commit_message, repoInfo.pushed_at,
-      repoInfo.stars_count, repoInfo.language,
+      h.first_commit_date, h.latest_commit_date, h.total_commits,
+      h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
+      repoInfo.stars_count, repoInfo.language, latestTag,
       ts, ts
     );
   }
@@ -82,53 +90,33 @@ async function storeRepo(projectId, repoInfo, history) {
 
 // POST /api/projects — create project
 router.post('/', async (req, res) => {
-  const { name, website_url, github_url, twitter_url, telegram_url } = req.body || {};
+  const { name, website_url, github_url, twitter_url, telegram_url,
+          website_enabled, website_content_check } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   const ts = now();
-  const result = db.prepare(`
-    INSERT INTO projects (name, website_url, github_url, twitter_url, telegram_url, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(name, website_url || null, github_url || null, twitter_url || null, telegram_url || null, ts, ts);
+  const result = await db.prepare(`
+    INSERT INTO projects (name, website_url, github_url, twitter_url, telegram_url,
+      website_enabled, website_content_check, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
+    website_enabled ? 1 : 0, website_content_check ? 1 : 0, ts, ts);
 
   const projectId = result.lastInsertRowid;
 
-  // Fetch GitHub repos if github_url provided
-  if (github_url) {
-    try {
-      console.log(`[${now()}] Fetching repos for project ${projectId} from ${github_url}`);
-      const repos = await fetchReposForOwner(github_url);
-      for (const repoInfo of repos) {
-        try {
-          const history = await fetchCommitHistory(repoInfo.full_name);
-          await storeRepo(projectId, repoInfo, history);
-        } catch (err) {
-          console.error(`[${now()}] Failed to fetch commit history for ${repoInfo.full_name}: ${err.message}`);
-          // Store repo with empty commit history
-          await storeRepo(projectId, repoInfo, {
-            first_commit_date: null, latest_commit_date: null, latest_commit_sha: null,
-            latest_commit_message: null, total_commits: 0
-          });
-        }
-      }
-    } catch (err) {
-      console.error(`[${now()}] GitHub fetch failed for project ${projectId}: ${err.message}`);
-    }
-  }
-
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
-  const repos = db.prepare('SELECT * FROM repos WHERE project_id = ?').all(projectId);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ?').all(projectId);
   res.status(201).json({ ...project, repos });
 });
 
-// PUT /api/projects/:id — update project
-router.put('/:id', (req, res) => {
+// PUT /api/projects/:id — update project (optionally sync repos array)
+router.put('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Project not found' });
 
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
-                   'website_enabled', 'github_enabled', 'twitter_enabled', 'telegram_enabled'];
+                   'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
@@ -136,116 +124,178 @@ router.put('/:id', (req, res) => {
     }
   }
 
-  if (Object.keys(updates).length === 0) {
-    return res.json(existing);
+  if (Object.keys(updates).length > 0) {
+    const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const values = Object.values(updates);
+    values.push(now(), id);
+    await db.prepare(`UPDATE projects SET ${setClause}, updated_at = ? WHERE id = ?`).run(...values);
   }
 
-  const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(updates);
-  values.push(now(), id);
+  // Sync repos if provided: upsert each, delete any not in the list
+  if (req.body && Array.isArray(req.body.repos)) {
+    const submitted = new Set(req.body.repos.map(r => r.full_name));
+    // Delete orphans
+    if (submitted.size > 0) {
+      const placeholders = Array(submitted.size).fill('?').join(',');
+      await db.prepare(`DELETE FROM repos WHERE project_id = ? AND full_name NOT IN (${placeholders})`).run(id, ...req.body.repos.map(r => r.full_name));
+    } else {
+      await db.prepare('DELETE FROM repos WHERE project_id = ?').run(id);
+    }
+    // Upsert each submitted repo
+    for (const repo of req.body.repos) {
+      const exists = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(id, repo.full_name);
+      const ts = now();
+      if (exists) {
+        await db.prepare(`
+          UPDATE repos SET repo_name=?, repo_url=?, description=?, default_branch=?,
+            stars_count=?, language=?, status='active', updated_at=?
+          WHERE id = ?
+        `).run(repo.repo_name, repo.repo_url, repo.description, repo.default_branch,
+          repo.stars_count, repo.language, ts, exists.id);
+      } else {
+        await db.prepare(`
+          INSERT INTO repos (project_id, repo_name, full_name, repo_url, description, default_branch,
+            stars_count, language, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        `).run(id, repo.repo_name, repo.full_name, repo.repo_url, repo.description, repo.default_branch,
+          repo.stars_count, repo.language, ts, ts);
+      }
+    }
+  }
 
-  db.prepare(`UPDATE projects SET ${setClause}, updated_at = ? WHERE id = ?`).run(...values);
-  const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.json(updated);
+  const updated = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
+  res.json({ ...updated, repos });
 });
 
 // DELETE /api/projects/:id — delete project (cascades)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Project not found' });
-  db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+  await db.prepare('DELETE FROM projects WHERE id = ?').run(id);
   res.json({ ok: true, deleted: id });
+});
+
+// GET /api/projects/:id/org-repos — fetch all repos from the org (for RepoManager)
+router.get('/:id/org-repos', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
+  try {
+    const repos = await fetchReposForOwner(project.github_url);
+    res.json(repos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/projects/:id/refresh-repos — re-fetch all repos from GitHub
 router.post('/:id/refresh-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
   if (!project.github_url) return res.status(400).json({ error: 'Project has no github_url' });
 
   try {
-    const repos = await fetchReposForOwner(project.github_url);
+    const githubRepos = await fetchReposForOwner(project.github_url);
+    const githubFullNames = new Set(githubRepos.map(r => r.full_name));
+
+    // Detect deleted repos
+    const localActiveRepos = await db.prepare(
+      'SELECT id, full_name, latest_commit_sha FROM repos WHERE project_id = ? AND status = \'active\''
+    ).all(id);
+    for (const localRepo of localActiveRepos) {
+      if (!githubFullNames.has(localRepo.full_name)) {
+        const ts = now();
+        await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, localRepo.id);
+        recordStatusChange(id, 'github', 'deleted', { repo_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
+      }
+    }
+
     let updated = 0;
     let added = 0;
-    for (const repoInfo of repos) {
-      const exists = db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(id, repoInfo.full_name);
+    for (const repoInfo of githubRepos) {
+      const exists = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(id, repoInfo.full_name);
       try {
         const history = await fetchCommitHistory(repoInfo.full_name);
-        await storeRepo(id, repoInfo, history);
+        const latestTag = await fetchLatestTag(repoInfo.full_name);
+        await storeRepo(id, repoInfo, history, latestTag);
         if (exists) updated++; else added++;
       } catch (err) {
         console.error(`[${now()}] refresh-repos: commit history failed for ${repoInfo.full_name}: ${err.message}`);
+        const latestTag = await fetchLatestTag(repoInfo.full_name).catch(() => null);
         await storeRepo(id, repoInfo, {
           first_commit_date: null, latest_commit_date: null, latest_commit_sha: null,
           latest_commit_message: null, total_commits: 0
-        });
+        }, latestTag);
         if (exists) updated++; else added++;
       }
     }
-    res.json({ ok: true, fetched: repos.length, updated, added });
+    res.json({ ok: true, fetched: githubRepos.length, updated, added });
   } catch (err) {
     console.error(`[${now()}] refresh-repos failed for project ${id}: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
 
+// POST /api/projects/:id/add-repos — upsert selected repos (fetched from GitHub)
+router.post('/:id/add-repos', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  if (!req.body || !Array.isArray(req.body.repos)) {
+    return res.status(400).json({ error: 'repos array required' });
+  }
+
+  for (const repo of req.body.repos) {
+    await storeRepo(id, repo);
+  }
+
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
+  res.json({ ok: true, repos });
+});
+
+// DELETE /api/projects/:id/repos/:full_name — hard-delete a specific repo
+// Uses wildcard to handle full_names like "owner/repo" that contain slashes
+router.delete('/:id/repos/*', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const fullName = decodeURIComponent(req.params[0]);
+  const existing = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(id, fullName);
+  if (!existing) return res.status(404).json({ error: 'Repo not found' });
+  await db.prepare('DELETE FROM repos WHERE id = ?').run(existing.id);
+  res.json({ ok: true });
+});
+
 // POST /api/projects/:id/check-website
 router.post('/:id/check-website', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.website_enabled) {
-    const result = { status: 'disabled', http_status: null, response_time_ms: 0, error_message: null };
-    logCheck(id, 'website', null, result);
-    return res.json(result);
-  }
   if (!project.website_url) {
     const result = { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL' };
-    logCheck(id, 'website', null, result);
+    await logCheck(id, 'website', null, result);
     return res.json(result);
   }
-  const result = await checkWebsite(project.website_url);
-  logCheck(id, 'website', null, result);
+  const result = await checkWebsite(project.website_url, id, !!project.website_content_check);
+  await logCheck(id, 'website', null, result);
   res.json(result);
 });
 
-// POST /api/projects/:id/confirm-website — confirm current content, clears "changed" state
-router.post('/:id/confirm-website', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.website_url) return res.status(400).json({ error: 'No website URL configured' });
-
-  // Fetch current content and insert confirmed event
-  const result = await checkWebsite(project.website_url, id);
-  const contentHash = result.details?.content_hash || null;
-  if (contentHash) {
-    db.prepare(
-      "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, 'website', 'confirmed', contentHash, now());
-  }
-  // Log the confirmation as a check with "ok" status
-  logCheck(id, 'website', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
-  res.json({ ok: true, confirmed_hash: contentHash });
-});
 
 // POST /api/projects/:id/check-github
 router.post('/:id/check-github', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.github_enabled) {
-    const result = { status: 'disabled', http_status: null, response_time_ms: 0, error_message: null };
-    logCheck(id, 'github', null, result);
-    return res.json(result);
-  }
-  const repos = db.prepare('SELECT * FROM repos WHERE project_id = ?').all(id);
+  if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
+  const repos = await db.prepare("SELECT * FROM repos WHERE project_id = ? AND status = 'active'").all(id);
   const results = [];
   for (const repo of repos) {
     const result = await checkGithubRepo(repo.full_name, id);
-    logCheck(id, 'github', repo.full_name, result);
+    await logCheck(id, 'github', repo.id, result);
     results.push({ repo: repo.full_name, ...result });
   }
   res.json({ ok: true, results });
@@ -254,38 +304,17 @@ router.post('/:id/check-github', async (req, res) => {
 // POST /api/projects/:id/check-twitter
 router.post('/:id/check-twitter', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.twitter_enabled) {
-    const result = { status: 'disabled', http_status: null, response_time_ms: 0, error_message: null };
-    logCheck(id, 'twitter', null, result);
-    return res.json(result);
-  }
   if (!project.twitter_url) {
     const result = { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL' };
-    logCheck(id, 'twitter', null, result);
+    await logCheck(id, 'twitter', null, result);
     return res.json(result);
   }
   const result = await checkTwitter(project.twitter_url, id);
-  logCheck(id, 'twitter', null, result);
+  await logCheck(id, 'twitter', null, result);
   res.json(result);
 });
 
-// POST /api/projects/:id/confirm-twitter — confirm current status, clears sticky error
-router.post('/:id/confirm-twitter', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.twitter_url) return res.status(400).json({ error: 'No Twitter URL configured' });
-
-  const result = await checkTwitter(project.twitter_url, id);
-  // Normalize 'changed' to 'ok' on confirm — user is confirming the recovered state
-  const confirmedValue = result.status === 'changed' ? 'ok' : result.status;
-  db.prepare(
-    "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, 'twitter', 'confirmed', confirmedValue, now());
-  logCheck(id, 'twitter', null, { status: 'ok', http_status: result.http_status, response_time_ms: result.response_time_ms, error_message: null });
-  res.json({ ok: true, confirmed_hash: confirmedValue });
-});
 
 module.exports = router;

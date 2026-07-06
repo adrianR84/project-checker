@@ -1,132 +1,366 @@
 // Database migrations — runs on every init, idempotent.
-// Each function migrates from one schema version to the next.
-
+/** Returns the current ISO timestamp. */
 const now = () => new Date().toISOString();
 
-/**
- * Add log_retention_days column to config (default 7).
- * Integrated into db.js CREATE TABLE for new installs; kept here for existing DBs.
- */
-function add_log_retention_days(db, save) {
-  const rows = db.exec('SELECT * FROM config WHERE id = 1');
-  if (!rows.length) return;
-  const cols = rows[0].columns;
-  if (cols.includes('log_retention_days')) return;
-  db.exec('ALTER TABLE config ADD COLUMN log_retention_days INTEGER NOT NULL DEFAULT 7');
-  save();
-  console.log(`[${now()}] Migration: added log_retention_days column`);
+// Legacy flat-column migrations — no-op on JSON schema
+const add_log_retention_days = () => {};
+const add_ui_refresh_seconds  = () => {};
+const add_compact_activity    = () => {};
+
+/** Migration: converts check_logs.resource_id from TEXT to INTEGER via table rebuild. */
+function convert_check_logs_resource_id_to_integer(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='check_logs'").get();
+  if (!row) return;
+  const sql = String(row.sql);
+  // Idempotency: skip if resource_id is already INTEGER
+  if (/resource_id\s+INTEGER/i.test(sql)) return;
+  console.log(`[${now()}] Migration: converting check_logs.resource_id TEXT → INTEGER`);
+  try {
+    db.exec(`
+      BEGIN TRANSACTION;
+      ALTER TABLE check_logs RENAME TO _cl_rid_old;
+      CREATE TABLE check_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+        resource_id INTEGER,
+        status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'disabled', 'unavailable', 'deleted', 'changed')),
+        http_status INTEGER,
+        response_time_ms INTEGER,
+        error_message TEXT,
+        details TEXT,
+        checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+      INSERT INTO check_logs (
+        id, project_id, resource_type, resource_id, status, http_status,
+        response_time_ms, error_message, details, checked_at
+      )
+      SELECT
+        old.id,
+        old.project_id,
+        old.resource_type,
+        CASE
+          WHEN old.resource_type = 'github' THEN (
+            SELECT r.id FROM repos r
+            WHERE r.project_id = old.project_id AND r.full_name = old.resource_id
+            LIMIT 1
+          )
+          ELSE NULL
+        END,
+        old.status,
+        old.http_status,
+        old.response_time_ms,
+        old.error_message,
+        old.details,
+        old.checked_at
+      FROM _cl_rid_old old;
+      DROP TABLE _cl_rid_old;
+      CREATE INDEX IF NOT EXISTS idx_check_logs_project_resource_date ON check_logs (project_id, resource_type, checked_at);
+      COMMIT;
+    `);
+  } catch (err) {
+    console.error(`[${now()}] convert_check_logs_resource_id_to_integer failed: ${err.message}`);
+  }
 }
 
-/**
- * Add ui_refresh_seconds column to config (default 60 = 1 minute).
- * Integrated into db.js CREATE TABLE for new installs; kept here for existing DBs.
- */
-function add_ui_refresh_seconds(db, save) {
-  const rows = db.exec('SELECT * FROM config WHERE id = 1');
-  if (!rows.length) return;
-  const cols = rows[0].columns;
-  if (cols.includes('ui_refresh_seconds')) return;
-  db.exec('ALTER TABLE config ADD COLUMN ui_refresh_seconds INTEGER NOT NULL DEFAULT 60');
-  save();
-  console.log(`[${now()}] Migration: added ui_refresh_seconds column`);
+/** Migration: rebuilds check_logs to add 'deleted' and 'changed' to status CHECK. */
+function fix_check_logs_status_check(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='check_logs'").get();
+  if (!row) return;
+  if (String(row.sql).indexOf("'deleted'") === -1 || String(row.sql).indexOf("'changed'") === -1) {
+    console.log(`[${now()}] Migration: fixing check_logs CHECK constraint`);
+    try {
+      db.exec(`
+        BEGIN TRANSACTION;
+        ALTER TABLE check_logs RENAME TO _cl_old;
+        CREATE TABLE check_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+          resource_id TEXT,
+          status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'disabled', 'unavailable', 'deleted', 'changed')),
+          http_status INTEGER,
+          response_time_ms INTEGER,
+          error_message TEXT,
+          details TEXT,
+          checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        INSERT INTO check_logs SELECT * FROM _cl_old;
+        DROP TABLE _cl_old;
+        COMMIT;
+      `);
+    } catch (err) {
+      console.error(`[${now()}] fix_check_logs_status_check failed: ${err.message}`);
+    }
+  }
 }
 
-/**
- * Create resource_status_changes table.
- * Integrated into db.js for new installs; kept here for existing DBs.
- */
-function add_resource_status_changes(db, save) {
-  const rows = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='resource_status_changes'");
-  if (rows.length && rows[0].values.length) return;
+/** Migration: rebuilds event_logs to add 'deleted' to event_type CHECK. */
+function fix_rsc_event_type_check(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
+  if (!row) return;
+  if (String(row.sql).indexOf("'deleted'") === -1) {
+    console.log(`[${now()}] Migration: fixing event_logs CHECK constraint`);
+    try {
+      db.exec(`
+        BEGIN TRANSACTION;
+        ALTER TABLE event_logs RENAME TO _rsc_old;
+        CREATE TABLE event_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+          event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed', 'deleted', 'tag_changed')),
+          value TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        INSERT INTO event_logs SELECT * FROM _rsc_old;
+        DROP TABLE _rsc_old;
+        COMMIT;
+      `);
+    } catch (err) {
+      console.error(`[${now()}] fix_rsc_event_type_check failed: ${err.message}`);
+    }
+  }
+}
+
+/** Migration: event_logs table is created by init(), no separate migration needed. */
+const add_event_logs = () => {};
+
+/** Migration: adds status column to repos if missing. */
+function add_repos_status(db) {
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get();
+  if (!table) return;
+  const cols = db.prepare("PRAGMA table_info(repos)").all().map(r => r.name);
+  if (cols.includes('status')) return;
+  db.exec('ALTER TABLE repos ADD COLUMN status TEXT NOT NULL DEFAULT \'active\'');
+}
+
+/** Migration: adds latest_tag column to repos if missing. */
+function add_repos_latest_tag(db) {
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get();
+  if (!table) return;
+  const cols = db.prepare("PRAGMA table_info(repos)").all().map(r => r.name);
+  if (cols.includes('latest_tag')) return;
+  db.exec('ALTER TABLE repos ADD COLUMN latest_tag TEXT');
+}
+
+/** Migration: adds confirmed column to event_logs if missing. */
+function add_rsc_confirmed_column(db) {
+  const rows = db.prepare("PRAGMA table_info(event_logs)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  if (cols.includes('confirmed')) return;
+  db.exec('ALTER TABLE event_logs ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0');
+}
+
+/** Migration: creates idx_event_logs_alerting index on event_logs for alert queries. */
+function add_rsc_alerting_index(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_event_logs_alerting'").get();
+  if (row) return;
+  db.exec('CREATE INDEX IF NOT EXISTS idx_event_logs_alerting ON event_logs (resource_type, confirmed, created_at DESC)');
+}
+
+/** Migration: renames commit_check_minutes → github_check_minutes and adds alert config columns. */
+function rename_commit_to_github_check_and_add_alert_cols(db) {
+  const rows = db.prepare("PRAGMA table_info(config)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  // Already migrated to new schema
+  if (cols.includes('settings')) return;
+  // github_check_minutes column exists means previous migration ran but left flat columns
+  if (cols.includes('github_check_minutes')) return;
+  // Check if _config_old exists from a failed prior run and clean it up
+  const oldTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_config_old'").get();
+  if (oldTable) {
+    db.exec("DROP TABLE IF EXISTS _config_old");
+  }
+}
+
+/** Migration: creates alert_logs table if missing. */
+function add_alert_logs_table(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='alert_logs'").get();
+  if (row) return;
   db.exec(`
-    CREATE TABLE resource_status_changes (
+    CREATE TABLE alert_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_id INTEGER NOT NULL,
-      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
-      event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed')),
-      value TEXT NOT NULL,
+      status_change_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      FOREIGN KEY (status_change_id) REFERENCES event_logs(id) ON DELETE CASCADE
     )
   `);
-  db.exec(`
-    CREATE INDEX idx_rsc_project_resource
-    ON resource_status_changes (project_id, resource_type, created_at DESC)
-  `);
-  save();
-  console.log(`[${now()}] Migration: created resource_status_changes table`);
 }
 
-/**
- * Back-populate resource_status_changes from old projects columns.
- * No-op on current schema (columns already dropped).
- */
-function backfill_resource_status_changes(db, save) {
-  const rows = db.exec("SELECT * FROM projects LIMIT 1");
-  if (!rows.length) return;
-  const cols = rows[0].columns;
-  if (!cols.includes('website_confirmed_hash') && !cols.includes('twitter_confirmed_hash') &&
-      !cols.includes('website_last_changed_at') && !cols.includes('github_last_changed_at') &&
-      !cols.includes('twitter_last_changed_at')) return;
-
-  const projects = db.exec("SELECT id, website_confirmed_hash, twitter_confirmed_hash, website_last_changed_at, github_last_changed_at, twitter_last_changed_at FROM projects");
-  if (!projects.length || !projects[0].values.length) return;
-
-  const r = projects[0];
-  const pcols = r.columns;
-  const idx = {
-    id: pcols.indexOf('id'),
-    wch: pcols.indexOf('website_confirmed_hash'),
-    tch: pcols.indexOf('twitter_confirmed_hash'),
-    wlch: pcols.indexOf('website_last_changed_at'),
-    glch: pcols.indexOf('github_last_changed_at'),
-    tlch: pcols.indexOf('twitter_last_changed_at'),
-  };
-
-  const insert = db.prepare(
-    "INSERT INTO resource_status_changes (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-  );
-
-  let count = 0;
-  for (const row of r.values) {
-    const pid = row[idx.id];
-
-    if (idx.wch >= 0 && row[idx.wch]) {
-      insert.run(pid, 'website', 'confirmed', row[idx.wch], row[idx.wlch] || now());
-      count++;
-    }
-    if (idx.tch >= 0 && row[idx.tch]) {
-      insert.run(pid, 'twitter', 'confirmed', row[idx.tch], row[idx.tlch] || now());
-      count++;
-    }
-    if (idx.wlch >= 0 && row[idx.wlch]) {
-      insert.run(pid, 'website', 'changed', '', row[idx.wlch]);
-      count++;
-    }
-    if (idx.glch >= 0 && row[idx.glch]) {
-      insert.run(pid, 'github', 'changed', '', row[idx.glch]);
-      count++;
-    }
-    if (idx.tlch >= 0 && row[idx.tlch]) {
-      insert.run(pid, 'twitter', 'changed', '', row[idx.tlch]);
-      count++;
-    }
-  }
-
-  if (count) {
-    save();
-    console.log(`[${now()}] Migration: back-filled ${count} status-change rows into resource_status_changes`);
+/** Migration: rebuilds alert_logs to point FK at event_logs instead of resource_status_changes. */
+function fix_alert_logs_fk(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_logs'").get();
+  if (!row) return;
+  if (String(row.sql).indexOf('resource_status_changes') === -1) return;
+  console.log(`[${now()}] Migration: fixing alert_logs FK`);
+  try {
+    db.exec(`
+      BEGIN TRANSACTION;
+      ALTER TABLE alert_logs RENAME TO _alert_old;
+      CREATE TABLE alert_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status_change_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (status_change_id) REFERENCES event_logs(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_alert_logs_status_change_id ON alert_logs (status_change_id, created_at DESC);
+      INSERT INTO alert_logs SELECT id, status_change_id, created_at FROM _alert_old;
+      DROP TABLE _alert_old;
+      COMMIT;
+    `);
+  } catch (err) {
+    console.error(`[${now()}] fix_alert_logs_fk failed: ${err.message}`);
   }
 }
 
-/**
- * Run all migrations in order. Safe to call on every init.
- */
-function runMigrations(db, save) {
-  try { add_log_retention_days(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_ui_refresh_seconds(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_resource_status_changes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  //try { backfill_resource_status_changes(db, save); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+/** Migration: rebuilds idx_alert_logs_status_change_id to include created_at DESC. */
+function fix_alert_logs_index(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_alert_logs_status_change_id'").get();
+  if (!row) return;
+  const sql = String(row.sql);
+  if (sql.indexOf('created_at') !== -1) return;
+  console.log(`[${now()}] Migration: fixing alert_logs index`);
+  try {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_alert_logs_status_change_id;
+      CREATE INDEX IF NOT EXISTS idx_alert_logs_status_change_id ON alert_logs (status_change_id, created_at DESC);
+    `);
+  } catch (err) {
+    console.error(`[${now()}] fix_alert_logs_index failed: ${err.message}`);
   }
+}
+
+/** Migration: drops redundant columns from alert_logs table (already-migrated DBs only). */
+function drop_redundant_alert_logs_cols(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_logs'").get();
+  if (!row) return;
+  const sql = String(row.sql);
+  if (sql.indexOf('project_id') === -1) return;
+  console.log(`[${now()}] Migration: dropping redundant columns from alert_logs`);
+  try {
+    db.exec(`
+      BEGIN TRANSACTION;
+      ALTER TABLE alert_logs RENAME TO _alert_old;
+      CREATE TABLE alert_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status_change_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (status_change_id) REFERENCES event_logs(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_alert_logs_status_change_id ON alert_logs (status_change_id, created_at DESC);
+      INSERT INTO alert_logs SELECT id, status_change_id, created_at FROM _alert_old;
+      DROP TABLE _alert_old;
+      COMMIT;
+    `);
+  } catch (err) {
+    console.error(`[${now()}] drop_redundant_alert_logs_cols failed: ${err.message}`);
+  }
+}
+
+/** Migration: migrates data from resource_status_changes into event_logs and drops old table. */
+function rename_rsc_to_event_logs(db) {
+  const oldTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='resource_status_changes'").get();
+  if (!oldTable) return;
+  const newTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
+  if (newTable) return; // event_logs already exists, migration was already done
+  console.log(`[${now()}] Migration: migrating resource_status_changes → event_logs`);
+  try {
+    db.exec(`
+      BEGIN TRANSACTION;
+      INSERT INTO event_logs (project_id, resource_type, event_type, value, created_at, confirmed)
+      SELECT project_id, resource_type, event_type, value, created_at, 0 FROM resource_status_changes;
+      DROP TABLE resource_status_changes;
+      COMMIT;
+    `);
+  } catch (err) {
+    console.error(`[${now()}] rename_rsc_to_event_logs failed: ${err.message}`);
+  }
+}
+
+/** Migration: consolidates flat config columns into JSON group columns: settings, check_intervals, alert_intervals, alert_stops. */
+function migrate_config_json_groups(db) {
+  const rows = db.prepare("PRAGMA table_info(config)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  // Fully migrated: settings column exists
+  if (cols.includes('settings')) return;
+  // settings column doesn't exist — cleanup orphaned _cfg_old from failed run
+  const oldTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_cfg_old'").get();
+  if (oldTable) db.exec("DROP TABLE IF EXISTS _cfg_old");
+}
+
+/** Migration: adds website_content_check column to projects if missing. */
+function add_website_content_check(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects' AND sql LIKE '%website_content_check%'").get();
+  if (row) return;
+  try {
+    db.exec('ALTER TABLE projects ADD COLUMN website_content_check INTEGER NOT NULL DEFAULT 1');
+  } catch (err) {
+    console.error(`[${now()}] add_website_content_check failed: ${err.message}`);
+  }
+}
+
+/** Migration: drops unused flat columns log_retention_days, ui_refresh_seconds, compact_activity from config. */
+function drop_old_config_flat_cols(db) {
+  const rows = db.prepare("PRAGMA table_info(config)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  const toDrop = ['log_retention_days', 'ui_refresh_seconds', 'compact_activity'].filter(c => cols.includes(c));
+  for (const col of toDrop) {
+    try {
+      db.exec(`ALTER TABLE config DROP COLUMN ${col}`);
+    } catch (err) {
+      console.error(`[${now()}] drop_old_config_flat_cols (${col}) failed: ${err.message}`);
+    }
+  }
+}
+
+/** Migration: adds telegram and pushbullet columns to config if missing. */
+function add_notification_config_cols(db) {
+  const rows = db.prepare("PRAGMA table_info(config)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  if (cols.includes('telegram')) return;
+  try {
+    db.exec("ALTER TABLE config ADD COLUMN telegram TEXT NOT NULL DEFAULT '{\"bot_token\":\"\",\"chat_id\":\"\",\"enabled\":false}'");
+  } catch (err) {
+    console.error(`[${now()}] add_notification_config_cols (telegram) failed: ${err.message}`);
+  }
+  try {
+    db.exec("ALTER TABLE config ADD COLUMN pushbullet TEXT NOT NULL DEFAULT '{\"access_token\":\"\",\"enabled\":false}'");
+  } catch (err) {
+    console.error(`[${now()}] add_notification_config_cols (pushbullet) failed: ${err.message}`);
+  }
+}
+
+/** Runs all idempotent migrations sequentially, logging errors but never throwing. */
+async function runMigrations(db) {
+  try { await rename_rsc_to_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await fix_alert_logs_fk(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_repos_status(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_repos_latest_tag(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await convert_check_logs_resource_id_to_integer(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await fix_check_logs_status_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await fix_rsc_event_type_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_log_retention_days(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_ui_refresh_seconds(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_compact_activity(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_rsc_confirmed_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await rename_commit_to_github_check_and_add_alert_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_alert_logs_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await drop_redundant_alert_logs_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await fix_alert_logs_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+}
 
 module.exports = { runMigrations };

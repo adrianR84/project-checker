@@ -67,13 +67,16 @@
       updateProject:  (id, d)  => req(`/projects/${id}`,     { method: 'PUT',    body: JSON.stringify(d) }),
       deleteProject:  (id)     => req(`/projects/${id}`,     { method: 'DELETE' }),
       refreshRepos:   (id)     => req(`/projects/${id}/refresh-repos`, { method: 'POST' }),
+      getOrgRepos:    (id)     => req(`/projects/${id}/org-repos`),
+      addRepos:       (id, repos) => req(`/projects/${id}/add-repos`,   { method: 'POST', body: JSON.stringify({ repos }) }),
+      removeRepo:     (id, fullName) => req(`/projects/${id}/repos/${encodeURIComponent(fullName)}`, { method: 'DELETE' }),
       checkWebsite:   (id)     => req(`/projects/${id}/check-website`,  { method: 'POST' }),
-      confirmWebsite: (id)     => req(`/projects/${id}/confirm-website`,{ method: 'POST' }),
       checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
       checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
-      confirmTwitter: (id)     => req(`/projects/${id}/confirm-twitter`,{ method: 'POST' }),
       getCheckLogs:       (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
       getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
+      confirmStatusChange: (id, confirmed = 1) => req(`/check-logs/status-changes/${id}/confirm`, { method: 'PATCH', body: JSON.stringify({ confirmed: confirmed ? 1 : 0 }) }),
+      getAlertLogs:       (q = {}) => req('/check-logs/alerts?' + new URLSearchParams(q).toString()),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
       triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
@@ -82,10 +85,15 @@
       triggerTwitter:  ()     => req('/settings/trigger-twitter',  { method: 'POST' }),
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
       clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
+      clearAlertLogs: ()       => req('/settings/clear-alert-logs', { method: 'POST' }),
     };
 
     // Expose globally so the template can call api.* after we return api: window.api
     window.api = api;
+
+    // Shared settings ref accessible across all components
+    const appSettings = ref(null);
+    window.appSettings = appSettings;
 
     /** Show a toast notification in the bottom-right corner */
     function showToast(msg, type = 'ok') {
@@ -151,11 +159,23 @@
       } catch { return u; }
     }
 
-    /** Format check_logs.details for display */
-    function logDetail(d) {
-      if (!d) return '—';
-      try { const p = typeof d === 'string' ? JSON.parse(d) : d; if (p.content_hash) return 'content changed (' + p.content_hash.slice(0, 8) + '…)'; } catch (_) {}
-      return typeof d === 'string' ? d : JSON.stringify(d);
+    /** Format a check_logs row for the detail column */
+    function logDetail(log) {
+      const { status, http_status, response_time_ms, error_message, details, resource_type, repo_name } = log || {};
+      const repo = (resource_type === 'github' && repo_name) ? repo_name + ' · ' : '';
+      if (status === 'ok') return repo + (http_status ? `HTTP ${http_status}${response_time_ms ? ' · ' + response_time_ms + 'ms' : ''}` : (response_time_ms ? response_time_ms + 'ms' : 'OK'));
+      if (status === 'error') return repo + (error_message || 'Unknown error');
+      if (status === 'disabled') return repo + 'Check disabled';
+      if (status === 'unavailable') return repo + 'Resource not configured';
+      if (status === 'deleted') return repo + 'Resource deleted';
+      if (status === 'changed' && details) {
+        try {
+          const p = typeof details === 'string' ? JSON.parse(details) : details;
+          if (resource_type === 'github' && p.sha) return repo + 'New Commit ' + p.sha.slice(0, 7);
+          if (p.content_hash) return repo + 'Content Changed';
+        } catch (_) {}
+      }
+      return repo || '—';
     }
 
     /** Map a raw status string → CSS class name for the badge */
@@ -245,6 +265,7 @@
 
               <!-- Latest commit info row -->
               <div class="repo-meta">
+                <span v-if="r.latest_tag" class="badge badge-ok" style="font-size:0.6rem;">{{ r.latest_tag }}</span>
                 <template v-if="r.latest_commit_sha">
                   <!-- Short SHA link to commit on GitHub -->
                   <a
@@ -273,92 +294,214 @@
 
     /* ── CheckLogList component ───────────────────────────────────────────────
        Renders a table of recent check log entries.
-       Props: logs (array), showProject (bool — show project name column)
+       Props: logs, showProject, page, total, limit
+       Emits: change-page
     ───────────────────────────────────────────────────────────────────────── */
     const CheckLogList = {
-      props: ['logs', 'showProject'],
+      props: ['logs', 'showProject', 'page', 'total', 'limit'],
+      emits: ['changePage'],
 
       template: `
         <div>
           <div v-if="!logs.length" class="muted">No check logs yet.</div>
 
-          <table v-else>
+          <table v-else class="compact">
             <thead>
               <tr>
-                <th>Type</th>
-                <th v-if="showProject">Project</th>
-                <th>Status</th>
-                <th>When</th>
-                <th>Detail</th>
+                <th class="project_cell" data-tooltip="Project name">Project</th>
+                <th class="resource_cell" data-tooltip="Resource type: website, GitHub, or Twitter">Type</th>
+                <th class="status_cell" data-tooltip="Check result status">Status</th>
+                <th class="time_cell" data-tooltip="Time of the check">When</th>
+                <th class="details_cell" data-tooltip="Response details">Details</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
+                <td>{{ log.project_name || log.project_id }}</td>
                 <td>{{ log.resource_type }}</td>
-                <td v-if="showProject">{{ log.project_name || log.project_id }}</td>
                 <td>
-                  <span :class="['badge', statusClass(log.status)]">
-                    <span class="dot"></span>{{ log.status }}
-                  </span>
+                  <span :class="['badge', statusClass(log.status)]">{{ log.status }}</span>
                 </td>
-                <td>
-                  <!-- absolute time on hover, relative in cell -->
-                  <span :title="absoluteTime(log.checked_at)">
-                    {{ showProject ? absoluteTime(log.checked_at) : relativeTime(log.checked_at) }}
-                  </span>
-                </td>
-                <td class="detail">{{ logDetail(log.detail) }}</td>
+                <td class="muted">{{ absoluteTime(log.checked_at) }}</td>
+                <td>{{ logDetail(log) }}</td>
               </tr>
             </tbody>
           </table>
+
+          <div class="pagination" v-if="totalPages > 1">
+            <button :disabled="page <= 1" @click="$emit('changePage', page - 1)">&larr;</button>
+            <span>Page {{ page }} of {{ totalPages }}</span>
+            <button :disabled="page >= totalPages" @click="$emit('changePage', page + 1)">&rarr;</button>
+          </div>
         </div>
       `,
+
+      computed: {
+        totalPages() { return Math.ceil(this.total / this.limit) || 1; }
+      },
 
       methods: { relativeTime, absoluteTime, statusClass, logDetail },
     };
 
+    /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
+    const statusChangeHelpers = {
+      badgeClass(eventType) {
+        if (eventType === 'confirmed') return 'ok';
+        if (eventType === 'tag_changed') return 'pending';
+        if (eventType === 'changed') return 'changed';
+        if (eventType === 'deleted') return 'error';
+        return 'pending';
+      },
+      formatChangeValue(eventType, resourceType, value) {
+        if (!value) return '—';
+        try {
+          const v = JSON.parse(value);
+          if (eventType === 'tag_changed') return `${v.repo_name} · ${v.ot ?? 'none'} → ${v.nt ?? 'none'}`;
+          if (eventType === 'changed' && resourceType === 'github') return `${v.repo_name} · commit ${v.sha?.slice(0, 7) ?? '?'}`;
+          if (eventType === 'changed' && resourceType === 'website') {
+            const hs = (v.bhs || v.ahs) ? `${v.bhs ?? ''} → ${v.ahs ?? ''}` : '';
+            const hv = (v.bh && v.ah) ? (v.bh !== v.ah ? 'content changed' : `${v.bh.slice(0, 8)}… → ${v.ah.slice(0, 8)}…`) : '';
+            return [hs, hv].filter(Boolean).join(' · ');
+          }
+          if (eventType === 'changed' && resourceType === 'twitter') {
+            const hs = (v.bhs || v.ahs) ? `${v.bhs ?? ''} → ${v.ahs ?? ''}` : '';
+            const bs = v.bs && v.as ? (v.as === 'error' ? '<span style="color:#e55">removed</span>' : `${v.bs} → ${v.as}`) : '';
+            return [hs, bs].filter(Boolean).join(' · ');
+          }
+          if (eventType === 'deleted' && resourceType === 'github') return `${v.repo_name} · <span style="color:#e55">deleted</span>`;
+          return value;
+        } catch (_) { return value; }
+      }
+    };
+
     /* ── StatusChangeList component ────────────────────────────────────────────
-       Renders resource_status_changes entries.
-       Props: logs (array), showProject (bool)
+       Renders event_logs entries.
+       Props: logs, showProject, page, total, limit
+       Emits: changePage, refresh
     ───────────────────────────────────────────────────────────────────────── */
     const StatusChangeList = {
-      props: ['logs', 'showProject'],
+      props: ['logs', 'showProject', 'page', 'total', 'limit'],
+      emits: ['changePage', 'refresh'],
 
       template: `
         <div>
           <div v-if="!logs.length" class="muted">No status changes yet.</div>
-          <table v-else>
+          <table v-else class="compact">
             <thead>
               <tr>
-                <th>Type</th>
-                <th v-if="showProject">Project</th>
-                <th>Event</th>
-                <th>Value</th>
-                <th>When</th>
+                <th class="project_cell" data-tooltip="Project name">Project</th>
+                <th class="resource_cell" data-tooltip="Resource type: website, GitHub, or Twitter">Type</th>
+                <th class="type_cell" data-tooltip="Type of status change event">Event</th>
+                <th class="time_cell" data-tooltip="Time of the event">When</th>
+                <th class="details_cell" data-tooltip="Additional event details">Details</th>
+                <th style="width:32px"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
+                <td>{{ log.project_name || log.project_id }}</td>
                 <td>{{ log.resource_type }}</td>
-                <td v-if="showProject">{{ log.project_name || log.project_id }}</td>
                 <td>
-                  <span :class="['badge', log.event_type === 'confirmed' ? 'badge-ok' : 'badge-error']">
+                  <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
                   </span>
                 </td>
-                <td class="detail">{{ log.value || '—' }}</td>
+                <td class="muted">{{ absoluteTime(log.created_at) }}</td>
+                <td v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
                 <td>
-                  <span :title="absoluteTime(log.created_at)">
-                    {{ showProject ? absoluteTime(log.created_at) : relativeTime(log.created_at) }}
-                  </span>
+                  <input type="checkbox" :checked="!!log.confirmed" @change="toggleConfirm(log, $event)" />
                 </td>
               </tr>
             </tbody>
           </table>
+
+          <div class="pagination" v-if="totalPages > 1">
+            <button :disabled="page <= 1" @click="$emit('changePage', page - 1)">&larr;</button>
+            <span>Page {{ page }} of {{ totalPages }}</span>
+            <button :disabled="page >= totalPages" @click="$emit('changePage', page + 1)">&rarr;</button>
+          </div>
         </div>
       `,
 
-      methods: { relativeTime, absoluteTime },
+      computed: {
+        totalPages() { return Math.ceil(this.total / this.limit) || 1; },
+      },
+
+      methods: {
+        relativeTime, absoluteTime,
+        badgeClass: statusChangeHelpers.badgeClass,
+        formatChangeValue: statusChangeHelpers.formatChangeValue,
+        async toggleConfirm(log, event) {
+          if (log.confirmed) {
+            if (!confirm('Unconfirm this status change?')) {
+              event.target.checked = true;
+              return;
+            }
+          }
+          try {
+            await api.confirmStatusChange(log.id, log.confirmed ? 0 : 1);
+            showToast(log.confirmed ? 'Unconfirmed' : 'Confirmed', 'ok');
+            this.$emit('changePage', this.page);
+          } catch (e) {
+            event.target.checked = !!log.confirmed;
+            alert('Failed: ' + e.message);
+          }
+        },
+      },
+    };
+
+    /* ── AlertLogsList component ──────────────────────────────────────────────
+       Renders alert_logs entries.
+       Props: logs, page, total, limit
+       Emits: change-page
+    ───────────────────────────────────────────────────────────────────────── */
+    const AlertLogsList = {
+      props: ['logs', 'page', 'total', 'limit'],
+      emits: ['changePage'],
+
+      template: `
+        <div>
+          <div v-if="!logs.length" class="muted">No alert logs yet.</div>
+          <table v-else class="compact">
+            <thead>
+              <tr>
+                <th class="project_cell alert" data-tooltip="Project name">Project</th>
+                <th class="type_cell" data-tooltip="Event type">Event</th>
+                <th class="time_cell" data-tooltip="Time the alert was recorded">When</th>
+                <th class="details_cell" data-tooltip="Alert details">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in logs" :key="log.id">
+                <td>{{ log.project_name || log.status_change_id }}</td>
+                <td>
+                  <span :class="['badge', badgeClass(log.event_type)]">
+                    {{ log.event_type }}
+                  </span>
+                </td>
+                <td class="muted">{{ absoluteTime(log.created_at) }}</td>
+                <td v-html="formatChangeValue(log.event_type, log.resource_type, log.change_value)"></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="pagination" v-if="totalPages > 1">
+            <button :disabled="page <= 1" @click="$emit('changePage', page - 1)">&larr;</button>
+            <span>Page {{ page }} of {{ totalPages }}</span>
+            <button :disabled="page >= totalPages" @click="$emit('changePage', page + 1)">&rarr;</button>
+          </div>
+        </div>
+      `,
+
+      computed: {
+        totalPages() { return Math.ceil(this.total / this.limit) || 1; }
+      },
+
+      methods: {
+        absoluteTime,
+        badgeClass: statusChangeHelpers.badgeClass,
+        formatChangeValue: statusChangeHelpers.formatChangeValue,
+      },
     };
 
     /* ── ProjectForm component ─────────────────────────────────────────────────
@@ -374,31 +517,64 @@
 
       template: `
         <div class="modal">
-          <h2>{{ initial ? 'Edit Project' : 'New Project' }}</h2>
+          <h2 style="font-size: 1.2rem;">{{ initial ? 'Edit Project' : 'New Project' }}</h2>
 
-          <div class="form-group">
-            <label>Name *</label>
-            <input v-model="f.name" required placeholder="My Project" />
+          <!-- Tab switcher -->
+          <div class="tabs">
+            <button :class="['tab', formTab === 'fields' ? 'active' : '']" @click="formTab = 'fields'">Fields</button>
+            <button :class="['tab', formTab === 'json' ? 'active' : '']" @click="formTab = 'json'">JSON</button>
           </div>
 
-          <div class="form-group">
-            <label>Website URL</label>
-            <input v-model="f.website_url" type="url" placeholder="https://example.com" />
+          <!-- Fields tab -->
+          <div v-if="formTab === 'fields'">
+            <div class="form-group">
+              <label>Name *</label>
+              <input v-model="f.name" required placeholder="My Project" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <label>Website URL</label>
+                <label><input type="checkbox" v-model="f.website_enabled" /> Enable</label>
+                <label><input type="checkbox" v-model="f.website_content_check" /> Content Check</label>
+              </div>
+              <input v-model="f.website_url" type="url" placeholder="https://example.com" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <label class="muted">GitHub URL (optional)</label>
+                <label><input type="checkbox" v-model="f.github_enabled" /> Enable</label>
+              </div>
+              <input v-model="f.github_url" type="url" placeholder="https://github.com/org" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <label>Twitter URL</label>
+                <label><input type="checkbox" v-model="f.twitter_enabled" /> Enable</label>
+              </div>
+              <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <label class="muted">Telegram URL (optional)</label>
+                <label><input type="checkbox" v-model="f.telegram_enabled" /> Enable</label>
+              </div>
+              <input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" />
+            </div>
           </div>
 
-          <div class="form-group">
-            <label>GitHub URL <span class="muted">(optional)</span></label>
-            <input v-model="f.github_url" type="url" placeholder="https://github.com/org" />
-          </div>
-
-          <div class="form-group">
-            <label>Twitter URL</label>
-            <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
-          </div>
-
-          <div class="form-group">
-            <label>Telegram URL <span class="muted">(optional)</span></label>
-            <input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" />
+          <!-- JSON tab (edit mode only — create has no existing project to partial-update) -->
+          <div v-if="initial && formTab === 'json'" class="form-group">
+            <label>Project JSON — only entered fields are updated</label>
+            <textarea
+              v-model="jsonEditText"
+              rows="8"
+              placeholder='{"name":"New Name","website":"https://new-site.com"}'
+            ></textarea>
+            <span v-if="jsonEditError" class="error-msg">{{ jsonEditError }}</span>
           </div>
 
           <div class="modal-actions">
@@ -415,13 +591,18 @@
         // Local form state — starts empty or pre-filled with initial values
         const f = ref({
           name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
+          website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true,
         });
+        const jsonEditText  = ref('');
+        const jsonEditError = ref('');
+        const formTab = ref('fields');
 
         // Sync form fields whenever the `initial` prop changes
         // (happens when switching from "create" to "edit" mode)
         watch(
           () => props.initial,
           (v) => {
+            formTab.value = 'fields';
             if (v) {
               f.value = {
                 name:         v.name         || '',
@@ -429,15 +610,35 @@
                 github_url:   v.github_url    || '',
                 twitter_url:  v.twitter_url   || '',
                 telegram_url: v.telegram_url  || '',
+                website_enabled:  !!v.website_enabled,
+                website_content_check: !!v.website_content_check,
+                github_enabled:   !!v.github_enabled,
+                twitter_enabled:  !!v.twitter_enabled,
+                telegram_enabled: !!v.telegram_enabled,
               };
             } else {
-              f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '' };
+              f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
+                website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true };
             }
           },
           { immediate: true }
         );
 
         function onSubmit() {
+          // If JSON tab active, merge JSON fields into f before submitting
+          if (formTab.value === 'json' && jsonEditText.value.trim()) {
+            jsonEditError.value = '';
+            try {
+              const o = JSON.parse(jsonEditText.value);
+              const fieldMap = { name: 'name', website: 'website_url', github: 'github_url', twitter: 'twitter_url', telegram: 'telegram_url' };
+              for (const [k, target] of Object.entries(fieldMap)) {
+                if (o[k] !== undefined) f.value[target] = o[k];
+              }
+            } catch (e) {
+              jsonEditError.value = 'Invalid JSON: ' + e.message;
+              return;
+            }
+          }
           // Convert empty strings → null so the DB gets real NULLs
           const p = { ...f.value };
           for (const k of Object.keys(p)) {
@@ -447,7 +648,135 @@
           emit('submit', p);
         }
 
-        return { f, onSubmit };
+        return { f, onSubmit, jsonEditText, jsonEditError, formTab };
+      },
+    };
+
+    /* ── RepoManager component ─────────────────────────────────────────────────
+       Add/remove repos for a project. Lives inside ProjectCard.
+       Props: projectId, githubUrl
+       Emits: repos-updated
+    ───────────────────────────────────────────────────────────────────────── */
+    const RepoManager = {
+      props: ['projectId', 'githubUrl', 'projectName'],
+      emits: ['repos-updated'],
+      template: `
+        <div class="modal">
+          <h2 style="font-size:1.2rem">Manage Repos — {{ projectName }}</h2>
+
+          <!-- Current repos -->
+          <div v-if="repos.length" style="margin-bottom:16px;">
+            <table style="margin:0;">
+              <tbody>
+                <tr v-for="r in repos" :key="r.full_name">
+                  <td style="white-space:nowrap"><input type="checkbox" :value="r.full_name" v-model="selectedToDelete" /></td>
+                  <td style="width:100%">{{ r.full_name }}</td>
+                  <td style="white-space:nowrap"><button class="secondary outline" @click="removeRepo(r)">×</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <button v-if="selectedToDelete.length" class="secondary" style="margin-top:8px;" @click="deleteSelected">Delete Selected ({{ selectedToDelete.length }})</button>
+          </div>
+          <div v-else class="muted" style="margin-bottom:16px;">No repos monitored yet.</div>
+
+          <!-- Fetch from GitHub -->
+          <div class="form-group">
+            <button class="secondary" :disabled="fetching" @click="fetchOrgsRepos">
+              <span v-if="fetching" class="spinner"></span>
+              <span v-else>↻ Fetch from GitHub</span>
+            </button>
+          </div>
+
+          <!-- Org repo checklist -->
+          <fieldset v-if="availableRepos.length">
+            <legend>Add repos from GitHub</legend>
+            <label v-for="r in availableRepos" :key="r.full_name">
+              <input type="checkbox" :value="r" v-model="selected" />
+              {{ r.full_name }} <span class="muted">({{ r.default_branch }}, ★{{ r.stars_count || 0 }})</span>
+            </label>
+          </fieldset>
+
+          <div v-if="selected.length" style="margin-top:8px;">
+            <button class="primary" :disabled="adding" @click="addSelected">
+              <span v-if="adding" class="spinner"></span>
+              <span v-else>Add Selected ({{ selected.length }})</span>
+            </button>
+          </div>
+
+          <div class="modal-actions" style="margin-top:16px;">
+            <button @click="$emit('repos-updated')">Done</button>
+          </div>
+        </div>
+      `,
+      setup(props, { emit }) {
+        const repos    = ref([]);
+        const orgRepos = ref([]);
+        const selected = ref([]);
+        const selectedToDelete = ref([]);
+        const availableRepos = computed(() =>
+          orgRepos.value.filter(r => !repos.value.some(m => m.full_name === r.full_name))
+        );
+        const fetching = ref(false);
+        const adding   = ref(false);
+
+        async function loadRepos() {
+          const p = await api.getProject(props.projectId);
+          repos.value = p.repos || [];
+        }
+        loadRepos();
+
+        async function fetchOrgsRepos() {
+          fetching.value = true;
+          try {
+            const all = await api.getOrgRepos(props.projectId);
+            orgRepos.value = all;
+          } catch (e) {
+            alert('Failed to fetch repos: ' + e.message);
+          } finally {
+            fetching.value = false;
+          }
+        }
+
+        async function addSelected() {
+          adding.value = true;
+          try {
+            await api.addRepos(props.projectId, selected.value);
+            selected.value = [];
+            orgRepos.value = [];
+            await loadRepos();
+            emit('repos-updated');
+          } catch (e) {
+            alert('Failed to add repos: ' + e.message);
+          } finally {
+            adding.value = false;
+          }
+        }
+
+        async function removeRepo(r) {
+          if (!confirm(`Remove ${r.full_name}?`)) return;
+          try {
+            await api.removeRepo(props.projectId, r.full_name);
+            await loadRepos();
+          } catch (e) {
+            alert('Failed to remove repo: ' + e.message);
+          }
+        }
+
+        async function deleteSelected() {
+          const toDelete = [...selectedToDelete.value];
+          if (!confirm(`Remove ${toDelete.length} repos?`)) return;
+          try {
+            for (const name of toDelete) {
+              await api.removeRepo(props.projectId, name);
+            }
+            selectedToDelete.value = [];
+            await loadRepos();
+          } catch (e) {
+            alert('Failed to remove repos: ' + e.message);
+          }
+        }
+
+        return { repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, fetchOrgsRepos, addSelected, removeRepo, deleteSelected };
       },
     };
 
@@ -467,63 +796,112 @@
           <!-- Card header: project name only -->
           <header class="head">
             <h2 class="name">{{ project.name }}</h2>
+            <button
+              class="secondary"
+              :disabled="busy === 'all'"
+              style="padding:2px 6px;"
+              data-tooltip="Refresh All" @click="refreshAll"
+            >
+              <span v-if="busy === 'all'" class="spinner"></span>
+              <span v-else>↺</span>
+            </button>
           </header>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
-          <table>
+          <table class="compact">
             <thead>
               <tr>
-                <th scope="col">Resource</th>
-                <th scope="col">Status</th>
-                <th scope="col">Last Checked</th>
-                <th scope="col">Last Change</th>
+                <th data-tooltip="Resource type">Resource</th>
+                <th class="action_cell" data-tooltip="Whether monitoring is enabled">Mon.</th>
+                <th data-tooltip="Current status">Status</th>
+                <th data-tooltip="Time of last check">Last Checked</th>
+                <th data-tooltip="Time of last status change">Last Change</th>
+                <th class="action_cell"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="project.twitter_url">
                 <td><a :href="project.twitter_url" target="_blank" rel="noopener">Twitter</a></td>
-                <td><span :class="['badge', statusClass(twitter.status)]"><span class="dot"></span>{{ twitter.status || 'pending' }}</span></td>
+                <td><span :class="['badge', project.twitter_enabled ? 'success' : 'secondary']">{{ project.twitter_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', statusClass(twitter.status)]">{{ twitter.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(twitter.checked_at) }}</span></td>
                 <td><span class="muted">{{ twitterLastChanged ? relativeTime(twitterLastChanged) : '—' }}</span></td>
+                <td class="tooltip-cell">
+                  <button
+                    v-if="project.twitter_url"
+                    class="secondary"
+                    :disabled="busy === 'twitter'"
+                    style="padding:2px 6px;"
+                    data-tooltip="Check Twitter" @click="runCheck('twitter', () => api.checkTwitter(project.id))"
+                  >
+                    <span v-if="busy === 'twitter'" class="spinner"></span>
+                    <span v-else>↻</span>
+                  </button>
+                </td>
               </tr>
               <tr v-else>
                 <td>Twitter</td>
-                <td colspan="3"><span class="muted">Not Set</span></td>
+                <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
 
               <tr v-if="project.website_url">
                 <td><a :href="project.website_url" target="_blank" rel="noopener">Website</a></td>
-                <td><span :class="['badge', statusClass(website.status)]"><span class="dot"></span>{{ website.status || 'pending' }}</span></td>
+                <td><span :class="['badge', project.website_enabled ? 'success' : 'secondary']">{{ project.website_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', statusClass(website.status)]">{{ website.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(website.checked_at) }}</span></td>
                 <td><span class="muted">{{ websiteLastChanged ? relativeTime(websiteLastChanged) : '—' }}</span></td>
+                <td class="tooltip-cell">
+                  <button
+                    v-if="project.website_url"
+                    class="secondary"
+                    :disabled="busy === 'website'"
+                    style="padding:2px 6px;"
+                    data-tooltip="Check Website" @click="runCheck('website', () => api.checkWebsite(project.id))"
+                  >
+                    <span v-if="busy === 'website'" class="spinner"></span>
+                    <span v-else>↻</span>
+                  </button>
+                </td>
               </tr>
               <tr v-else>
                 <td>Website</td>
-                <td colspan="3"><span class="muted">Not Set</span></td>
+                <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
 
               <tr v-if="project.github_url">
                 <td><a :href="project.github_url" target="_blank" rel="noopener">GitHub</a></td>
-                <td><span :class="['badge', statusClass(github.status)]"><span class="dot"></span>{{ github.status || 'pending' }}</span></td>
+                <td><span :class="['badge', project.github_enabled ? 'success' : 'secondary']">{{ project.github_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', statusClass(github.status)]">{{ github.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(github.checked_at) }}</span></td>
                 <td><span class="muted">{{ githubLastChanged ? relativeTime(githubLastChanged) : '—' }}</span></td>
+                <td class="tooltip-cell">
+                  <button
+                    class="secondary"
+                    :disabled="busy === 'github'"
+                    style="padding:2px 6px;"
+                    data-tooltip="Check GitHub" @click="runCheck('github', () => api.checkGithub(project.id))"
+                  >
+                    <span v-if="busy === 'github'" class="spinner"></span>
+                    <span v-else>↻</span>
+                  </button>
+                </td>
               </tr>
               <tr v-else>
                 <td>GitHub</td>
-                <td colspan="3"><span class="muted">Not Set</span></td>
+                <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
             </tbody>
           </table>
 
           <!-- GitHub repos section with refresh button -->
-          <section class="repos-section">
+          <section v-if="!appSettings?.compact_activity" class="repos-section">
             <div class="repos-head">
               <b>Repositories</b>
               <button
                 v-if="project.github_url"
                 class="secondary"
                 :disabled="busy === 'repos'"
-                @click="runCheck('repos', () => api.refreshRepos(project.id))"
+                data-tooltip="Refresh Repos" class="tooltip-cell" @click="runCheck('repos', () => api.refreshRepos(project.id))"
               >
                 <span v-if="busy === 'repos'" class="spinner"></span>
                 <span v-else>↻ Refresh</span>
@@ -532,65 +910,22 @@
             <div class="repos-scroll">
               <RepoList :repos="project.repos || []" />
             </div>
-          </section>
 
-          <!-- Refresh action buttons: Twitter, Website, GitHub -->
-          <section class="actions-row">
-            <button
-              v-if="project.twitter_url"
-              class="secondary"
-              :disabled="busy === 'twitter'"
-              @click="runCheck('twitter', () => api.checkTwitter(project.id))"
-            >
-              <span v-if="busy === 'twitter'" class="spinner"></span>
-              <span v-else>↻ Twitter</span>
-            </button>
-
-            <button
-              v-if="project.twitter_url && (twitter.status === 'changed' || twitter.status === 'error')"
-              class="contrast"
-              :disabled="busy === 'confirm'"
-              @click="runCheck('confirm', () => api.confirmTwitter(project.id))"
-            >
-              <span v-if="busy === 'confirm'" class="spinner"></span>
-              <span v-else>✓ Confirm</span>
-            </button>
-
-            <button
-              v-if="project.website_url"
-              class="secondary"
-              :disabled="busy === 'website'"
-              @click="runCheck('website', () => api.checkWebsite(project.id))"
-            >
-              <span v-if="busy === 'website'" class="spinner"></span>
-              <span v-else>↻ Website</span>
-            </button>
-
-            <button
-              v-if="project.website_url && (website.status === 'changed' || website.status === 'error')"
-              class="contrast"
-              :disabled="busy === 'confirm'"
-              @click="runCheck('confirm', () => api.confirmWebsite(project.id))"
-            >
-              <span v-if="busy === 'confirm'" class="spinner"></span>
-              <span v-else>✓ Confirm</span>
-            </button>
-
-            <button
-              class="secondary"
-              :disabled="busy === 'github'"
-              @click="runCheck('github', () => api.checkGithub(project.id))"
-            >
-              <span v-if="busy === 'github'" class="spinner"></span>
-              <span v-else>↻ GitHub</span>
-            </button>
+            <!-- Deleted repos -->
+            <div v-if="project.deletedRepos && project.deletedRepos.length" class="repos-scroll" style="margin-top:8px;">
+              <div class="muted" style="font-size:0.75rem;margin-bottom:4px;">Deleted</div>
+              <ul class="repo-list">
+                <li v-for="r in project.deletedRepos" :key="r.full_name" class="repo" style="opacity:0.5;text-decoration:line-through;">
+                  <div class="repo-name">{{ r.full_name }}</div>
+                </li>
+              </ul>
+            </div>
           </section>
 
         </article>
       `,
 
       setup(props, { emit }) {
-        // busy tracks which check is currently running (used to show spinner + disable button)
         const busy = ref(null);
 
         // project.*_status objects come from the dashboard API (latest check result per resource)
@@ -618,14 +953,33 @@
           }
         }
 
+        async function refreshAll() {
+          busy.value = 'all';
+          try {
+            await Promise.all([
+              props.project.twitter_url  && window.api.checkTwitter(props.project.id),
+              props.project.website_url  && window.api.checkWebsite(props.project.id),
+              props.project.github_url   && window.api.checkGithub(props.project.id),
+            ].filter(Boolean));
+            emit('refreshed');
+          } catch (e) {
+            alert(`Refresh all failed: ${e.message}`);
+          } finally {
+            busy.value = null;
+          }
+        }
+
         return {
-          busy, website, github, twitter,
+          busy,
+          website, github, twitter,
           websiteLastChanged, githubLastChanged, twitterLastChanged,
           runCheck,
+          refreshAll,
           relativeTime,
           statusClass,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
+          appSettings: window.appSettings,
         };
       },
     };
@@ -635,7 +989,7 @@
        The dashboard endpoint returns projects with their latest status baked in.
     ───────────────────────────────────────────────────────────────────────── */
     const ActivityPage = {
-      components: { ProjectCard, CheckLogList, StatusChangeList },
+      components: { ProjectCard, CheckLogList, StatusChangeList, AlertLogsList },
 
       template: `
         <div class="page">
@@ -661,7 +1015,7 @@
             No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
           </div>
 
-          <div v-else class="grid cols-2">
+          <div v-else class="project-grid">
             <ProjectCard
               v-for="p in projects"
               :key="p.id"
@@ -674,11 +1028,17 @@
           <section v-if="showLogs" class="logs-section">
             <div class="tabs">
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
-              <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Status Changes</button>
+              <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
+              <button :class="['tab', logTab === 'alert-logs' ? 'active' : '']" @click="logTab = 'alert-logs'">Alert Logs</button>
             </div>
             <article>
-              <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true" />
-              <StatusChangeList v-else :logs="statusChanges" :show-project="true" />
+              <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true"
+                :page="logPage" :total="logTotal" :limit="logLimit" @change-page="loadLogs" />
+              <StatusChangeList v-else-if="logTab === 'status-changes'" :logs="statusChanges" :show-project="true"
+                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges"
+                @confirm="onConfirmStatusChange" />
+              <AlertLogsList v-else :logs="alertLogs"
+                :page="alertPage" :total="alertTotal" :limit="alertLimit" @change-page="loadAlertLogs" />
             </article>
           </section>
 
@@ -686,14 +1046,26 @@
       `,
 
       setup() {
-        const projects      = ref([]);
-        const logs         = ref([]);
+        const projects       = ref([]);
+        const logs          = ref([]);
         const statusChanges = ref([]);
-        const loading      = ref(true);
-        const checkingAll  = ref(false);
-        const error        = ref('');
-        const showLogs     = ref(true);
-        const logTab       = ref('check-logs');
+        const alertLogs     = ref([]);
+        const loading       = ref(true);
+        const checkingAll   = ref(false);
+        const error         = ref('');
+        const showLogs      = ref(true);
+        const logTab        = ref('check-logs');
+
+        // Pagination state for each tab
+        const logPage   = ref(1);
+        const logTotal  = ref(0);
+        const logLimit  = ref(20);
+        const scPage    = ref(1);
+        const scTotal   = ref(0);
+        const scLimit   = ref(15);
+        const alertPage  = ref(1);
+        const alertTotal = ref(0);
+        const alertLimit = ref(20);
 
         /** Load dashboard (projects + status) */
         async function load() {
@@ -706,23 +1078,46 @@
           } finally {
             loading.value = false;
           }
+          // Also refresh whichever log tab is open
+          if (logTab.value === 'check-logs') loadLogs(1);
+          else if (logTab.value === 'status-changes') loadStatusChanges(1);
+          else if (logTab.value === 'alert-logs') loadAlertLogs(1);
         }
 
-        /** Load 30 most recent log entries */
-        async function loadLogs() {
+        /** Load log entries for the current page */
+        async function loadLogs(page = 1) {
+          logPage.value = page;
+          const offset = (page - 1) * logLimit.value;
           try {
-            const r = await api.getCheckLogs({ limit: 30 });
-            logs.value = r.items || r.logs || r || [];
+            const r = await api.getCheckLogs({ limit: logLimit.value, offset });
+            logs.value = r.logs || [];
+            logTotal.value = r.total || 0;
           } catch (e) {
             console.error(e);
           }
         }
 
-        /** Load 30 most recent status-change entries */
-        async function loadStatusChanges() {
+        /** Load status-change entries for the current page */
+        async function loadStatusChanges(page = 1) {
+          scPage.value = page;
+          const offset = (page - 1) * scLimit.value;
           try {
-            const r = await api.getStatusChanges({ limit: 30 });
-            statusChanges.value = r.items || r.logs || r || [];
+            const r = await api.getStatusChanges({ limit: scLimit.value, offset });
+            statusChanges.value = r.logs || [];
+            scTotal.value = r.total || 0;
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        /** Load alert log entries for the current page */
+        async function loadAlertLogs(page = 1) {
+          alertPage.value = page;
+          const offset = (page - 1) * alertLimit.value;
+          try {
+            const r = await api.getAlertLogs({ limit: alertLimit.value, offset });
+            alertLogs.value = r.logs || [];
+            alertTotal.value = r.total || 0;
           } catch (e) {
             console.error(e);
           }
@@ -746,19 +1141,23 @@
 
         onMounted(async () => {
           load();
-          loadLogs();
-          loadStatusChanges();
+          loadLogs(1);
+          loadStatusChanges(1);
+          loadAlertLogs(1);
           try {
             const cfg = await api.getSettings();
+            window.appSettings.value = cfg;
             if (cfg.ui_refresh_seconds) {
-              pollTimer = setInterval(() => { load(); loadLogs(); loadStatusChanges(); }, cfg.ui_refresh_seconds * 1000);
+              pollTimer = setInterval(() => { load(); loadStatusChanges(1);}, cfg.ui_refresh_seconds * 1000);
             }
           } catch { /* auto-refresh disabled */ }
         });
 
         onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 
-        return { projects, logs, statusChanges, loading, checkingAll, error, showLogs, logTab, checkAll, api: window.api };
+        return { projects, logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
+                 logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
+                 load, loadLogs, loadStatusChanges, loadAlertLogs, checkAll, api: window.api };
       },
     };
 
@@ -766,13 +1165,14 @@
        Table list of all projects with Create / Edit / Delete / JSON Import.
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectsPage = {
-      components: { ProjectForm },
+      components: { ProjectForm, RepoManager },
 
       template: `
         <div class="page">
 
           <div class="toolbar">
             <h1>Projects</h1>
+            <button @click="exportProjects">Export JSON</button>
             <button @click="importOpen = true">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
@@ -791,11 +1191,11 @@
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Website</th>
-                  <th>GitHub</th>
-                  <th>Twitter</th>
-                  <th>Telegram</th>
+                  <th data-tooltip="Project name">Name</th>
+                  <th data-tooltip="Website URL">Website</th>
+                  <th data-tooltip="GitHub organization URL">GitHub</th>
+                  <th data-tooltip="Twitter handle or URL">Twitter</th>
+                  <th data-tooltip="Telegram bot or group URL">Telegram</th>
                   <th class="col-actions"></th>
                 </tr>
               </thead>
@@ -807,8 +1207,9 @@
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
                   <td class="col-actions">
-                    <button class="secondary" title="Edit"   @click="openEdit(p)">✎</button>
-                    <button class="secondary" title="Delete" @click="onDelete(p)">🗑</button>
+                    <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
+                    <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>
+                    <button class="secondary" data-tooltip="Delete" @click="onDelete(p)">🗑</button>
                   </td>
                 </tr>
               </tbody>
@@ -862,6 +1263,16 @@
             </div>
           </div>
 
+          <!-- RepoManager modal -->
+          <div v-if="manageProject" class="modal-backdrop" @click.self="manageProject = null">
+            <RepoManager
+              :projectId="manageProject.id"
+              :githubUrl="manageProject.github_url"
+              :projectName="manageProject.name"
+              @repos-updated="manageProject = null"
+            />
+          </div>
+
         </div>
       `,
 
@@ -875,6 +1286,8 @@
         const importOpen  = ref(false); // JSON import modal visibility
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
+        const manageProject = ref(null); // project for RepoManager modal
+        const lastGithubImport = ref(null); // import-created project needing repo setup
 
         /** Fetch all projects from the API */
         async function load() {
@@ -891,6 +1304,7 @@
 
         function openCreate() { editing.value = null; showForm.value = true; }
         function openEdit(p)   { editing.value = p;    showForm.value = true; }
+        function openManageRepos(p) { manageProject.value = p; }
 
         /** Create or update a project, then reload the list */
         async function onSubmit(payload) {
@@ -899,10 +1313,18 @@
           try {
             if (editing.value) {
               await api.updateProject(editing.value.id, payload);
+              showForm.value  = false;
+              editing.value    = null;
+              await load();
             } else {
-              await api.createProject(payload);
+              const created = await api.createProject(payload);
+              showForm.value = false;
+              await load();
+              if (payload.github_url) {
+                const fresh = projects.value.find(p => p.id === created.id);
+                if (fresh) openManageRepos(fresh);
+              }
             }
-            showForm.value  = false;
             editing.value    = null;
             await load();
           } catch (e) {
@@ -927,9 +1349,8 @@
         /**
          * Import one or more projects from the JSON textarea.
          * Accepts a single object or an array of objects.
-         * Field mapping (API → import format):
-         *   name → name,  url → website_url,
-         *   github → github_url,  twitter → twitter_url,  telegram → telegram_url
+         * Field mapping (import format → API):
+         *   name,  website,  github,  twitter,  telegram
          */
         async function onImport() {
           let parsed;
@@ -947,14 +1368,15 @@
 
           for (const item of list) {
             try {
-              await api.createProject({
+              const created = await api.createProject({
                 name:         item.name,
-                website_url:   item.url,
+                website_url:   item.website,
                 github_url:    item.github,
                 twitter_url:   item.twitter,
                 telegram_url:  item.telegram,
               });
               ok++;
+              if (item.github) lastGithubImport.value = created;
             } catch (e) {
               failed++;
             }
@@ -965,6 +1387,28 @@
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
+          if (lastGithubImport.value) {
+            const fresh = projects.value.find(p => p.id === lastGithubImport.value.id);
+            if (fresh) openManageRepos(fresh);
+            lastGithubImport.value = null;
+          }
+        }
+
+        /** Export all projects as JSON (same format as import) */
+        function exportProjects() {
+          const data = projects.value.map(p => ({
+            name:     p.name,
+            website:  p.website_url,
+            github:   p.github_url,
+            twitter:  p.twitter_url,
+            telegram: p.telegram_url,
+          }));
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'projects.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
         }
 
         /** Read a File into the textarea via FileReader */
@@ -980,8 +1424,9 @@
 
         return {
           projects, loading, error, showForm, editing, submitting,
-          importOpen, importText, importing,
-          openCreate, openEdit, onSubmit, onDelete, onImport, onFile,
+          importOpen, importText, importing, manageProject, lastGithubImport,
+          openCreate, openEdit, openManageRepos,
+          onSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel,
           api: window.api,
         };
@@ -1010,21 +1455,21 @@
 
             <!-- Check interval configuration -->
             <article>
-              <h2>Check Intervals</h2>
+              <h3>Check Intervals</h3>
               <p class="muted">How often each check runs automatically (in minutes). 60 min = 1 hour, 1440 min = 1 day.</p>
 
               <div class="form-group">
-                <label>Commit / GitHub (minutes)</label>
-                <input v-model.number="form.commit_interval_minutes" type="number" min="1" max="10080" />
+                <label data-tooltip="How often to check GitHub repositories for changes">GitHub (minutes)</label>
+                <input v-model.number="form.github_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
               <div class="form-group">
-                <label>Website (minutes)</label>
+                <label data-tooltip="How often to check website content for changes">Website (minutes)</label>
                 <input v-model.number="form.website_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
               <div class="form-group">
-                <label>Twitter (minutes)</label>
+                <label data-tooltip="How often to check Twitter for changes">Twitter (minutes)</label>
                 <input v-model.number="form.twitter_interval_minutes" type="number" min="1" max="10080" />
               </div>
 
@@ -1036,20 +1481,142 @@
               </div>
             </article>
 
+            <!-- Alert Settings -->
+            <article class="force-wide">
+              <h3>Alert Settings</h3>
+              <p class="muted">System for automatic alert recording. Set interval to 0 to disable alerting.</p>
+
+              <div class="grid">
+                <div class="form-group">
+                  <label data-tooltip="How often to record a new alert for each unconfirmed GitHub change (minutes). Set interval to 0 to disable alerting.">GitHub Alert Interval (min)</label>
+                  <input v-model.number="form.github_alert_minutes" type="number" min="0" max="10080" />
+                </div>
+                <div class="form-group">
+                  <label data-tooltip="Stop recording new alerts after this many minutes. Set to 0 for indefinite alert until confirmed.">GitHub Alert Stop (min) <span class="muted" style="font-weight:normal">(0 = never stop)</span></label>
+                  <input v-model.number="form.github_alert_stop_minutes" type="number" min="0" max="10080" />
+                </div>
+
+                <div class="form-group">
+                  <label data-tooltip="How often to record a new alert for each unconfirmed Website change (minutes). Set interval to 0 to disable alerting.">Website Alert Interval (min)</label>
+                  <input v-model.number="form.website_alert_minutes" type="number" min="0" max="10080" />
+                </div>
+                <div class="form-group">
+                  <label data-tooltip="Stop recording new alerts after this many minutes. Set to 0 for indefinite alert until confirmed.">Website Alert Stop (min) <span class="muted" style="font-weight:normal">(0 = never stop)</span></label>
+                  <input v-model.number="form.website_alert_stop_minutes" type="number" min="0" max="10080" />
+                </div>
+
+                <div class="form-group">
+                  <label data-tooltip="How often to record a new alert for each unconfirmed Twitter change (minutes). Set interval to 0 to disable alerting.">Twitter Alert Interval (min)</label>
+                  <input v-model.number="form.twitter_alert_minutes" type="number" min="0" max="10080" />
+                </div>
+                <div class="form-group">
+                  <label data-tooltip="Stop recording new alerts after this many minutes. Set to 0 for indefinite alert until confirmed.">Twitter Alert Stop (min) <span class="muted" style="font-weight:normal">(0 = never stop)</span></label>
+                  <input v-model.number="form.twitter_alert_stop_minutes" type="number" min="0" max="10080" />
+                </div>
+              </div>
+
+              <button :disabled="saving" @click="saveAlertSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </article>
+
+            <!-- Notification Channels -->
+            <article class="force-wide">
+              <h3>Notification Channels</h3>
+              <p class="muted">Send alerts to Telegram and/or Pushbullet when an alert is recorded.</p>
+
+              <div class="grid">
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" v-model="form.telegram_enabled" />
+                    Enable Telegram
+                  </label>
+                  <input
+                    v-model="form.telegram_bot_token"
+                    type="password"
+                    placeholder="Bot Token"
+                    autocomplete="off"
+                    :disabled="!form.telegram_enabled"
+                  />
+                  <input
+                    v-model="form.telegram_chat_id"
+                    placeholder="Chat ID"
+                    :disabled="!form.telegram_enabled"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" v-model="form.pushbullet_enabled" />
+                    Enable Pushbullet
+                  </label>
+                  <input
+                    v-model="form.pushbullet_access_token"
+                    type="password"
+                    placeholder="Access Token"
+                    autocomplete="off"
+                    :disabled="!form.pushbullet_enabled"
+                  />
+                </div>
+              </div>
+
+              <button :disabled="saving" @click="saveNotificationSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </article>
+
+            <!-- Manual checks -->
+            <article>
+              <h3>Manual Checks</h3>
+              <p class="muted">Run checks for each resource type across all projects.</p>
+
+              <div class="trigger-row">
+                Websites
+                <button data-tooltip="Check all enabled websites now" :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerWebsites)">
+                  <span v-if="triggering === 'web'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+              <div class="trigger-row">
+                GitHub Repos
+                <button data-tooltip="Check all GitHub repositories for commits and tag changes" :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerGithub)">
+                  <span v-if="triggering === 'gh'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+              <div class="trigger-row">
+                Twitter
+                <button data-tooltip="Check all enabled Twitter accounts now" :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerTwitter)">
+                  <span v-if="triggering === 'tw'" class="spinner"></span>
+                  <span v-else>Run All</span>
+                </button>
+              </div>
+
+            </article>
+
             <!-- App Settings -->
             <article>
-              <h2>App Settings</h2>
+              <h3>App Settings</h3>
+
+              <div class="form-group">
+                <label data-tooltip="GitHub personal access token for higher API rate limits and private repo access">GitHub Token</label>
+                <input v-model="form.github_token" type="password" autocomplete="off" placeholder="ghp_…" />
+              </div>
 
               <fieldset role="group">
-                <label>
+                <label data-tooltip="Automatically delete check logs and status changes older than the specified number of days">
                   <input type="checkbox" v-model="form.log_retention_enabled" />
-                  Delete logs older than 
+                  Delete logs older than
                   <input v-show="form.log_retention_enabled" v-model.number="form.log_retention_days" type="number" min="0" max="365" style="width:80px"/> days
                 </label>
               </fieldset>
 
               <fieldset role="group">
-                <label>
+                <label data-tooltip="Automatically reload the Activity page at the selected interval to show latest status">
                   <input type="checkbox" v-model="form.ui_refresh_enabled" />
                   Enable auto-refresh
                 </label>
@@ -1062,7 +1629,14 @@
               </fieldset>
 
               <fieldset role="group">
-                <label>
+                <label data-tooltip="Hide the Repositories section for each project in the Activity view">
+                  <input type="checkbox" v-model="form.compact_activity" />
+                  Compacted Activity Display
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
+                <label data-tooltip="Show or hide the Clear Logs and Clear All Data buttons">
                   <input type="checkbox" v-model="form.showDangerZone" />
                   Show DB options
                 </label>
@@ -1074,49 +1648,22 @@
               </button>
             </article>
 
-            <!-- Manual triggers -->
-            <article>
-              <h2>Manual Triggers</h2>
-              <p class="muted">Run checks for each resource type across all projects.</p>
-
-              <div class="trigger-row">
-                Websites
-                <button :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerWebsites)">
-                  <span v-if="triggering === 'web'" class="spinner"></span>
-                  <span v-else>Run All</span>
-                </button>
-              </div>
-
-              <div class="trigger-row">
-                GitHub Repos
-                <button :disabled="triggering === 'gh'" @click="onTrigger('gh', api.triggerGithub)">
-                  <span v-if="triggering === 'gh'" class="spinner"></span>
-                  <span v-else>Run All</span>
-                </button>
-              </div>
-
-              <div class="trigger-row">
-                Twitter
-                <button :disabled="triggering === 'tw'" @click="onTrigger('tw', api.triggerTwitter)">
-                  <span v-if="triggering === 'tw'" class="spinner"></span>
-                  <span v-else>Run All</span>
-                </button>
-              </div>
-
-            </article>
-
             <!-- Danger zone: wipe all data (keeps config) -->
             <article v-if="form.showDangerZone" class="danger-zone">
-              <h2>Danger Zone</h2>
+              <h3>Danger Zone</h3>
               <p class="muted">
                 Delete all check logs, or delete everything including projects and repos. Settings are always kept.
               </p>
               <div class="danger-row">
-                <button class="danger" :disabled="clearingLogs" @click="onClearLogs">
+                <button class="danger" data-tooltip="Delete all logs but keep projects and repos" :disabled="clearingLogs" @click="onClearLogs">
                   <span v-if="clearingLogs" class="spinner"></span>
                   <span v-else>Clear Logs</span>
                 </button>
-                <button class="danger" :disabled="clearing" @click="onClear">
+                <button class="danger" data-tooltip="Delete only alert logs" :disabled="clearingAlerts" @click="onClearAlerts">
+                  <span v-if="clearingAlerts" class="spinner"></span>
+                  <span v-else>Clear Alert Logs</span>
+                </button>
+                <button class="danger" data-tooltip="Delete all projects, repos, check logs and status changes. Settings are preserved" :disabled="clearing" @click="onClear">
                   <span v-if="clearing" class="spinner"></span>
                   <span v-else>Clear All Data</span>
                 </button>
@@ -1130,7 +1677,7 @@
       setup() {
         const settings    = ref(null);
         const form        = ref({
-          commit_interval_minutes:   360,
+          github_interval_minutes:   360,
           website_interval_minutes:  1440,
           twitter_interval_minutes:  1440,
           log_retention_days:        7,
@@ -1138,12 +1685,26 @@
           ui_refresh_seconds:        60,
           ui_refresh_enabled:        false,
           showDangerZone:           false,
+          compact_activity:         false,
+          github_alert_minutes:       60,
+          github_alert_stop_minutes:  1440,
+          website_alert_minutes:      60,
+          website_alert_stop_minutes:  1440,
+          twitter_alert_minutes:       60,
+          twitter_alert_stop_minutes:  1440,
+          github_token:               '',
+          telegram_enabled:         false,
+          telegram_bot_token:       '',
+          telegram_chat_id:         '',
+          pushbullet_enabled:       false,
+          pushbullet_access_token:  '',
         });
         const loading   = ref(true);
         const saving    = ref(false);
         const triggering = ref(null);  // which trigger is running: 'web' | 'gh' | 'tw'
         const clearing  = ref(false);
-        const clearingLogs = ref(false);
+        const clearingLogs  = ref(false);
+        const clearingAlerts = ref(false);
         const error      = ref('');
 
         /**
@@ -1152,13 +1713,15 @@
          */
         function pickMinutes(s, kind) {
           if (!s) return 360;
-          // Flat shape: { commit_check_minutes: 360, website_check_minutes: 1440, ... }
+          // Flat shape: { github_check_minutes: 360, website_check_minutes: 1440, ... }
           const d = s[kind + '_check_minutes'];
           if (d != null) return d;
-          // Array shape: { configs: [{ resource_type: 'commit', interval_minutes: 360 }, ...] }
-          const row = s.configs && s.configs.find &&
-            s.configs.find(c => c.resource_type === kind || c.type === kind);
-          return (row && row.interval_minutes) || 360;
+          // Backward compat: commit_check_minutes
+          if (kind === 'github' || kind === 'commit') {
+            const b = s.commit_check_minutes;
+            if (b != null) return b;
+          }
+          return 360;
         }
 
         /** Load settings from GET /api/settings */
@@ -1168,14 +1731,28 @@
           try {
             settings.value = await api.getSettings();
             form.value = {
-              commit_interval_minutes:  pickMinutes(settings.value, 'commit'),
-              website_interval_minutes: pickMinutes(settings.value, 'website'),
+              github_interval_minutes:   pickMinutes(settings.value, 'github'),
+              website_interval_minutes:  pickMinutes(settings.value, 'website'),
               twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
               log_retention_days:   settings.value.log_retention_days || 7,
               log_retention_enabled: !!settings.value.log_retention_days,
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
+              compact_activity:     !!settings.value.compact_activity,
+              github_alert_minutes:      settings.value.github_alert_minutes ?? 60,
+              github_alert_stop_minutes:  settings.value.github_alert_stop_minutes ?? 1440,
+              website_alert_minutes:      settings.value.website_alert_minutes ?? 60,
+              website_alert_stop_minutes:  settings.value.website_alert_stop_minutes ?? 1440,
+              twitter_alert_minutes:      settings.value.twitter_alert_minutes ?? 60,
+              twitter_alert_stop_minutes:  settings.value.twitter_alert_stop_minutes ?? 1440,
+              github_token:              settings.value.github_token || '',
+              telegram_enabled:         !!settings.value.telegram?.enabled,
+              telegram_bot_token:        settings.value.telegram?.bot_token || '',
+              telegram_chat_id:          settings.value.telegram?.chat_id || '',
+              pushbullet_enabled:       !!settings.value.pushbullet?.enabled,
+              pushbullet_access_token:   settings.value.pushbullet?.access_token || '',
             };
+            appSettings.value = settings.value;
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -1189,7 +1766,7 @@
           error.value = '';
           try {
             settings.value = await api.updateSettings({
-              commit_check_minutes:  Number(form.value.commit_interval_minutes),
+              github_check_minutes:  Number(form.value.github_interval_minutes),
               website_check_minutes: Number(form.value.website_interval_minutes),
               twitter_check_minutes: Number(form.value.twitter_interval_minutes),
               log_retention_days:    Number(form.value.log_retention_days),
@@ -1208,13 +1785,63 @@
           error.value = '';
           try {
             settings.value = await api.updateSettings({
+              github_token: form.value.github_token,
               log_retention_days: form.value.log_retention_enabled
                 ? Number(form.value.log_retention_days) || 7
                 : 0,
               ui_refresh_seconds: form.value.ui_refresh_enabled
                 ? Number(form.value.ui_refresh_seconds) || 60
                 : 0,
+              compact_activity: form.value.compact_activity ? 1 : 0,
             });
+            appSettings.value = settings.value;
+            showToast('Saved.');
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            saving.value = false;
+          }
+        }
+
+        /** Save Alert Settings */
+        async function saveAlertSettings() {
+          saving.value = true;
+          error.value = '';
+          try {
+            settings.value = await api.updateSettings({
+              github_alert_minutes:      Number(form.value.github_alert_minutes),
+              github_alert_stop_minutes:  Number(form.value.github_alert_stop_minutes),
+              website_alert_minutes:      Number(form.value.website_alert_minutes),
+              website_alert_stop_minutes:  Number(form.value.website_alert_stop_minutes),
+              twitter_alert_minutes:      Number(form.value.twitter_alert_minutes),
+              twitter_alert_stop_minutes:  Number(form.value.twitter_alert_stop_minutes),
+            });
+            appSettings.value = settings.value;
+            showToast('Saved.');
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            saving.value = false;
+          }
+        }
+
+        /** Save Notification Channels (Telegram + Pushbullet) */
+        async function saveNotificationSettings() {
+          saving.value = true;
+          error.value = '';
+          try {
+            settings.value = await api.updateSettings({
+              telegram: {
+                enabled:   form.value.telegram_enabled,
+                bot_token: form.value.telegram_bot_token,
+                chat_id:   form.value.telegram_chat_id,
+              },
+              pushbullet: {
+                enabled:      form.value.pushbullet_enabled,
+                access_token: form.value.pushbullet_access_token,
+              },
+            });
+            appSettings.value = settings.value;
             showToast('Saved.');
           } catch (e) {
             error.value = e.message;
@@ -1248,6 +1875,19 @@
           }
         }
 
+        /** Clear alert logs only */
+        async function onClearAlerts() {
+          if (!confirm('Delete all alert logs?')) return;
+          clearingAlerts.value = true;
+          try {
+            await api.clearAlertLogs();
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            clearingAlerts.value = false;
+          }
+        }
+
         /** Delete all projects/repos/logs but keep the config row */
         async function onClear() {
           const msg = 'Delete all projects, repos and check logs? Config will be kept.';
@@ -1262,34 +1902,12 @@
           }
         }
 
-        // Derived refs: last run timestamp for each check type (from settings.configs)
-        // The dashboard API returns this on the config rows when available.
-        const lastCommit = computed(() => {
-          const r = settings.value?.configs?.find?.(
-            c => c.resource_type === 'commit' || c.type === 'commit'
-          );
-          return r?.last_checked_at || r?.last_run_at || null;
-        });
-        const lastWebsite = computed(() => {
-          const r = settings.value?.configs?.find?.(
-            c => c.resource_type === 'website'
-          );
-          return r?.last_checked_at || null;
-        });
-        const lastTwitter = computed(() => {
-          const r = settings.value?.configs?.find?.(
-            c => c.resource_type === 'twitter'
-          );
-          return r?.last_checked_at || null;
-        });
-
         onMounted(load);
 
         return {
-          settings, form, loading, saving, triggering, clearing, clearingLogs,
+          settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           error,
-          onSave, saveAppSettings, onTrigger, onClear, onClearLogs,
-          lastCommit, lastWebsite, lastTwitter,
+          onSave, saveAppSettings, saveAlertSettings, saveNotificationSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
           relativeTime,
           api: window.api,
         };
