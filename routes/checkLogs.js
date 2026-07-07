@@ -25,7 +25,8 @@ router.get('/', async (req, res) => {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const rows = await db.prepare(`
     SELECT cl.*, p.name AS project_name,
-      r.full_name AS repo_name
+      r.full_name AS repo_name,
+      p.website_url, p.twitter_url, p.github_url
     FROM check_logs cl
     LEFT JOIN projects p ON p.id = cl.project_id AND p.enabled = 1
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
@@ -58,7 +59,8 @@ router.get('/status-changes', async (req, res) => {
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed' AND p.enabled = 1` : "WHERE rsc.event_type != 'confirmed' AND p.enabled = 1";
   const rows = await db.prepare(`
-    SELECT rsc.*, p.name AS project_name
+    SELECT rsc.*, p.name AS project_name,
+      p.website_url, p.twitter_url, p.github_url
     FROM event_logs rsc
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
@@ -101,7 +103,8 @@ router.get('/alerts', async (req, res) => {
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND p.enabled = 1` : 'WHERE p.enabled = 1';
   const rows = await db.prepare(`
-    SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value
+    SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value,
+      p.website_url, p.twitter_url, p.github_url
     FROM alert_logs al
     LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id
     LEFT JOIN projects p ON p.id = rsc.project_id

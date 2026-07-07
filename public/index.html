@@ -182,6 +182,14 @@
       return repo || '—';
     }
 
+    /** Return the URL for a log entry's resource (website, twitter, or github repo) */
+    function resourceUrl(log) {
+      if (log.resource_type === 'website' && log.website_url) return log.website_url;
+      if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
+      if (log.resource_type === 'github' && log.repo_name) return 'https://github.com/' + log.repo_name;
+      return null;
+    }
+
     /** Map a raw status string → CSS class name for the badge */
     function statusClass(s) {
       if (s === 'ok' || s === 'success') return 'ok';
@@ -336,7 +344,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.project_id }}</td>
-                <td>{{ log.resource_type }}</td>
+                <td><a v-if="resourceUrl(log)" :href="resourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
                 <td>
                   <span :class="['badge', statusClass(log.status)]">{{ log.status }}</span>
                 </td>
@@ -358,7 +366,7 @@
         totalPages() { return Math.ceil(this.total / this.limit) || 1; }
       },
 
-      methods: { relativeTime, absoluteTime, statusClass, logDetail },
+      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceUrl },
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
@@ -389,6 +397,28 @@
           if (eventType === 'deleted' && resourceType === 'github') return `${v.repo_name} · <span style="color:#e55">deleted</span>`;
           return value;
         } catch (_) { return value; }
+      },
+      scResourceUrl(log) {
+        if (log.resource_type === 'website' && log.website_url) return log.website_url;
+        if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
+        if (log.resource_type === 'github' && log.value) {
+          try {
+            const v = JSON.parse(log.value);
+            if (v.repo_name) return 'https://github.com/' + v.repo_name;
+          } catch (_) {}
+        }
+        return null;
+      },
+      alertResourceUrl(log) {
+        if (log.resource_type === 'website' && log.website_url) return log.website_url;
+        if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
+        if (log.resource_type === 'github' && log.change_value) {
+          try {
+            const v = JSON.parse(log.change_value);
+            if (v.repo_name) return 'https://github.com/' + v.repo_name;
+          } catch (_) {}
+        }
+        return null;
       }
     };
 
@@ -418,7 +448,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.project_id }}</td>
-                <td>{{ log.resource_type }}</td>
+                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -449,6 +479,7 @@
         relativeTime, absoluteTime,
         badgeClass: statusChangeHelpers.badgeClass,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
+        scResourceUrl: statusChangeHelpers.scResourceUrl,
         async toggleConfirm(log, event) {
           if (log.confirmed) {
             if (!confirm('Unconfirm this status change?')) {
@@ -484,6 +515,7 @@
             <thead>
               <tr>
                 <th class="project_cell alert" data-tooltip="Project name">Project</th>
+                <th class="type_cell" data-tooltip="Resource type">Resource</th>
                 <th class="type_cell" data-tooltip="Event type">Event</th>
                 <th class="time_cell" data-tooltip="Time the alert was recorded">When</th>
                 <th class="details_cell" data-tooltip="Alert details">Details</th>
@@ -492,6 +524,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.status_change_id }}</td>
+                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -519,6 +552,7 @@
         absoluteTime,
         badgeClass: statusChangeHelpers.badgeClass,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
+        alertResourceUrl: statusChangeHelpers.alertResourceUrl,
       },
     };
 
@@ -1129,7 +1163,7 @@
         const checkingAll   = ref(false);
         const error         = ref('');
         const showLogs      = ref(true);
-        const logTab        = ref('check-logs');
+        const logTab        = ref('status-changes');
 
         // Pagination state for each tab
         const logPage   = ref(1);
