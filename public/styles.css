@@ -325,11 +325,16 @@ table.compact .details_cell   { min-width: 140px; }
 .price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; }
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
 .price-table td.num, .price-table th.num { text-align: right; }
+.price-table td.cen, .price-table th.cen { text-align: center; }
 .price-table tr:hover td { background: var(--pico-card-background-color-hover, rgba(255,255,255,0.03)); }
 .price-table .neg { color: #e53e3e; }
 .price-table .pos { color: #38a169; }
 .price-table a { text-decoration: none; }
 .price-table a:hover { text-decoration: underline; }
+.price-table th { cursor: pointer; user-select: none; }
+.price-table th:hover { color: var(--app-primary); }
+.price-table th.sort-asc::after { content: ' ↑' !important; }
+.price-table th.sort-desc::after { content: ' ↓' !important; }
 
 .tabs { display: flex; gap: 2px; margin: 0 20px 0 20px; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border);}
 .tab {

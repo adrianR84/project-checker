@@ -31,7 +31,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick, Transition } = Vue;
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -1140,7 +1140,7 @@
 
           <div class="toolbar">
             <h1>Activity</h1>
-            <button class="secondary" @click="showLogs = !showLogs">
+            <button v-if="false" class="secondary" @click="showLogs = !showLogs">
               {{ showLogs ? 'Hide logs' : 'Show recent logs' }}
             </button>
             <button v-if="false" class="primary" :disabled="checkingAll || loading" @click="checkAll">
@@ -1190,20 +1190,20 @@
             </div>
 
             <div v-else class="table-wrapper">
-              <table class="price-table">
+              <table id="price-table" class="price-table">
                 <thead>
                   <tr>
-                    <th>Project</th>
-                    <th>Symbol</th>
-                    <th>Age</th>
-                    <th>Price</th>
-                    <th>1h</th>
-                    <th>6h</th>
-                    <th>24h</th>
-                    <th>Liquidity</th>
-                    <th>Volume 24h</th>
-                    <th>MCap</th>
-                    <th>Chain</th>
+                    <th :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
+                    <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
+                    <th class="cen" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
+                    <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
+                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
+                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
+                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
+                    <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
+                    <th :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
+                    <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
+                    <th :class="['sortable', priceSort.col === 'chain' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('chain')">Chain</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1216,16 +1216,16 @@
                       </a>
                     </td>
                     <td>
-                      <a :href="'https://x.com/search?q=%24' + row.symbol + '&src=typed_query'"
+                      <a :href="'https://x.com/search?q=%24' + (row.symbol.startsWith('$') ? row.symbol.slice(1) : row.symbol) + '&src=typed_query'"
                          target="_blank" rel="noopener">
                         {{ row.symbol || '—' }}
                       </a>
                     </td>
                     <td>{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
-                    <td class="num">{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</td>
-                    <td :class="['num', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
-                    <td :class="['num', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
-                    <td :class="['num', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
+                    <td class="cen">{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</td>
+                    <td :class="['cen', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
+                    <td :class="['cen', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
+                    <td :class="['cen', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
                     <td class="num">{{ fmtShortNum(row.volume_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.market_cap) }}</td>
@@ -1391,7 +1391,7 @@
         });
 
         // Watch activityTab to load/fetch prices when switching to Prices tab
-        watch(() => activityTab.value, (tab) => {
+        watch(() => activityTab.value, async (tab) => {
           if (tab === 'prices' && !prices.value.length) {
             loadPrices();
           }
@@ -1403,11 +1403,37 @@
           }
         });
 
+        // Sort state
+        const priceSort = ref({ col: null, desc: true });
+
+        function sortCol(col) {
+          if (priceSort.value.col === col) {
+            priceSort.value.desc = !priceSort.value.desc;
+          } else {
+            priceSort.value.col = col;
+            priceSort.value.desc = true;
+          }
+          const num = (v) => v == null || isNaN(v) ? -Infinity : parseFloat(v);
+          const str = (v) => (v == null ? '' : String(v)).toLowerCase();
+          const rows = [...prices.value];
+          rows.sort((a, b) => {
+            const va = a[col], vb = b[col];
+            let cmp;
+            if (['project_name', 'symbol', 'chain'].includes(col)) {
+              cmp = str(va) < str(vb) ? -1 : str(va) > str(vb) ? 1 : 0;
+            } else {
+              cmp = num(va) < num(vb) ? -1 : num(va) > num(vb) ? 1 : 0;
+            }
+            return priceSort.value.desc ? -cmp : cmp;
+          });
+          prices.value = rows;
+        }
+
         return {
           activityTab, projects, prices, pricesLoading,
           logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
-          load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, checkAll,
+          load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, checkAll, sortCol, priceSort,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
         };
       },
