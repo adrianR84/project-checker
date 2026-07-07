@@ -34,6 +34,8 @@ async function init() {
       github_enabled INTEGER NOT NULL DEFAULT 1,
       twitter_enabled INTEGER NOT NULL DEFAULT 1,
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
+      token TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );

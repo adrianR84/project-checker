@@ -12,6 +12,7 @@ router.get('/', async (req, res) => {
   const projects = await db.prepare(`
     SELECT id, name, website_url, github_url, twitter_url, telegram_url,
            website_enabled, website_content_check, github_enabled, twitter_enabled, telegram_enabled,
+           token, enabled,
            created_at, updated_at
     FROM projects
     ORDER BY id DESC
@@ -91,16 +92,17 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
 // POST /api/projects — create project
 router.post('/', async (req, res) => {
   const { name, website_url, github_url, twitter_url, telegram_url,
-          website_enabled, website_content_check } = req.body || {};
+          website_enabled, website_content_check, token, enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   const ts = now();
+  const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
     INSERT INTO projects (name, website_url, github_url, twitter_url, telegram_url,
-      website_enabled, website_content_check, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      website_enabled, website_content_check, token, enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
-    website_enabled ? 1 : 0, website_content_check ? 1 : 0, ts, ts);
+    website_enabled ? 1 : 0, website_content_check ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, ts, ts);
 
   const projectId = result.lastInsertRowid;
 
@@ -131,12 +133,37 @@ router.put('/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Project not found' });
 
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
-                   'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled'];
+                   'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled',
+                   'token', 'enabled'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
       updates[key] = req.body[key];
     }
+  }
+
+  // Auto-fill token symbol/chain from DexScreener if contract is provided but symbol or chain is missing
+  if (updates.token && updates.token.contract && (!updates.token.symbol || !updates.token.chain)) {
+    try {
+      const chain = updates.token.chain || 'solana';
+      const data = await fetch(`https://api.dexscreener.com/token-pairs/v1/${chain}/${updates.token.contract}`).then(r => r.json());
+      const pair = Array.isArray(data) ? data.find(p => p.baseToken?.address === updates.token.contract) : null;
+      if (pair?.baseToken) {
+        updates.token = {
+          ...updates.token,
+          symbol: updates.token.symbol || pair.baseToken.symbol || null,
+          chain: updates.token.chain || pair.chainId || chain,
+          contract: updates.token.contract,
+        };
+      }
+    } catch (err) {
+      console.error(`[${now()}] Dexscreener lookup failed: ${err.message}`);
+    }
+  }
+
+  // Serialize token as JSON string for DB
+  if (updates.token && typeof updates.token === 'object') {
+    updates.token = (updates.token.symbol || updates.token.contract || updates.token.chain) ? JSON.stringify(updates.token) : null;
   }
 
   if (Object.keys(updates).length > 0) {

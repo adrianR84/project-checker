@@ -321,6 +321,19 @@ function drop_old_config_flat_cols(db) {
   }
 }
 
+/** Migration: adds token (JSON) and enabled columns to projects if missing. */
+function add_token_and_enabled_columns(db) {
+  const rows = db.prepare("PRAGMA table_info(projects)").all();
+  if (!rows) return;
+  const cols = rows.map(r => r.name);
+  if (!cols.includes('token')) {
+    try { db.exec("ALTER TABLE projects ADD COLUMN token TEXT"); } catch (e) { console.error(`[${now()}] add_token_and_enabled_columns (token) failed: ${e.message}`); }
+  }
+  if (!cols.includes('enabled')) {
+    try { db.exec("ALTER TABLE projects ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"); } catch (e) { console.error(`[${now()}] add_token_and_enabled_columns (enabled) failed: ${e.message}`); }
+  }
+}
+
 /** Migration: adds telegram and pushbullet columns to config if missing. */
 function add_notification_config_cols(db) {
   const rows = db.prepare("PRAGMA table_info(config)").all();
@@ -361,6 +374,7 @@ async function runMigrations(db) {
   try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

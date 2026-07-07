@@ -95,6 +95,10 @@
     const appSettings = ref(null);
     window.appSettings = appSettings;
 
+    // Fear & Greed Index — fetched once at startup, displayed in navbar
+    const fearIndex = ref(null);
+    window.fearIndex = fearIndex;
+
     /** Show a toast notification in the bottom-right corner */
     function showToast(msg, type = 'ok') {
       const el = document.createElement('div');
@@ -196,10 +200,15 @@
         <nav class="navbar">
           <ul>
             <li>
-              <span class="brand">
+              <a href="#/" class="brand">
                 <span class="logo-dot"></span>
                 Project Checker
-              </span>
+              </a>
+            </li>
+            <li v-if="fearIndex?.value !== undefined">
+              <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" style="font-size:0.8rem" :class="['badge', fearIndex.value_classification === 'Fear' ? 'error' : fearIndex.value_classification === 'Greed' ? 'ok' : 'pending']" :title="'Fear & Greed Index: ' + fearIndex.value_classification">
+                {{ fearIndex.value }} {{ fearIndex.value_classification }}
+              </a>
             </li>
           </ul>
           <ul>
@@ -230,6 +239,14 @@
           currentRoute.value = window.location.hash.slice(1) || '/';
         });
 
+        // Fetch Fear & Greed Index once at startup
+        if (!window.fearIndex.value) {
+          fetch('https://api.alternative.me/fng/')
+            .then(r => r.json())
+            .then(j => { if (j.data?.[0]) window.fearIndex.value = j.data[0]; })
+            .catch(() => {});
+        }
+
         return {
           leftTabs: [
             { to: '/',         label: 'Activity'  },
@@ -239,6 +256,7 @@
             { to: '/settings', label: 'Settings'  },
           ],
           currentRoute,
+          fearIndex: window.fearIndex,
         };
       },
     };
@@ -527,8 +545,11 @@
 
           <!-- Fields tab -->
           <div v-if="formTab === 'fields'">
-            <div class="form-group">
-              <label>Name *</label>
+            <div class="form-row">
+              <div class="form-row-header">
+                <label>Name *</label>
+                <label><input type="checkbox" v-model="f.project_enabled" /> Project enabled</label>
+              </div>
               <input v-model="f.name" required placeholder="My Project" />
             </div>
 
@@ -564,15 +585,27 @@
               </div>
               <input v-model="f.telegram_url" type="url" placeholder="https://t.me/channel" />
             </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <label>Token</label>
+                <span v-if="tokenLookupBusy" class="spinner" style="width:1rem;height:1rem;display:inline-block;"></span>
+              </div>
+              <div class="form-row-group">
+                <input v-model="f.token_symbol" placeholder="Symbol (e.g. JTVO)" style="flex: 1;" />
+                <input v-model="f.token_contract" placeholder="Contract" style="flex: 2;" @blur="lookupToken" />
+                <input v-model="f.token_chain" placeholder="Chain (e.g. solana)" style="flex: 1;" />
+              </div>
+            </div>
           </div>
 
           <!-- JSON tab (edit mode only — create has no existing project to partial-update) -->
-          <div v-if="initial && formTab === 'json'" class="form-group">
+          <div v-if="formTab === 'json'" class="form-group">
             <label>Project JSON — only entered fields are updated</label>
             <textarea
               v-model="jsonEditText"
               rows="8"
-              placeholder='{"name":"New Name","website":"https://new-site.com"}'
+              placeholder='{"name":"New Name","website":"https://new-site.com","symbol":"JTVO","contractAddress":"...","chainId":"solana"}'
             ></textarea>
             <span v-if="jsonEditError" class="error-msg">{{ jsonEditError }}</span>
           </div>
@@ -592,10 +625,12 @@
         const f = ref({
           name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
           website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true,
+          project_enabled: true, token_symbol: '', token_contract: '', token_chain: '',
         });
         const jsonEditText  = ref('');
         const jsonEditError = ref('');
         const formTab = ref('fields');
+        const tokenLookupBusy = ref(false);
 
         // Sync form fields whenever the `initial` prop changes
         // (happens when switching from "create" to "edit" mode)
@@ -604,6 +639,7 @@
           (v) => {
             formTab.value = 'fields';
             if (v) {
+              const tok = v.token ? (typeof v.token === 'string' ? JSON.parse(v.token) : v.token) : {};
               f.value = {
                 name:         v.name         || '',
                 website_url:   v.website_url   || '',
@@ -615,14 +651,36 @@
                 github_enabled:   !!v.github_enabled,
                 twitter_enabled:  !!v.twitter_enabled,
                 telegram_enabled: !!v.telegram_enabled,
+                project_enabled: !!v.enabled,
+                token_symbol: tok.symbol || '',
+                token_contract: tok.contract || '',
+                token_chain: tok.chain || '',
               };
             } else {
               f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
-                website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true };
+                website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true,
+                project_enabled: true, token_symbol: '', token_contract: '', token_chain: '' };
             }
           },
           { immediate: true }
         );
+
+        async function lookupToken() {
+          const contract = f.value.token_contract?.trim();
+          if (!contract || f.value.token_symbol?.trim() || f.value.token_chain?.trim()) return;
+          tokenLookupBusy.value = true;
+          try {
+            const chain = f.value.token_chain?.trim() || 'solana';
+            const r = await fetch(`https://api.dexscreener.com/token-pairs/v1/${chain}/${contract}`);
+            const data = await r.json();
+            const pair = Array.isArray(data) ? data.find(p => p.baseToken?.address === contract) : null;
+            if (pair?.baseToken) {
+              if (!f.value.token_symbol) f.value.token_symbol = pair.baseToken.symbol || '';
+              if (!f.value.token_chain)  f.value.token_chain  = pair.chainId || chain;
+            }
+          } catch (_) {}
+          finally { tokenLookupBusy.value = false; }
+        }
 
         function onSubmit() {
           // If JSON tab active, merge JSON fields into f before submitting
@@ -634,6 +692,12 @@
               for (const [k, target] of Object.entries(fieldMap)) {
                 if (o[k] !== undefined) f.value[target] = o[k];
               }
+              if (o.symbol !== undefined) f.value.token_symbol   = o.symbol;
+              if (o.contract !== undefined) f.value.token_contract = o.contract;
+              if (o.contractAddress !== undefined) f.value.token_contract = o.contractAddress;
+              if (o.chain !== undefined)   f.value.token_chain   = o.chain;
+              if (o.chainId !== undefined) f.value.token_chain   = o.chainId;
+              if (o.enabled !== undefined)  f.value.project_enabled = !!o.enabled;
             } catch (e) {
               jsonEditError.value = 'Invalid JSON: ' + e.message;
               return;
@@ -645,10 +709,20 @@
             if (p[k] === '') p[k] = null;
           }
           if (!p.name) { alert('Name is required'); return; }
-          emit('submit', p);
+          // Build token and enabled from flat form fields
+          const token = (p.token_symbol || p.token_contract || p.token_chain)
+            ? { symbol: p.token_symbol, contract: p.token_contract, chain: p.token_chain }
+            : null;
+          emit('submit', {
+            name: p.name, website_url: p.website_url, github_url: p.github_url,
+            twitter_url: p.twitter_url, telegram_url: p.telegram_url,
+            website_enabled: p.website_enabled, website_content_check: p.website_content_check,
+            github_enabled: p.github_enabled, twitter_enabled: p.twitter_enabled, telegram_enabled: p.telegram_enabled,
+            token, enabled: p.project_enabled ? 1 : 0,
+          });
         }
 
-        return { f, onSubmit, jsonEditText, jsonEditError, formTab };
+        return { f, onSubmit, jsonEditText, jsonEditError, formTab, lookupToken, tokenLookupBusy };
       },
     };
 
@@ -1196,16 +1270,18 @@
                   <th data-tooltip="GitHub organization URL">GitHub</th>
                   <th data-tooltip="Twitter handle or URL">Twitter</th>
                   <th data-tooltip="Telegram bot or group URL">Telegram</th>
+                  <th data-tooltip="Token info">Token</th>
                   <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="p in projects" :key="p.id">
+                <tr v-for="p in projects" :key="p.id" :class="{ disabled: !p.enabled }">
                   <td>{{ p.name }}</td>
                   <td><a v-if="p.website_url" :href="p.website_url" target="_blank" rel="noopener">{{ urlLabel(p.website_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
+                  <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
                     <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>
@@ -1245,7 +1321,7 @@
                 <textarea
                   v-model="importText"
                   rows="10"
-                  placeholder='[{"name":"Example","website_url":"https://example.com","github_url":"https://github.com/example"}]'
+                  placeholder='[{"name":"Example","website":"https://example.com","github":"https://github.com/example","symbol":"JTVO","contractAddress":"...","chainId":"solana","enabled":true}]'
                 ></textarea>
               </div>
 
@@ -1369,14 +1445,19 @@
           for (const item of list) {
             try {
               const hasWebsite = !!item.website;
+              const tok = (item.symbol || item.contractAddress || item.chainId)
+                ? { symbol: item.symbol || null, contract: item.contractAddress || null, chain: item.chainId || null }
+                : null;
               const created = await api.createProject({
                 name:                   item.name,
                 website_url:            item.website,
                 github_url:             item.github,
                 twitter_url:            item.twitter,
                 telegram_url:           item.telegram,
-                website_enabled:        hasWebsite,      // enable if URL present
-                website_content_check:  hasWebsite,      // enable content check if URL present
+                website_enabled:        hasWebsite,
+                website_content_check:  hasWebsite,
+                token:                  tok,
+                enabled:                item.enabled !== undefined ? (item.enabled ? 1 : 0) : 1,
               });
               ok++;
               if (item.github) lastGithubImport.value = created;
@@ -1399,13 +1480,20 @@
 
         /** Export all projects as JSON (same format as import) */
         function exportProjects() {
-          const data = projects.value.map(p => ({
-            name:     p.name,
-            website:  p.website_url,
-            github:   p.github_url,
-            twitter:  p.twitter_url,
-            telegram: p.telegram_url,
-          }));
+          const data = projects.value.map(p => {
+            const tok = p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
+            return {
+              name:     p.name,
+              website:  p.website_url,
+              github:   p.github_url,
+              twitter:  p.twitter_url,
+              telegram: p.telegram_url,
+              symbol:        tok.symbol || null,
+              contractAddress: tok.contract || null,
+              chainId:       tok.chain || null,
+              enabled:       p.enabled,
+            };
+          });
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -1425,12 +1513,16 @@
 
         onMounted(load);
 
+        function tok(p) {
+          return p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
+        }
+
         return {
           projects, loading, error, showForm, editing, submitting,
           importOpen, importText, importing, manageProject, lastGithubImport,
           openCreate, openEdit, openManageRepos,
           onSubmit, onDelete, onImport, onFile, exportProjects,
-          urlLabel,
+          urlLabel, tok,
           api: window.api,
         };
       },
