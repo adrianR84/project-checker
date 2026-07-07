@@ -320,6 +320,31 @@ function add_token_and_enabled_columns(db) {
   }
 }
 
+/** Migration: creates token_prices table if missing. */
+function add_token_prices_table(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='token_prices'").get();
+  if (row) return;
+  db.exec(`
+    CREATE TABLE token_prices (
+      project_id INTEGER PRIMARY KEY,
+      symbol TEXT,
+      chain TEXT,
+      contract TEXT,
+      price_usd REAL,
+      price_change_h1 REAL,
+      price_change_h4 REAL,
+      price_change_h6 REAL,
+      price_change_h24 REAL,
+      liquidity_usd REAL,
+      volume_h24 REAL,
+      market_cap REAL,
+      pair_created_at TEXT,
+      fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `);
+}
+
 /** Migration: adds telegram and pushbullet columns to config if missing. */
 function add_notification_config_cols(db) {
   const rows = db.prepare("PRAGMA table_info(config)").all();
@@ -356,6 +381,7 @@ async function runMigrations(db) {
   try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

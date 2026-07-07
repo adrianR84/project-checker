@@ -77,6 +77,7 @@
       getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
       confirmStatusChange: (id, confirmed = 1) => req(`/check-logs/status-changes/${id}/confirm`, { method: 'PATCH', body: JSON.stringify({ confirmed: confirmed ? 1 : 0 }) }),
       getAlertLogs:       (q = {}) => req('/check-logs/alerts?' + new URLSearchParams(q).toString()),
+      getTokenPrices:     ()       => req('/token-prices'),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
       triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
@@ -127,7 +128,26 @@
 
     function relativeTime(v) {
       if (!v) return 'never';
-      const d = new Date(v);
+      let ms;
+      if (typeof v === 'number') {
+        ms = v > 1e12 ? v : v * 1000;
+      } else if (typeof v === 'string') {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed) && parsed > 1e12) {
+          // Already milliseconds (e.g. "1781640210000.0")
+          ms = parsed;
+        } else if (!isNaN(parsed) && parsed > 1e9) {
+          // Unix seconds
+          ms = parsed * 1000;
+        } else {
+          // ISO string
+          ms = new Date(v).getTime();
+        }
+      } else {
+        ms = new Date(v).getTime();
+      }
+      if (isNaN(ms)) return 'never';
+      const d = new Date(ms);
       if (isNaN(d)) return 'never';
       const diff = (d.getTime() - Date.now()) / 1000;
       for (const [u, s] of UNITS)
@@ -141,6 +161,21 @@
       const d = new Date(v);
       if (isNaN(d)) return '—';
       return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+    }
+
+    /** Format a number as short dollar value: 1000 → $1K, 1000000 → $1M, 1000000000 → $1B */
+    function fmtShortNum(v) {
+      if (v == null || isNaN(v)) return '—';
+      if (Math.abs(v) >= 1e9) return '$' + (v / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+      if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (Math.abs(v) >= 1e3) return '$' + (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+      return '$' + v.toFixed(2);
+    }
+
+    /** Format a price-change value as percentage string */
+    function fmtPct(v) {
+      if (v == null || isNaN(v)) return '—';
+      return (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2) + '%';
     }
 
     /** Extract the hostname from a URL, stripping leading "www." */
@@ -1114,23 +1149,92 @@
             </button>
           </div>
 
-          <div v-if="error" class="[role="alert"]">{{ error }}</div>
-
-          <div v-if="loading" class="center-loader">
-            <span class="spinner lg"></span>
+          <div class="tabs" style="margin: 0 20px;">
+            <button :class="['tab', activityTab === 'resources' ? 'active' : '']" @click="activityTab = 'resources'">Resources</button>
+            <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
           </div>
 
-          <div v-else-if="!projects.length" class="empty">
-            No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
+          <!-- Resources tab: project cards -->
+          <div v-if="activityTab === 'resources'">
+
+            <div v-if="error" class="[role="alert"]">{{ error }}</div>
+
+            <div v-if="loading" class="center-loader">
+              <span class="spinner lg"></span>
+            </div>
+
+            <div v-else-if="!projects.length" class="empty">
+              No projects yet. Add one in the <a href="#/projects">Projects</a> tab.
+            </div>
+
+            <div v-else class="project-grid">
+              <ProjectCard
+                v-for="p in projects"
+                :key="p.id"
+                :project="p"
+                @refreshed="load"
+              />
+            </div>
+
           </div>
 
-          <div v-else class="project-grid">
-            <ProjectCard
-              v-for="p in projects"
-              :key="p.id"
-              :project="p"
-              @refreshed="load"
-            />
+          <!-- Prices tab: token price table -->
+          <div v-else-if="activityTab === 'prices'">
+
+            <div v-if="pricesLoading" class="center-loader">
+              <span class="spinner lg"></span>
+            </div>
+
+            <div v-else-if="!prices.length" class="empty" style="padding: 2rem 0;">
+              No token prices yet. Add tokens to your enabled projects.
+            </div>
+
+            <div v-else class="table-wrapper">
+              <table class="price-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Symbol</th>
+                    <th>Age</th>
+                    <th>Price</th>
+                    <th>1h</th>
+                    <th>6h</th>
+                    <th>24h</th>
+                    <th>Liquidity</th>
+                    <th>Volume 24h</th>
+                    <th>MCap</th>
+                    <th>Chain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in prices" :key="row.project_id">
+                    <td>
+                      <a :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
+                         target="_blank" rel="noopener"
+                         :title="row.project_name">
+                        {{ row.project_name.length > 30 ? row.project_name.slice(0, 30) + '…' : row.project_name }}
+                      </a>
+                    </td>
+                    <td>
+                      <a :href="'https://x.com/search?q=%24' + row.symbol + '&src=typed_query'"
+                         target="_blank" rel="noopener">
+                        {{ row.symbol || '—' }}
+                      </a>
+                    </td>
+                    <td>{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
+                    <td class="num">{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</td>
+                    <td :class="['num', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
+                    <td :class="['num', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
+                    <td :class="['num', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
+                    <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
+                    <td class="num">{{ fmtShortNum(row.volume_h24) }}</td>
+                    <td class="num">{{ fmtShortNum(row.market_cap) }}</td>
+                    <td>{{ row.chain || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
           </div>
 
           <!-- Optional recent logs table -->
@@ -1155,7 +1259,11 @@
       `,
 
       setup() {
-        const projects       = ref([]);
+        const PRICES_REFRESH_MS = 30_000;
+        const activityTab   = ref('resources');
+        const projects      = ref([]);
+        const prices        = ref([]);
+        const pricesLoading = ref(false);
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
@@ -1187,8 +1295,19 @@
           } finally {
             loading.value = false;
           }
-          // Also refresh whichever log tab is open
           ({ 'check-logs': loadLogs, 'status-changes': loadStatusChanges, 'alert-logs': loadAlertLogs }[logTab.value] || (() => {}))(1);
+        }
+
+        /** Load token prices */
+        async function loadPrices() {
+          pricesLoading.value = true;
+          try {
+            prices.value = await api.getTokenPrices();
+          } catch (e) {
+            console.error(e);
+          } finally {
+            pricesLoading.value = false;
+          }
         }
 
         /** Load log entries for the current page */
@@ -1245,6 +1364,8 @@
         }
 
         let pollTimer = null;
+        let pricesTimer = null;
+        let prevActivityTab = activityTab.value;
 
         onMounted(async () => {
           load();
@@ -1260,11 +1381,31 @@
           } catch { /* auto-refresh disabled */ }
         });
 
-        onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
+        onUnmounted(() => {
+          if (pollTimer) clearInterval(pollTimer);
+          if (pricesTimer) clearInterval(pricesTimer);
+        });
 
-        return { projects, logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
-                 logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
-                 load, loadLogs, loadStatusChanges, loadAlertLogs, checkAll, api: window.api };
+        // Watch activityTab to load/fetch prices when switching to Prices tab
+        watch(() => activityTab.value, (tab) => {
+          if (tab === 'prices' && !prices.value.length) {
+            loadPrices();
+          }
+          if (tab === 'prices') {
+            if (pricesTimer) clearInterval(pricesTimer);
+            pricesTimer = setInterval(loadPrices, PRICES_REFRESH_MS);
+          } else {
+            if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
+          }
+        });
+
+        return {
+          activityTab, projects, prices, pricesLoading,
+          logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
+          logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
+          load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, checkAll,
+          api: window.api, relativeTime, fmtShortNum, fmtPct,
+        };
       },
     };
 

@@ -139,6 +139,26 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_alert_logs_status_change_id ON alert_logs(status_change_id);
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS token_prices (
+      project_id INTEGER PRIMARY KEY,
+      symbol TEXT,
+      chain TEXT,
+      contract TEXT,
+      price_usd REAL,
+      price_change_h1 REAL,
+      price_change_h4 REAL,
+      price_change_h6 REAL,
+      price_change_h24 REAL,
+      liquidity_usd REAL,
+      volume_h24 REAL,
+      market_cap REAL,
+      pair_created_at TEXT,
+      fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
   // Run migrations
   const { runMigrations } = require('./migrations');
   await runMigrations(database);

@@ -9,6 +9,7 @@ const now = () => new Date().toISOString();
 
 let jobs = [];
 let initialized = false;
+let tokenPriceInterval = null;
 
 /** Stops and clears all scheduled cron jobs. */
 function clearJobs() {
@@ -16,6 +17,7 @@ function clearJobs() {
     try { j.stop(); } catch (_) {}
   }
   jobs = [];
+  if (tokenPriceInterval) { clearInterval(tokenPriceInterval); tokenPriceInterval = null; }
 }
 
 /** Converts a minute count into a node-cron expression (e.g. 60 → "0 0/1 * * *"). */
@@ -167,6 +169,81 @@ async function runAlertTick() {
 
 let lastCommitExpr = null, lastWebsiteExpr = null, lastTwitterExpr = null;
 
+const TOKEN_CHECK_INTERVAL_MS = 60_000; // 1 minute, configurable via settings later
+
+/** Fetches token prices from DexScreener for all enabled projects with tokens, in batches of 5. */
+async function runTokenPriceTick() {
+  const projects = await db.prepare(`
+    SELECT id, token FROM projects WHERE enabled = 1 AND token IS NOT NULL AND token != ''
+  `).all();
+  if (!projects.length) return;
+  console.log(`[${now()}] Scheduler: token price tick — ${projects.length} tokens`);
+
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < projects.length; i += BATCH_SIZE) {
+    const batch = projects.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(async (p) => {
+      try {
+        const token = JSON.parse(p.token);
+        if (!token.contract || !token.chain) return;
+        const url = `https://api.dexscreener.com/token-pairs/v1/${token.chain}/${token.contract}`;
+        const res = await fetch(url);
+        if (res.status === 429) {
+          console.warn(`[${now()}] DexScreener rate-limited, pausing 1s before retry`);
+          await new Promise(r => setTimeout(r, 1000));
+          const retry = await fetch(url);
+          if (!retry.ok) return;
+          const data = await retry.json();
+          await upsertTokenPrice(p.id, token, data);
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        await upsertTokenPrice(p.id, token, data);
+      } catch (err) {
+        console.error(`[${now()}] token price fetch failed for project ${p.id}: ${err.message}`);
+      }
+    }));
+  }
+}
+
+/** Finds the best pair (highest liquidity) from DexScreener response and upserts into token_prices. */
+async function upsertTokenPrice(projectId, token, data) {
+  const pairs = Array.isArray(data) ? data : [];
+  const matched = pairs.filter(p => p.baseToken?.address === token.contract);
+  const pair = matched.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+  if (!pair) return;
+  const ts = now();
+  await db.prepare(`
+    INSERT INTO token_prices (project_id, symbol, chain, contract, price_usd,
+      price_change_h1, price_change_h4, price_change_h6, price_change_h24,
+      liquidity_usd, volume_h24, market_cap, pair_created_at, fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id) DO UPDATE SET
+      symbol = excluded.symbol, chain = excluded.chain, contract = excluded.contract,
+      price_usd = excluded.price_usd, price_change_h1 = excluded.price_change_h1,
+      price_change_h4 = excluded.price_change_h4, price_change_h6 = excluded.price_change_h6,
+      price_change_h24 = excluded.price_change_h24, liquidity_usd = excluded.liquidity_usd,
+      volume_h24 = excluded.volume_h24, market_cap = excluded.market_cap,
+      pair_created_at = excluded.pair_created_at, fetched_at = excluded.fetched_at
+  `).run(
+    projectId,
+    pair.baseToken?.symbol || token.symbol || null,
+    pair.chainId || token.chain || null,
+    token.contract,
+    pair.priceUsd || null,
+    pair.priceChange?.h1 || null,
+    pair.priceChange?.h4 || null,
+    pair.priceChange?.h6 || null,
+    pair.priceChange?.h24 || null,
+    pair.liquidity?.usd || null,
+    pair.volume?.h24 || null,
+    pair.marketCap || null,
+    pair.pairCreatedAt || null,
+    ts
+  );
+}
+
 /** Rebuilds all cron schedules from current config. Only rebuilds if any expression changed.
     Also schedules: daily log purge (midnight) and alert tick (every 1 min, interval-throttled). */
 async function reschedule() {
@@ -218,6 +295,11 @@ async function reschedule() {
   const alertJob = cron.schedule('* * * * *', () => { runAlertTick().catch(err => console.error(err)); });
   jobs.push(alertJob);
   console.log(`[${now()}] Scheduler: alert tick job → "* * * * *" (1-min grid)`);
+
+  // Token price tick: every TOKEN_CHECK_INTERVAL_MS ms via setInterval (not cron, for rate-limit control)
+  clearInterval(tokenPriceInterval);
+  tokenPriceInterval = setInterval(() => { runTokenPriceTick().catch(err => console.error(err)); }, TOKEN_CHECK_INTERVAL_MS);
+  console.log(`[${now()}] Scheduler: token price tick → every ${TOKEN_CHECK_INTERVAL_MS / 1000}s`);
 }
 
 function init() {
@@ -227,6 +309,7 @@ function init() {
   }
   initialized = true;
   reschedule();
+  runTokenPriceTick().catch(err => console.error(`[${now()}] initial token price tick failed: ${err.message}`));
 
   setInterval(() => {
     reschedule();
