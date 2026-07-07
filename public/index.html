@@ -1154,9 +1154,7 @@
             loading.value = false;
           }
           // Also refresh whichever log tab is open
-          if (logTab.value === 'check-logs') loadLogs(1);
-          else if (logTab.value === 'status-changes') loadStatusChanges(1);
-          else if (logTab.value === 'alert-logs') loadAlertLogs(1);
+          ({ 'check-logs': loadLogs, 'status-changes': loadStatusChanges, 'alert-logs': loadAlertLogs }[logTab.value] || (() => {}))(1);
         }
 
         /** Load log entries for the current page */
@@ -1480,15 +1478,15 @@
         /** Export all projects as JSON (same format as import) */
         function exportProjects() {
           const data = projects.value.map(p => {
-            const tok = p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
+            const t = tok(p);
             return {
               name:     p.name,
               website:  p.website_url,
               github:   p.github_url,
               twitter:  p.twitter_url,
-              symbol:        tok.symbol || null,
-              contractAddress: tok.contract || null,
-              chainId:       tok.chain || null,
+              symbol:        t.symbol || null,
+              contractAddress: t.contract || null,
+              chainId:       t.chain || null,
               enabled:       p.enabled,
             };
           });
@@ -1872,21 +1870,12 @@
           }
         }
 
-        /** Save App Settings (log retention only) */
-        async function saveAppSettings() {
+        // ponytail: shared save wrapper — all four save functions follow the same try/catch/finally shape
+        async function saveSettings(payload) {
           saving.value = true;
           error.value = '';
           try {
-            settings.value = await api.updateSettings({
-              github_token: form.value.github_token,
-              log_retention_days: form.value.log_retention_enabled
-                ? Number(form.value.log_retention_days) || 7
-                : 0,
-              ui_refresh_seconds: form.value.ui_refresh_enabled
-                ? Number(form.value.ui_refresh_seconds) || 60
-                : 0,
-              compact_activity: form.value.compact_activity ? 1 : 0,
-            });
+            settings.value = await api.updateSettings(payload);
             appSettings.value = settings.value;
             showToast('Saved.');
           } catch (e) {
@@ -1894,53 +1883,47 @@
           } finally {
             saving.value = false;
           }
+        }
+
+        /** Save App Settings (log retention only) */
+        async function saveAppSettings() {
+          await saveSettings({
+            github_token: form.value.github_token,
+            log_retention_days: form.value.log_retention_enabled
+              ? Number(form.value.log_retention_days) || 7
+              : 0,
+            ui_refresh_seconds: form.value.ui_refresh_enabled
+              ? Number(form.value.ui_refresh_seconds) || 60
+              : 0,
+            compact_activity: form.value.compact_activity ? 1 : 0,
+          });
         }
 
         /** Save Alert Settings */
         async function saveAlertSettings() {
-          saving.value = true;
-          error.value = '';
-          try {
-            settings.value = await api.updateSettings({
-              github_alert_minutes:      Number(form.value.github_alert_minutes),
-              github_alert_stop_minutes:  Number(form.value.github_alert_stop_minutes),
-              website_alert_minutes:      Number(form.value.website_alert_minutes),
-              website_alert_stop_minutes:  Number(form.value.website_alert_stop_minutes),
-              twitter_alert_minutes:      Number(form.value.twitter_alert_minutes),
-              twitter_alert_stop_minutes:  Number(form.value.twitter_alert_stop_minutes),
-            });
-            appSettings.value = settings.value;
-            showToast('Saved.');
-          } catch (e) {
-            error.value = e.message;
-          } finally {
-            saving.value = false;
-          }
+          await saveSettings({
+            github_alert_minutes:      Number(form.value.github_alert_minutes),
+            github_alert_stop_minutes:  Number(form.value.github_alert_stop_minutes),
+            website_alert_minutes:      Number(form.value.website_alert_minutes),
+            website_alert_stop_minutes:  Number(form.value.website_alert_stop_minutes),
+            twitter_alert_minutes:      Number(form.value.twitter_alert_minutes),
+            twitter_alert_stop_minutes:  Number(form.value.twitter_alert_stop_minutes),
+          });
         }
 
         /** Save Notification Channels (Telegram + Pushbullet) */
         async function saveNotificationSettings() {
-          saving.value = true;
-          error.value = '';
-          try {
-            settings.value = await api.updateSettings({
-              telegram: {
-                enabled:   form.value.telegram_enabled,
-                bot_token: form.value.telegram_bot_token,
-                chat_id:   form.value.telegram_chat_id,
-              },
-              pushbullet: {
-                enabled:      form.value.pushbullet_enabled,
-                access_token: form.value.pushbullet_access_token,
-              },
-            });
-            appSettings.value = settings.value;
-            showToast('Saved.');
-          } catch (e) {
-            error.value = e.message;
-          } finally {
-            saving.value = false;
-          }
+          await saveSettings({
+            telegram: {
+              enabled:   form.value.telegram_enabled,
+              bot_token: form.value.telegram_bot_token,
+              chat_id:   form.value.telegram_chat_id,
+            },
+            pushbullet: {
+              enabled:      form.value.pushbullet_enabled,
+              access_token: form.value.pushbullet_access_token,
+            },
+          });
         }
 
         /** Run trigger-all for a specific kind (web / gh / tw) */

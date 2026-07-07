@@ -143,19 +143,17 @@ async function init() {
   const { runMigrations } = require('./migrations');
   await runMigrations(database);
 
-  const configRow = database.prepare('SELECT id FROM config WHERE id = 1').get();
-  if (!configRow) {
-    const settings = JSON.stringify({ log_retention_days: 7, ui_refresh_seconds: 60, compact_activity_display: 0, github_token: null });
-    const check_intervals = JSON.stringify({ github: 360, website: 1440, twitter: 1440 });
-    const alert_intervals = JSON.stringify({ github: 60, website: 60, twitter: 60 });
-    const alert_stops = JSON.stringify({ github: 1440, website: 1440, twitter: 1440 });
-    const telegram = JSON.stringify({ bot_token: '', chat_id: '', enabled: false });
-    const pushbullet = JSON.stringify({ access_token: '', enabled: false });
-    database.prepare(`INSERT INTO config (id, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet) VALUES (1, ?, ?, ?, ?, ?, ?)`).run(settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet);
-  }
-
   console.log(`[${now()}] Database initialized`);
   return dbProxy;
+}
+
+// ponytail: coerce types SQLite can't bind — booleans → 0/1, objects/arrays → JSON
+function bindParams(params) {
+  return params.map(v => {
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+    return v;
+  });
 }
 
 // Promisified prepare — all methods return promises
@@ -165,32 +163,16 @@ const dbProxy = {
   prepare(sql) {
     return {
       run(...params) {
-        // ponytail: coerce types SQLite can't bind — booleans → 0/1, objects/arrays → JSON
-        const bound = params.map(v => {
-          if (typeof v === 'boolean') return v ? 1 : 0;
-          if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-          return v;
-        });
-        db.prepare(sql).run(...bound);
+        db.prepare(sql).run(...bindParams(params));
         const row = db.prepare('SELECT last_insert_rowid() as id').get();
         return Promise.resolve({ lastInsertRowid: row.id });
       },
       get(...params) {
-        const bound = params.map(v => {
-          if (typeof v === 'boolean') return v ? 1 : 0;
-          if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-          return v;
-        });
-        const row = db.prepare(sql).get(...bound);
+        const row = db.prepare(sql).get(...bindParams(params));
         return Promise.resolve(row ?? undefined);
       },
       all(...params) {
-        const bound = params.map(v => {
-          if (typeof v === 'boolean') return v ? 1 : 0;
-          if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-          return v;
-        });
-        const rows = db.prepare(sql).all(...bound);
+        const rows = db.prepare(sql).all(...bindParams(params));
         return Promise.resolve(rows);
       }
     };

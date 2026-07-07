@@ -110,13 +110,28 @@ async function logCheck(projectId, resourceType, resourceId, result) {
   );
 }
 
+// ponytail: shared helpers, extracted to avoid duplication between checkWebsite and checkTwitter
+function emptyUrlResult(msg) {
+  return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: msg };
+}
+
+async function fetchWithTimeout(url, ms, opts = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow', ...opts });
+    return { res, responseTimeMs: Date.now() - t0 };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // Check a website URL: GET + optional MD5 hash of body.
 /** Checks a website via GET, optionally hashing body to detect content changes. */
 async function checkWebsite(url, projectId, contentCheck = true) {
   const start = Date.now();
-  if (!url) {
-    return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided', details: null };
-  }
+  if (!url) return emptyUrlResult('No URL provided');
 
   let lastHash = null;
   let lastHttpStatus = null;
@@ -131,16 +146,11 @@ async function checkWebsite(url, projectId, contentCheck = true) {
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch(url, {
+    const { res, responseTimeMs } = await fetchWithTimeout(url, 15000, {
       method: 'GET',
-      signal: controller.signal,
-      redirect: 'follow',
       headers: { 'User-Agent': 'project-checker/1.0' }
     });
-    clearTimeout(timeout);
-    const response_time_ms = Date.now() - start;
+    const response_time_ms = responseTimeMs;
 
     let contentHash = null;
     if (contentCheck && res.ok) {
@@ -251,9 +261,7 @@ async function checkGithubRepo(fullName, projectId) {
 /** Checks a Twitter/X URL via GET and records status changes on transitions. */
 async function checkTwitter(url, projectId) {
   const start = Date.now();
-  if (!url) {
-    return { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL provided' };
-  }
+  if (!url) return { ...emptyUrlResult('No URL provided'), details: null };
 
   let lastStatus = null;
   let lastHttpStatus = null;
@@ -266,16 +274,11 @@ async function checkTwitter(url, projectId) {
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch(url, {
+    const { res, responseTimeMs } = await fetchWithTimeout(url, 15000, {
       method: 'GET',
-      signal: controller.signal,
-      redirect: 'follow',
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; project-checker/1.0)' }
     });
-    clearTimeout(timeout);
-    const response_time_ms = Date.now() - start;
+    const response_time_ms = responseTimeMs;
     let newStatus = res.ok ? 'ok' : 'error';
     let _defuddleDetails = null;
 

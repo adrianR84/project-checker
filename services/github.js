@@ -1,5 +1,6 @@
 // GitHub API service — token is read from config DB (no env var needed)
 const GITHUB_API = 'https://api.github.com';
+const RATE_LIMIT_MSG = 'GitHub API 403: Rate limit exceeded. Provide a GitHub token in App Settings for 5000 req/hr.';
 
 /** Returns request headers for the GitHub API, including auth token from DB if set. */
 async function ghHeaders() {
@@ -29,9 +30,7 @@ function parseOwner(githubUrl) {
 async function ghFetch(url) {
   const res = await fetch(url, { headers: await ghHeaders() });
   if (!res.ok) {
-    if (res.status === 403) {
-      throw new Error(`GitHub API 403: Rate limit exceeded. Provide a GitHub token in App Settings for 5000 req/hr.`);
-    }
+    if (res.status === 403) throw new Error(RATE_LIMIT_MSG);
     throw new Error(`GitHub API ${res.status}: ${res.statusText} for ${url}`);
   }
   return res.json();
@@ -41,10 +40,7 @@ async function ghFetch(url) {
 async function ghFetchWithMeta(url) {
   const res = await fetch(url, { headers: await ghHeaders() });
   if (!res.ok) {
-    if (res.status === 403) {
-      const msg = `GitHub API 403: Rate limit exceeded. Provide a GitHub token in App Settings for 5000 req/hr.`;
-      throw new Error(msg);
-    }
+    if (res.status === 403) throw new Error(RATE_LIMIT_MSG);
     throw new Error(`GitHub API ${res.status}: ${res.statusText} for ${url}`);
   }
   const data = await res.json();

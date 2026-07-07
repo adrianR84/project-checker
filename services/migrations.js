@@ -2,10 +2,11 @@
 /** Returns the current ISO timestamp. */
 const now = () => new Date().toISOString();
 
-// Legacy flat-column migrations — no-op on JSON schema
-const add_log_retention_days = () => {};
-const add_ui_refresh_seconds  = () => {};
-const add_compact_activity    = () => {};
+// ponytail: shared helper to check if a column exists in a table
+function hasColumn(db, table, col) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all();
+  return rows.some(r => r.name === col);
+}
 
 /** Migration: converts check_logs.resource_id from TEXT to INTEGER via table rebuild. */
 function convert_check_logs_resource_id_to_integer(db) {
@@ -126,33 +127,24 @@ function fix_rsc_event_type_check(db) {
   }
 }
 
-/** Migration: event_logs table is created by init(), no separate migration needed. */
-const add_event_logs = () => {};
 
 /** Migration: adds status column to repos if missing. */
 function add_repos_status(db) {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get();
-  if (!table) return;
-  const cols = db.prepare("PRAGMA table_info(repos)").all().map(r => r.name);
-  if (cols.includes('status')) return;
+  if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get()) return;
+  if (hasColumn(db, 'repos', 'status')) return;
   db.exec('ALTER TABLE repos ADD COLUMN status TEXT NOT NULL DEFAULT \'active\'');
 }
 
 /** Migration: adds latest_tag column to repos if missing. */
 function add_repos_latest_tag(db) {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get();
-  if (!table) return;
-  const cols = db.prepare("PRAGMA table_info(repos)").all().map(r => r.name);
-  if (cols.includes('latest_tag')) return;
+  if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get()) return;
+  if (hasColumn(db, 'repos', 'latest_tag')) return;
   db.exec('ALTER TABLE repos ADD COLUMN latest_tag TEXT');
 }
 
 /** Migration: adds confirmed column to event_logs if missing. */
 function add_rsc_confirmed_column(db) {
-  const rows = db.prepare("PRAGMA table_info(event_logs)").all();
-  if (!rows) return;
-  const cols = rows.map(r => r.name);
-  if (cols.includes('confirmed')) return;
+  if (hasColumn(db, 'event_logs', 'confirmed')) return;
   db.exec('ALTER TABLE event_logs ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0');
 }
 
@@ -165,13 +157,10 @@ function add_rsc_alerting_index(db) {
 
 /** Migration: renames commit_check_minutes → github_check_minutes and adds alert config columns. */
 function rename_commit_to_github_check_and_add_alert_cols(db) {
-  const rows = db.prepare("PRAGMA table_info(config)").all();
-  if (!rows) return;
-  const cols = rows.map(r => r.name);
-  // Already migrated to new schema
-  if (cols.includes('settings')) return;
+  // Already migrated to new schema (settings column is the indicator)
+  if (hasColumn(db, 'config', 'settings')) return;
   // github_check_minutes column exists means previous migration ran but left flat columns
-  if (cols.includes('github_check_minutes')) return;
+  if (hasColumn(db, 'config', 'github_check_minutes')) return;
   // Check if _config_old exists from a failed prior run and clean it up
   const oldTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_config_old'").get();
   if (oldTable) {
@@ -285,11 +274,8 @@ function rename_rsc_to_event_logs(db) {
 
 /** Migration: consolidates flat config columns into JSON group columns: settings, check_intervals, alert_intervals, alert_stops. */
 function migrate_config_json_groups(db) {
-  const rows = db.prepare("PRAGMA table_info(config)").all();
-  if (!rows) return;
-  const cols = rows.map(r => r.name);
   // Fully migrated: settings column exists
-  if (cols.includes('settings')) return;
+  if (hasColumn(db, 'config', 'settings')) return;
   // settings column doesn't exist — cleanup orphaned _cfg_old from failed run
   const oldTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_cfg_old'").get();
   if (oldTable) db.exec("DROP TABLE IF EXISTS _cfg_old");
@@ -361,12 +347,7 @@ async function runMigrations(db) {
   try { await convert_check_logs_resource_id_to_integer(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await fix_check_logs_status_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await fix_rsc_event_type_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_log_retention_days(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_ui_refresh_seconds(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_compact_activity(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_rsc_confirmed_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await rename_commit_to_github_check_and_add_alert_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_alert_logs_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await drop_redundant_alert_logs_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await fix_alert_logs_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
