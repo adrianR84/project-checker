@@ -27,14 +27,14 @@ router.get('/', async (req, res) => {
     SELECT cl.*, p.name AS project_name,
       r.full_name AS repo_name
     FROM check_logs cl
-    LEFT JOIN projects p ON p.id = cl.project_id
+    LEFT JOIN projects p ON p.id = cl.project_id AND p.enabled = 1
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
     ${where}
     ORDER BY cl.checked_at DESC, cl.id DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl ${where}`).get(...params);
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl LEFT JOIN projects p ON p.id = cl.project_id AND p.enabled = 1 ${where}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
@@ -56,7 +56,7 @@ router.get('/status-changes', async (req, res) => {
     params.push(resourceType);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed'` : "WHERE rsc.event_type != 'confirmed'";
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed' AND p.enabled = 1` : "WHERE rsc.event_type != 'confirmed' AND p.enabled = 1";
   const rows = await db.prepare(`
     SELECT rsc.*, p.name AS project_name
     FROM event_logs rsc
@@ -66,8 +66,8 @@ router.get('/status-changes', async (req, res) => {
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const countWhere = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed'` : "WHERE rsc.event_type != 'confirmed'";
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc ${countWhere}`).get(...params);
+  const countWhere = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed' AND p.enabled = 1` : "WHERE rsc.event_type != 'confirmed' AND p.enabled = 1";
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc LEFT JOIN projects p ON p.id = rsc.project_id ${countWhere}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
@@ -99,7 +99,7 @@ router.get('/alerts', async (req, res) => {
     params.push(resourceType);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND p.enabled = 1` : 'WHERE p.enabled = 1';
   const rows = await db.prepare(`
     SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value
     FROM alert_logs al
@@ -110,7 +110,7 @@ router.get('/alerts', async (req, res) => {
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM alert_logs al ${where}`).get(...params);
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM alert_logs al LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 

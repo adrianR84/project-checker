@@ -1269,7 +1269,6 @@
                   <th data-tooltip="Website URL">Website</th>
                   <th data-tooltip="GitHub organization URL">GitHub</th>
                   <th data-tooltip="Twitter handle or URL">Twitter</th>
-                  <th data-tooltip="Telegram bot or group URL">Telegram</th>
                   <th data-tooltip="Token info">Token</th>
                   <th class="col-actions"></th>
                 </tr>
@@ -1280,7 +1279,6 @@
                   <td><a v-if="p.website_url" :href="p.website_url" target="_blank" rel="noopener">{{ urlLabel(p.website_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
-                  <td><a v-if="p.telegram_url" :href="p.telegram_url" target="_blank" rel="noopener">{{ urlLabel(p.telegram_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
@@ -1487,7 +1485,6 @@
               website:  p.website_url,
               github:   p.github_url,
               twitter:  p.twitter_url,
-              telegram: p.telegram_url,
               symbol:        tok.symbol || null,
               contractAddress: tok.contract || null,
               chainId:       tok.chain || null,

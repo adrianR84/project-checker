@@ -72,6 +72,7 @@ button, .btn {
 .center-loader { display: flex; justify-content: center; padding: 60px 0; }
 
 tr.disabled td { opacity: 0.45; }
+table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
 /* ── Vue transitions ─────────────────────────────────────────────────── */
 .fade-enter-active, .fade-leave-active { transition: opacity 180ms; }

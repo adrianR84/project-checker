@@ -7,10 +7,11 @@ const router = express.Router();
 // GET /api/dashboard
 router.get('/', async (req, res) => {
   const projects = await db.prepare(`
-    SELECT id, name,
+    SELECT id, name, enabled,
            website_enabled, website_content_check, github_enabled, twitter_enabled,
            website_url, github_url, twitter_url
     FROM projects
+    WHERE enabled = 1
     ORDER BY id
   `).all();
 
@@ -61,6 +62,7 @@ router.get('/', async (req, res) => {
     result.push({
       id: p.id,
       name: p.name,
+      enabled: !!p.enabled,
       website_enabled: !!p.website_enabled,
       github_enabled: !!p.github_enabled,
       twitter_enabled: !!p.twitter_enabled,

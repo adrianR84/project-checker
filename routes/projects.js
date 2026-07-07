@@ -224,6 +224,7 @@ router.get('/:id/org-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
   try {
     const repos = await fetchReposForOwner(project.github_url);
@@ -238,6 +239,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'Project has no github_url' });
 
   try {
@@ -287,6 +289,7 @@ router.post('/:id/add-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
 
   if (!req.body || !Array.isArray(req.body.repos)) {
     return res.status(400).json({ error: 'repos array required' });
@@ -322,6 +325,7 @@ router.post('/:id/check-website', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.website_url) {
     const result = { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL' };
     await logCheck(id, 'website', null, result);
@@ -338,6 +342,7 @@ router.post('/:id/check-github', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
   const repos = await db.prepare("SELECT * FROM repos WHERE project_id = ? AND status = 'active'").all(id);
   const results = [];
@@ -354,6 +359,7 @@ router.post('/:id/check-twitter', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.twitter_url) {
     const result = { status: 'unavailable', http_status: null, response_time_ms: 0, error_message: 'No URL' };
     await logCheck(id, 'twitter', null, result);

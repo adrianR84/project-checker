@@ -30,7 +30,7 @@ function everyNMinutes(n) {
 async function runWebsiteTick() {
   const projects = await db.prepare(`
     SELECT id, website_url, website_content_check FROM projects
-    WHERE website_enabled = 1 AND website_url IS NOT NULL AND website_url != ''
+    WHERE enabled = 1 AND website_enabled = 1 AND website_url IS NOT NULL AND website_url != ''
   `).all();
   console.log(`[${now()}] Scheduler: website tick — ${projects.length} projects`);
   for (const p of projects) {
@@ -47,7 +47,7 @@ async function runWebsiteTick() {
 async function runTwitterTick() {
   const projects = await db.prepare(`
     SELECT id, twitter_url FROM projects
-    WHERE twitter_enabled = 1 AND twitter_url IS NOT NULL AND twitter_url != ''
+    WHERE enabled = 1 AND twitter_enabled = 1 AND twitter_url IS NOT NULL AND twitter_url != ''
   `).all();
   console.log(`[${now()}] Scheduler: twitter tick — ${projects.length} projects`);
   for (const p of projects) {
@@ -63,7 +63,7 @@ async function runTwitterTick() {
 /** Fetches GitHub repos for all enabled projects, detects deleted repos (marks status=deleted, records event_logs),
     checks remaining active repos and logs results to check_logs. */
 async function runCommitTick() {
-  const projects = await db.prepare(`SELECT id, github_url FROM projects WHERE github_enabled = 1 AND github_url IS NOT NULL`).all();
+  const projects = await db.prepare(`SELECT id, github_url FROM projects WHERE enabled = 1 AND github_enabled = 1 AND github_url IS NOT NULL`).all();
   console.log(`[${now()}] Scheduler: commit tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
