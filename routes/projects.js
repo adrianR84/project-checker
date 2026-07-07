@@ -105,6 +105,14 @@ router.post('/', async (req, res) => {
           website_enabled, website_content_check, token, enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
+  // Prevent duplicate: same name + website_url
+  if (website_url) {
+    const existing = await db.prepare(
+      'SELECT id FROM projects WHERE name = ? AND website_url = ?'
+    ).get(name, website_url);
+    if (existing) return res.status(409).json({ error: 'Project with this name and website already exists' });
+  }
+
   const ts = now();
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`

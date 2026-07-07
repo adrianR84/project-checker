@@ -83,4 +83,15 @@ router.get('/', async (req, res) => {
   res.json(result);
 });
 
+// GET /api/dashboard/token-prices
+router.get('/token-prices', async (req, res) => {
+  const rows = await db.prepare(`
+    SELECT tp.*, p.name AS project_name
+    FROM token_prices tp
+    JOIN projects p ON p.id = tp.project_id
+    ORDER BY p.name
+  `).all();
+  res.json(rows);
+});
+
 module.exports = router;

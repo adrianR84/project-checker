@@ -77,7 +77,7 @@
       getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
       confirmStatusChange: (id, confirmed = 1) => req(`/check-logs/status-changes/${id}/confirm`, { method: 'PATCH', body: JSON.stringify({ confirmed: confirmed ? 1 : 0 }) }),
       getAlertLogs:       (q = {}) => req('/check-logs/alerts?' + new URLSearchParams(q).toString()),
-      getTokenPrices:     ()       => req('/token-prices'),
+      getTokenPrices:     ()       => req('/dashboard/token-prices'),
       getSettings:    ()       => req('/settings'),
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
       triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
@@ -1143,7 +1143,7 @@
             <button class="secondary" @click="showLogs = !showLogs">
               {{ showLogs ? 'Hide logs' : 'Show recent logs' }}
             </button>
-            <button class="primary" :disabled="checkingAll || loading" @click="checkAll">
+            <button v-if="false" class="primary" :disabled="checkingAll || loading" @click="checkAll">
               <span v-if="checkingAll" class="spinner"></span>
               <span v-else>Check All</span>
             </button>
@@ -1259,8 +1259,8 @@
       `,
 
       setup() {
-        const PRICES_REFRESH_MS = 30_000;
-        const activityTab   = ref('resources');
+        let pricesRefreshMs = 30_000;
+        const activityTab   = ref('prices');
         const projects      = ref([]);
         const prices        = ref([]);
         const pricesLoading = ref(false);
@@ -1369,14 +1369,18 @@
 
         onMounted(async () => {
           load();
+          loadPrices();
           loadLogs(1);
           loadStatusChanges(1);
           loadAlertLogs(1);
           try {
             const cfg = await api.getSettings();
             window.appSettings.value = cfg;
+            pricesRefreshMs = (cfg.ui_refresh_seconds || 30) * 1000;
+            // Start prices refresh immediately since Prices is default
+            pricesTimer = setInterval(loadPrices, pricesRefreshMs);
             if (cfg.ui_refresh_seconds) {
-              pollTimer = setInterval(() => { load(); loadStatusChanges(1);}, cfg.ui_refresh_seconds * 1000);
+              pollTimer = setInterval(() => { load(); }, cfg.ui_refresh_seconds * 1000);
             }
           } catch { /* auto-refresh disabled */ }
         });
@@ -1393,7 +1397,7 @@
           }
           if (tab === 'prices') {
             if (pricesTimer) clearInterval(pricesTimer);
-            pricesTimer = setInterval(loadPrices, PRICES_REFRESH_MS);
+            pricesTimer = setInterval(loadPrices, pricesRefreshMs);
           } else {
             if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
           }

@@ -16,10 +16,8 @@ const projectsRouter = require('./routes/projects');
 const checkLogsRouter = require('./routes/checkLogs');
 const settingsRouter = require('./routes/settings');
 const dashboardRouter = require('./routes/dashboard');
-const pricesRouter = require('./routes/prices');
 
 app.use('/api/projects', projectsRouter);
-app.use('/api/token-prices', pricesRouter);
 app.use('/api/check-logs', checkLogsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/dashboard', dashboardRouter);

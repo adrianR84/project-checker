@@ -149,7 +149,7 @@ table.compact td:has([data-tooltip]) { overflow: visible; }
 table.compact .project_cell{ min-width: 150px; max-width: 300px; }
 table.compact .project_cell.alert  { width: 250px; }
 table.compact .resource_cell { min-width: 70px;  width: 80px;  }
-table.compact .type_cell     { min-width: 70px;  width: 90px;  }
+table.compact .type_cell     { min-width: 70px;  width: 100px;  }
 table.compact .time_cell     { min-width: 150px; width: 150px; }
 table.compact .status_cell   { min-width: 70px;  width: 90px;  }
 table.compact .action_cell   { min-width: 40px;  width: 40px;  }
@@ -266,7 +266,7 @@ table.compact .details_cell   { min-width: 140px; }
 
 /* ── Project card ────────────────────────────────────────────────────── */
 
-.project-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.project-grid { display: grid; grid-template-columns: 1fr; gap: 18px; padding-top:15px;}
 @media (min-width: 900px) {
   .project-grid { grid-template-columns: repeat(2, 1fr); }
 }
