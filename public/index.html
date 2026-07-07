@@ -870,15 +870,6 @@
           <!-- Card header: project name only -->
           <header class="head">
             <h2 class="name">{{ project.name }}</h2>
-            <button
-              class="secondary"
-              :disabled="busy === 'all'"
-              style="padding:2px 6px;"
-              data-tooltip="Refresh All" @click="refreshAll"
-            >
-              <span v-if="busy === 'all'" class="spinner"></span>
-              <span v-else>↺</span>
-            </button>
           </header>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
@@ -890,7 +881,17 @@
                 <th data-tooltip="Current status">Status</th>
                 <th data-tooltip="Time of last check">Last Checked</th>
                 <th data-tooltip="Time of last status change">Last Change</th>
-                <th class="action_cell"></th>
+                <th class="action_cell">
+                  <button
+                    class="secondary"
+                    :disabled="busy === 'all'"
+                    style="padding:2px 6px;"
+                    data-tooltip="Refresh All" @click="refreshAll"
+                  >
+                    <span v-if="busy === 'all'" class="spinner"></span>
+                    <span v-else>↻</span>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
