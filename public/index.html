@@ -1193,22 +1193,22 @@
               <table id="price-table" class="price-table">
                 <thead>
                   <tr>
-                    <th :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
+                    <th class="hide-sm" :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
                     <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
-                    <th class="cen" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
+                    <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
                     <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
-                    <th :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
+                    <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
                     <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
-                    <th :class="['sortable', priceSort.col === 'chain' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('chain')">Chain</th>
+                    <th class="hide-sm" :class="['sortable', priceSort.col === 'chain' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('chain')">Chain</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in prices" :key="row.project_id">
-                    <td>
+                    <td class="hide-sm">
                       <a :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
                          target="_blank" rel="noopener"
                          :title="row.project_name">
@@ -1221,15 +1221,15 @@
                         {{ row.symbol || '—' }}
                       </a>
                     </td>
-                    <td>{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
+                    <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
                     <td class="cen">{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</td>
                     <td :class="['cen', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
                     <td :class="['cen', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
                     <td :class="['cen', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
-                    <td class="num">{{ fmtShortNum(row.volume_h24) }}</td>
+                    <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.market_cap) }}</td>
-                    <td>{{ row.chain || '—' }}</td>
+                    <td class="hide-sm">{{ row.chain || '—' }}</td>
                   </tr>
                 </tbody>
               </table>
