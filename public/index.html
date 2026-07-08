@@ -1311,6 +1311,10 @@
           pricesLoading.value = true;
           try {
             prices.value = await api.getTokenPrices();
+            // Re-apply active sort after refresh so both rows and th arrow stay
+            if (priceSort.value.col) {
+              applyPriceSort(priceSort.value.col, priceSort.value.desc);
+            }
           } catch (e) {
             console.error(e);
           } finally {
@@ -1434,6 +1438,18 @@
           );
         });
 
+        function applyPriceSort(col, desc) {
+          const num = (v) => v == null || isNaN(v) ? -Infinity : parseFloat(v);
+          const str = (v) => (v == null ? '' : String(v)).toLowerCase();
+          prices.value = [...prices.value].sort((a, b) => {
+            const va = a[col], vb = b[col];
+            const cmp = ['project_name', 'symbol', 'chain'].includes(col)
+              ? (str(va) < str(vb) ? -1 : str(va) > str(vb) ? 1 : 0)
+              : (num(va) < num(vb) ? -1 : num(va) > num(vb) ? 1 : 0);
+            return desc ? -cmp : cmp;
+          });
+        }
+
         function sortCol(col) {
           if (priceSort.value.col === col) {
             priceSort.value.desc = !priceSort.value.desc;
@@ -1441,20 +1457,7 @@
             priceSort.value.col = col;
             priceSort.value.desc = true;
           }
-          const num = (v) => v == null || isNaN(v) ? -Infinity : parseFloat(v);
-          const str = (v) => (v == null ? '' : String(v)).toLowerCase();
-          const rows = [...prices.value];
-          rows.sort((a, b) => {
-            const va = a[col], vb = b[col];
-            let cmp;
-            if (['project_name', 'symbol', 'chain'].includes(col)) {
-              cmp = str(va) < str(vb) ? -1 : str(va) > str(vb) ? 1 : 0;
-            } else {
-              cmp = num(va) < num(vb) ? -1 : num(va) > num(vb) ? 1 : 0;
-            }
-            return priceSort.value.desc ? -cmp : cmp;
-          });
-          prices.value = rows;
+          applyPriceSort(priceSort.value.col, priceSort.value.desc);
         }
 
         return {
