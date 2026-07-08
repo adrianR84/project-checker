@@ -186,7 +186,7 @@ function add_alert_logs_table(db) {
 function fix_alert_logs_fk(db) {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_logs'").get();
   if (!row) return;
-  if (String(row.sql).indexOf('resource_status_changes') === -1) return;
+  if (String(row.sql).indexOf('resource_status_changes') === -1 && String(row.sql).indexOf('_el_price_old') === -1) return;
   console.log(`[${now()}] Migration: fixing alert_logs FK`);
   try {
     db.exec(`
@@ -457,7 +457,7 @@ async function runMigrations(db) {
   try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_price_alerts_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_price_to_check_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  //try { await add_price_to_check_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   //try { await add_price_to_event_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }

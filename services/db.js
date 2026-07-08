@@ -13,6 +13,10 @@ const now = () => new Date().toISOString();
 function openDatabase() {
   // ponytail: DatabaseSync constructor auto-opens the file and persists changes
   db = new DatabaseSync(DB_PATH, { enableForeignKeyConstraints: true });
+  // Clean up any orphaned temp tables from prior interrupted migrations
+  try { db.exec("DROP TABLE IF EXISTS _el_price_old"); } catch (_) {}
+  try { db.exec("DROP TABLE IF EXISTS _alert_old"); } catch (_) {}
+  try { db.exec("DROP TABLE IF EXISTS _alert_old2"); } catch (_) {}
   console.log(`[${now()}] Database opened: ${DB_PATH}`);
   return db;
 }
