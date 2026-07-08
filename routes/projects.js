@@ -86,15 +86,15 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
       INSERT INTO repos (
         project_id, repo_name, full_name, repo_url, description, default_branch,
         first_commit_date, latest_commit_date, total_commits, latest_commit_sha,
-        latest_commit_message, pushed_at, stars_count, language, latest_tag, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        latest_commit_message, pushed_at, stars_count, language, latest_tag, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       projectId,
       repoInfo.repo_name, repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
       h.first_commit_date, h.latest_commit_date, h.total_commits,
       h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
       repoInfo.stars_count, repoInfo.language, latestTag,
-      ts, ts
+      'active', ts, ts
     );
   }
 }

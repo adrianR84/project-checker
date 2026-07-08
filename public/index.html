@@ -822,6 +822,12 @@
           </div>
           <div v-else class="muted" style="margin-bottom:16px;">No repos monitored yet.</div>
 
+          <!-- Manual add by full name -->
+          <div style="display:flex;gap:6px;margin-bottom:12px;">
+            <input v-model="manualName" type="text" placeholder="owner/repo-name" style="flex:1;" />
+            <button class="secondary" :disabled="!manualName || adding" @click="manualAdd" style="padding:3x 5px; height:45px;">Add</button>
+          </div>
+
           <!-- Fetch from GitHub -->
           <div class="form-group">
             <button class="secondary" :disabled="fetching" @click="fetchOrgsRepos">
@@ -861,6 +867,7 @@
         );
         const fetching = ref(false);
         const adding   = ref(false);
+        const manualName = ref('');
 
         async function loadRepos() {
           const p = await api.getProject(props.projectId);
@@ -905,6 +912,33 @@
           }
         }
 
+        async function manualAdd() {
+          let name = manualName.value.trim()
+            .replace(/^https:\/\/github\.com\//, '')
+            .replace(/\.git$/, '');
+          if (!name) return;
+          const parts = name.split('/');
+          const owner = parts[0] || '';
+          const repo = parts[1] || name;
+          try {
+            await api.addRepos(props.projectId, [{
+              full_name: `${owner}/${repo}`,
+              repo_name: repo,
+              repo_url: `https://github.com/${owner}/${repo}`,
+              description: '',
+              default_branch: '',
+              pushed_at: null,
+              stars_count: 0,
+              language: null,
+            }]);
+            manualName.value = '';
+            await loadRepos();
+            emit('repos-updated');
+          } catch (e) {
+            alert('Failed to add repo: ' + e.message);
+          }
+        }
+
         async function deleteSelected() {
           const toDelete = [...selectedToDelete.value];
           if (!confirm(`Remove ${toDelete.length} repos?`)) return;
@@ -919,7 +953,7 @@
           }
         }
 
-        return { repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, fetchOrgsRepos, addSelected, removeRepo, deleteSelected };
+        return { repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, manualName, manualAdd, fetchOrgsRepos, addSelected, removeRepo, deleteSelected };
       },
     };
 
@@ -1500,6 +1534,7 @@
 
           <div class="toolbar">
             <h1>Projects</h1>
+            <input v-model="projFilter" type="text" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 140px; padding: 2px 6px; font-size: 0.8125rem; height: 30px" />
             <button @click="exportProjects">Export JSON</button>
             <button @click="importOpen = true">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
@@ -1528,7 +1563,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="p in projects" :key="p.id" :class="{ disabled: !p.enabled }">
+                <tr v-for="p in filteredProjects" :key="p.id" :class="{ disabled: !p.enabled }">
                   <td>{{ p.name }}</td>
                   <td><a v-if="p.website_url" :href="p.website_url" target="_blank" rel="noopener">{{ urlLabel(p.website_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
@@ -1616,6 +1651,17 @@
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
         const lastGithubImport = ref(null); // import-created project needing repo setup
+        const projFilter = ref('');
+
+        const filteredProjects = computed(() => {
+          const q = projFilter.value.toLowerCase();
+          if (!q) return projects.value;
+          return projects.value.filter(p =>
+            p.name.toLowerCase().includes(q) ||
+            (p.website_url || '').toLowerCase().includes(q) ||
+            (p.github_url || '').toLowerCase().includes(q)
+          );
+        });
 
         /** Fetch all projects from the API */
         async function load() {
@@ -1769,8 +1815,9 @@
         }
 
         return {
-          projects, loading, error, showForm, editing, submitting,
+          projects, filteredProjects, loading, error, showForm, editing, submitting,
           importOpen, importText, importing, manageProject, lastGithubImport,
+          projFilter,
           openCreate, openEdit, openManageRepos,
           onSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
