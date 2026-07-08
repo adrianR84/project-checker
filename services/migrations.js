@@ -353,9 +353,15 @@ function add_price_alerts_column(db) {
 
 /** Migration: adds 'price' to resource_type CHECK in check_logs via table rebuild. */
 function add_price_to_check_logs_resource_type(db) {
+  // Target state: check_logs exists and already includes 'price'
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='check_logs'").get();
+  if (row && String(row.sql).includes("'price'")) return;
+  // Cleanup orphaned temp table from a prior interrupted run
+  const orphan = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_cl_price_old'").get();
+  if (orphan) {
+    try { db.exec("DROP TABLE IF EXISTS _cl_price_old"); } catch (_) {}
+  }
   if (!row) return;
-  if (String(row.sql).includes("'price'")) return;
   console.log(`[${now()}] Migration: adding 'price' to check_logs.resource_type CHECK`);
   try {
     db.exec(`
@@ -384,9 +390,15 @@ function add_price_to_check_logs_resource_type(db) {
 
 /** Migration: adds 'price' to resource_type CHECK in event_logs via table rebuild. */
 function add_price_to_event_logs_resource_type(db) {
+  // Target state: event_logs exists and already includes 'price'
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
+  if (row && String(row.sql).includes("'price'")) return;
+  // Cleanup orphaned temp table from a prior interrupted run
+  const orphan = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_el_price_old'").get();
+  if (orphan) {
+    try { db.exec("DROP TABLE IF EXISTS _el_price_old"); } catch (_) {}
+  }
   if (!row) return;
-  if (String(row.sql).includes("'price'")) return;
   console.log(`[${now()}] Migration: adding 'price' to event_logs.resource_type CHECK`);
   try {
     db.exec(`
