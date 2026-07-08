@@ -81,7 +81,8 @@ async function init() {
       alert_intervals TEXT NOT NULL DEFAULT '{"github":60,"website":60,"twitter":60}',
       alert_stops TEXT NOT NULL DEFAULT '{"github":1440,"website":1440,"twitter":1440}',
       telegram TEXT NOT NULL DEFAULT '{"bot_token":"","chat_id":"","enabled":false}',
-      pushbullet TEXT NOT NULL DEFAULT '{"access_token":"","enabled":false}'
+      pushbullet TEXT NOT NULL DEFAULT '{"access_token":"","enabled":false}',
+      price_alerts TEXT NOT NULL DEFAULT '{"alerts":[{"price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}'
     );
   `);
 
@@ -89,7 +90,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS check_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL,
-      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter', 'price')),
       resource_id INTEGER,
       status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'disabled', 'unavailable', 'deleted', 'changed')),
       http_status INTEGER,
@@ -110,7 +111,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS event_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL,
-      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
+      resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter', 'price')),
       event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed', 'deleted', 'tag_changed')),
       value TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -231,6 +232,10 @@ const dbProxy = {
     async getPushbullet() {
       const row = await dbProxy.prepare('SELECT pushbullet FROM config WHERE id = 1').get();
       return row ? JSON.parse(row.pushbullet) : null;
+    },
+    async getPriceAlerts() {
+      const row = await dbProxy.prepare('SELECT price_alerts FROM config WHERE id = 1').get();
+      return row ? JSON.parse(row.price_alerts) : null;
     }
   }
 };

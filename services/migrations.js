@@ -345,6 +345,72 @@ function add_token_prices_table(db) {
   `);
 }
 
+/** Migration: adds price_alerts column to config if missing. */
+function add_price_alerts_column(db) {
+  if (hasColumn(db, 'config', 'price_alerts')) return;
+  db.exec("ALTER TABLE config ADD COLUMN price_alerts TEXT NOT NULL DEFAULT '{\"alerts\":[{\"price_change\":10,\"price_interval\":5,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":25,\"price_interval\":15,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":50,\"price_interval\":60,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1}]}'");
+}
+
+/** Migration: adds 'price' to resource_type CHECK in check_logs via table rebuild. */
+function add_price_to_check_logs_resource_type(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='check_logs'").get();
+  if (!row) return;
+  if (String(row.sql).includes("'price'")) return;
+  console.log(`[${now()}] Migration: adding 'price' to check_logs.resource_type CHECK`);
+  try {
+    db.exec(`
+      ALTER TABLE check_logs RENAME TO _cl_price_old;
+      CREATE TABLE check_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter', 'price')),
+        resource_id INTEGER,
+        status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'disabled', 'unavailable', 'deleted', 'changed')),
+        http_status INTEGER,
+        response_time_ms INTEGER,
+        error_message TEXT,
+        details TEXT,
+        checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+      INSERT INTO check_logs SELECT * FROM _cl_price_old;
+      DROP TABLE _cl_price_old;
+      CREATE INDEX IF NOT EXISTS idx_check_logs_project_resource_date ON check_logs (project_id, resource_type, checked_at);
+    `);
+  } catch (err) {
+    console.error(`[${now()}] add_price_to_check_logs_resource_type failed: ${err.message}`);
+  }
+}
+
+/** Migration: adds 'price' to resource_type CHECK in event_logs via table rebuild. */
+function add_price_to_event_logs_resource_type(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
+  if (!row) return;
+  if (String(row.sql).includes("'price'")) return;
+  console.log(`[${now()}] Migration: adding 'price' to event_logs.resource_type CHECK`);
+  try {
+    db.exec(`
+      ALTER TABLE event_logs RENAME TO _el_price_old;
+      CREATE TABLE event_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter', 'price')),
+        event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed', 'deleted', 'tag_changed')),
+        value TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        confirmed INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+      INSERT INTO event_logs SELECT * FROM _el_price_old;
+      DROP TABLE _el_price_old;
+      CREATE INDEX IF NOT EXISTS idx_event_logs_project_resource ON event_logs (project_id, resource_type, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_event_logs_alerting ON event_logs (resource_type, confirmed, created_at DESC);
+    `);
+  } catch (err) {
+    console.error(`[${now()}] add_price_to_event_logs_resource_type failed: ${err.message}`);
+  }
+}
+
 /** Migration: adds telegram and pushbullet columns to config if missing. */
 function add_notification_config_cols(db) {
   const rows = db.prepare("PRAGMA table_info(config)").all();
@@ -378,6 +444,9 @@ async function runMigrations(db) {
   try { await fix_alert_logs_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_price_alerts_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_price_to_check_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_price_to_event_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }

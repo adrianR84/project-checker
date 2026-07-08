@@ -364,3 +364,53 @@ table.compact .details_cell   { min-width: 140px; }
   font-size: 0.8125rem;
   color: var(--app-muted);
 }
+
+/* ── Price Alerts Table ─────────────────────────────────────────────────── */
+.price-alerts-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.price-alerts-header,
+.price-alert-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 80px 80px 40px 60px;
+  align-items: center;
+  gap: 8px;
+}
+.price-alerts-header {
+  font-size: 0.75rem;
+  color: var(--app-muted);
+  letter-spacing: 0.05em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--app-border);
+}
+.price-alerts-header .upp {text-transform: uppercase;}
+.price-alert-row {
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 40%, transparent);
+}
+.price-alert-row .switch {
+  justify-self: center;
+}
+.row-disabled input,
+.row-disabled label {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.row-disabled label:last-child {
+  opacity: 1;
+  pointer-events: auto;
+}
+.alert-num {
+  color: var(--app-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.price-alert-row input[type="number"] {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.875rem;
+}
+

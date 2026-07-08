@@ -8,13 +8,14 @@ const now = () => new Date().toISOString();
 
 // GET /api/settings
 router.get('/', async (req, res) => {
-  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet] = await Promise.all([
+  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts] = await Promise.all([
     db.config.getSettings(),
     db.config.getCheckIntervals(),
     db.config.getAlertIntervals(),
     db.config.getAlertStops(),
     db.config.getTelegram(),
-    db.config.getPushbullet()
+    db.config.getPushbullet(),
+    db.config.getPriceAlerts()
   ]);
   if (!settings) return res.status(500).json({ error: 'config not found' });
   // Return flat shape for frontend compatibility
@@ -38,6 +39,7 @@ router.get('/', async (req, res) => {
     alert_stops,
     telegram,
     pushbullet,
+    price_alerts,
   });
 });
 
@@ -106,8 +108,29 @@ router.put('/', async (req, res) => {
     }
   }
 
-  if (Object.keys(updates).length === 0 && !req.body?.telegram && !req.body?.pushbullet) {
+  if (Object.keys(updates).length === 0 && !req.body?.telegram && !req.body?.pushbullet && !req.body?.price_alerts) {
     return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  // price_alerts { alerts: [{ price_change, price_interval, enabled, telegram, pushbullet, log }, ...] }
+  if (req.body?.price_alerts && typeof req.body.price_alerts === 'object') {
+    const cur = await db.config.getPriceAlerts();
+    if (cur) {
+      const incoming = req.body.price_alerts;
+      const merged = {
+        alerts: (incoming.alerts && Array.isArray(incoming.alerts))
+          ? incoming.alerts.map((a, i) => ({
+              price_change:   typeof a.price_change === 'number' ? a.price_change : cur.alerts[i]?.price_change ?? 10,
+              price_interval: typeof a.price_interval === 'number' ? a.price_interval : cur.alerts[i]?.price_interval ?? 5,
+              enabled:        a.enabled === 1 || a.enabled === 0 ? a.enabled : (cur.alerts[i]?.enabled ?? 1),
+              telegram:       a.telegram === 1 || a.telegram === 0 ? a.telegram : (cur.alerts[i]?.telegram ?? 1),
+              pushbullet:     a.pushbullet === 1 || a.pushbullet === 0 ? a.pushbullet : (cur.alerts[i]?.pushbullet ?? 0),
+              log:            a.log === 1 || a.log === 0 ? a.log : (cur.alerts[i]?.log ?? 1),
+            }))
+          : cur.alerts
+      };
+      await db.prepare('UPDATE config SET price_alerts = ? WHERE id = 1').run(JSON.stringify(merged));
+    }
   }
 
   // telegram { bot_token, chat_id, enabled }
@@ -171,16 +194,17 @@ router.put('/', async (req, res) => {
   }
 
   const cfg = await db.prepare('SELECT * FROM config WHERE id = 1').get();
-  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet] = await Promise.all([
+  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts] = await Promise.all([
     db.config.getSettings(),
     db.config.getCheckIntervals(),
     db.config.getAlertIntervals(),
     db.config.getAlertStops(),
     db.config.getTelegram(),
-    db.config.getPushbullet()
+    db.config.getPushbullet(),
+    db.config.getPriceAlerts()
   ]);
   console.log(`[${now()}] Settings updated: ${JSON.stringify(updates)}`);
-  res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet });
+  res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts });
 });
 
 // Run checks for a single project across enabled resources

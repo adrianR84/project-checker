@@ -1960,6 +1960,38 @@
               </button>
             </article>
 
+            <!-- Price Alerts -->
+            <article class="force-wide">
+              <h3>Price Alerts</h3>
+              <p class="muted">Configure price change alerts with notification options per alert slot.</p>
+
+              <div class="price-alerts-table">
+                <div class="price-alerts-header">
+                  <span>#</span>
+                  <span data-tooltip="Trigger alert when price changes by this percentage (UP or DOWN)"><span class="upp">Price Change %</span></span>
+                  <span data-tooltip="Notification sent every set minutes"><span class="upp">Interval (min)</span></span>
+                  <span data-tooltip="Send Telegram notification"><span class="upp">Telegram</span></span>
+                  <span data-tooltip="Send Pushbullet notification"><span class="upp">Pushbullet</span></span>
+                  <span data-tooltip="Log the alert event"><span class="upp">Log</span></span>
+                  <span data-tooltip="Enable or disable this alert slot"><span class="upp">Enabled</span></span>
+                </div>
+                <div v-for="(alert, i) in form.price_alerts" :key="i" class="price-alert-row" :class="{ 'row-disabled': !alert._enabled }">
+                  <span class="alert-num">{{ i + 1 }}</span>
+                  <input v-model.number="alert.price_change" type="number" min="0" step="0.1" :disabled="!alert._enabled" />
+                  <input v-model.number="alert.price_interval" type="number" min="1" max="10080" :disabled="!alert._enabled" />
+                  <label class="switch"><input type="checkbox" v-model="alert._telegram" @change="alert.telegram = alert._telegram ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
+                  <label class="switch"><input type="checkbox" v-model="alert._pushbullet" @change="alert.pushbullet = alert._pushbullet ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
+                  <label class="switch"><input type="checkbox" v-model="alert._log" @change="alert.log = alert._log ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
+                  <label class="switch"><input type="checkbox" v-model="alert._enabled" @change="alert.enabled = alert._enabled ? 1 : 0" /><span class="slider"></span></label>
+                </div>
+              </div>
+
+              <button :disabled="saving" @click="savePriceAlertsSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </article>
+
             <!-- Manual checks -->
             <article>
               <h3>Manual Checks</h3>
@@ -2091,6 +2123,11 @@
           telegram_chat_id:         '',
           pushbullet_enabled:       false,
           pushbullet_access_token:  '',
+          price_alerts: [
+            { price_change: 10, price_interval: 5, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
+            { price_change: 25, price_interval: 15, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
+            { price_change: 50, price_interval: 60, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
+          ],
         });
         const loading   = ref(true);
         const saving    = ref(false);
@@ -2144,6 +2181,18 @@
               telegram_chat_id:          settings.value.telegram?.chat_id || '',
               pushbullet_enabled:       !!settings.value.pushbullet?.enabled,
               pushbullet_access_token:   settings.value.pushbullet?.access_token || '',
+              price_alerts: (settings.value.price_alerts?.alerts || []).map(a => ({
+                price_change:   a.price_change ?? 10,
+                price_interval: a.price_interval ?? 5,
+                enabled:        a.enabled ?? 1,
+                telegram:       a.telegram ?? 1,
+                pushbullet:     a.pushbullet ?? 0,
+                log:            a.log ?? 1,
+                _enabled:    !!(a.enabled ?? 1),
+                _telegram:   !!(a.telegram ?? 1),
+                _pushbullet: !!(a.pushbullet ?? 0),
+                _log:        !!(a.log ?? 1),
+              })),
             };
             appSettings.value = settings.value;
           } catch (e) {
@@ -2228,6 +2277,22 @@
           });
         }
 
+        /** Save Price Alerts */
+        async function savePriceAlertsSettings() {
+          await saveSettings({
+            price_alerts: {
+              alerts: form.value.price_alerts.map(a => ({
+                price_change:   a.price_change,
+                price_interval: a.price_interval,
+                enabled:        a.enabled,
+                telegram:       a.telegram,
+                pushbullet:     a.pushbullet,
+                log:            a.log,
+              })),
+            },
+          });
+        }
+
         /** Run trigger-all for a specific kind (web / gh / tw) */
         async function onTrigger(kind, fn) {
           triggering.value = kind;
@@ -2285,7 +2350,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           error,
-          onSave, saveAppSettings, saveAlertSettings, saveNotificationSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
+          onSave, saveAppSettings, saveAlertSettings, saveNotificationSettings, savePriceAlertsSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
           relativeTime,
           api: window.api,
         };
