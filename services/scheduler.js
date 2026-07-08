@@ -7,6 +7,10 @@ const { sendAlert } = require('./notifications');
 
 const now = () => new Date().toISOString();
 
+// SCHEDULER_DEBUG=1 — enables verbose scheduler tick/reschedule console output
+const SCHEDULER_DEBUG = process.env.SCHEDULER_DEBUG === '1';
+const scheduleLog = (...args) => { if (SCHEDULER_DEBUG) console.log(...args); };
+
 let jobs = [];
 let initialized = false;
 let tokenPriceInterval = null;
@@ -34,7 +38,7 @@ async function runWebsiteTick() {
     SELECT id, website_url, website_content_check FROM projects
     WHERE enabled = 1 AND website_enabled = 1 AND website_url IS NOT NULL AND website_url != ''
   `).all();
-  console.log(`[${now()}] Scheduler: website tick — ${projects.length} projects`);
+  scheduleLog(`[${now()}] Scheduler: website tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
       const r = await checkWebsite(p.website_url, p.id, !!p.website_content_check);
@@ -51,13 +55,13 @@ async function runTwitterTick() {
     SELECT id, twitter_url FROM projects
     WHERE enabled = 1 AND twitter_enabled = 1 AND twitter_url IS NOT NULL AND twitter_url != ''
   `).all();
-  console.log(`[${now()}] Scheduler: twitter tick — ${projects.length} projects`);
+  scheduleLog(`[${now()}] Scheduler: twitter tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
       const r = await checkTwitter(p.twitter_url);
       await logCheck(p.id, 'twitter', null, r);
     } catch (err) {
-      console.error(`[${now()}] twitter check failed for project ${p.id}: ${err.message}`);
+      scheduleLog(`[${now()}] twitter check failed for project ${p.id}: ${err.message}`);
     }
   }
 }
@@ -66,7 +70,7 @@ async function runTwitterTick() {
     checks remaining active repos and logs results to check_logs. */
 async function runCommitTick() {
   const projects = await db.prepare(`SELECT id, github_url FROM projects WHERE enabled = 1 AND github_enabled = 1 AND github_url IS NOT NULL`).all();
-  console.log(`[${now()}] Scheduler: commit tick — ${projects.length} projects`);
+  scheduleLog(`[${now()}] Scheduler: commit tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
       const githubRepos = await fetchReposForOwner(p.github_url);
@@ -87,7 +91,7 @@ async function runCommitTick() {
         }
       }
     } catch (err) {
-      console.error(`[${now()}] commit tick failed for project ${p.id}: ${err.message}`);
+      scheduleLog(`[${now()}] commit tick failed for project ${p.id}: ${err.message}`);
     }
   }
 }
@@ -98,7 +102,7 @@ async function purgeOldLogs() {
   if (!settings?.log_retention_days) return;
   const cutoff = new Date(Date.now() - settings.log_retention_days * 86400_000).toISOString();
   await db.prepare('DELETE FROM check_logs WHERE checked_at < ?').run(cutoff);
-  console.log(`[${now()}] Scheduler: purged logs older than ${settings.log_retention_days} days`);
+  scheduleLog(`[${now()}] Scheduler: purged logs older than ${settings.log_retention_days} days`);
 }
 
 /** Fires every minute (1-min cron grid). For each resource type:
@@ -177,7 +181,7 @@ async function runTokenPriceTick() {
     SELECT id, token FROM projects WHERE enabled = 1 AND token IS NOT NULL AND token != ''
   `).all();
   if (!projects.length) return;
-  console.log(`[${now()}] Scheduler: token price tick — ${projects.length} tokens`);
+  scheduleLog(`[${now()}] Scheduler: token price tick — ${projects.length} tokens`);
 
   const BATCH_SIZE = 5;
   for (let i = 0; i < projects.length; i += BATCH_SIZE) {
@@ -189,7 +193,7 @@ async function runTokenPriceTick() {
         const url = `https://api.dexscreener.com/token-pairs/v1/${token.chain}/${token.contract}`;
         const res = await fetch(url);
         if (res.status === 429) {
-          console.warn(`[${now()}] DexScreener rate-limited, pausing 1s before retry`);
+          scheduleLog(`[${now()}] DexScreener rate-limited, pausing 1s before retry`);
           await new Promise(r => setTimeout(r, 1000));
           const retry = await fetch(url);
           if (!retry.ok) return;
@@ -270,36 +274,36 @@ async function reschedule() {
     jobs.push(j);
   }
   lastCommitExpr = commitExpr;
-  console.log(`[${now()}] Scheduler: commit job → "${commitExpr}" (every ${intervals.github}min)`);
+  scheduleLog(`[${now()}] Scheduler: commit job → "${commitExpr}" (every ${intervals.github}min)`);
 
   if (cron.validate(websiteExpr)) {
     const j = cron.schedule(websiteExpr, () => { runWebsiteTick().catch(err => console.error(err)); });
     jobs.push(j);
   }
   lastWebsiteExpr = websiteExpr;
-  console.log(`[${now()}] Scheduler: website job → "${websiteExpr}" (every ${intervals.website}min)`);
+  scheduleLog(`[${now()}] Scheduler: website job → "${websiteExpr}" (every ${intervals.website}min)`);
 
   if (cron.validate(twitterExpr)) {
     const j = cron.schedule(twitterExpr, () => { runTwitterTick().catch(err => console.error(err)); });
     jobs.push(j);
   }
   lastTwitterExpr = twitterExpr;
-  console.log(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${intervals.twitter}min)`);
+  scheduleLog(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${intervals.twitter}min)`);
 
   const purgeExpr = '0 0 * * *';
   const purgeJob = cron.schedule(purgeExpr, () => { purgeOldLogs().catch(err => console.error(err)); });
   jobs.push(purgeJob);
-  console.log(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
+  scheduleLog(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
 
   // Alert tick: every minute (1-min grid, throttled by config interval inside runAlertTick)
   const alertJob = cron.schedule('* * * * *', () => { runAlertTick().catch(err => console.error(err)); });
   jobs.push(alertJob);
-  console.log(`[${now()}] Scheduler: alert tick job → "* * * * *" (1-min grid)`);
+  scheduleLog(`[${now()}] Scheduler: alert tick job → "* * * * *" (1-min grid)`);
 
   // Token price tick: every TOKEN_CHECK_INTERVAL_MS ms via setInterval (not cron, for rate-limit control)
   clearInterval(tokenPriceInterval);
   tokenPriceInterval = setInterval(() => { runTokenPriceTick().catch(err => console.error(err)); }, TOKEN_CHECK_INTERVAL_MS);
-  console.log(`[${now()}] Scheduler: token price tick → every ${TOKEN_CHECK_INTERVAL_MS / 1000}s`);
+  scheduleLog(`[${now()}] Scheduler: token price tick → every ${TOKEN_CHECK_INTERVAL_MS / 1000}s`);
 }
 
 function init() {
@@ -315,7 +319,7 @@ function init() {
     reschedule();
   }, 5 * 60 * 1000);
 
-  console.log(`[${now()}] Scheduler initialized`);
+  scheduleLog(`[${now()}] Scheduler initialized`);
 }
 
 module.exports = { init, purgeOldLogs };
