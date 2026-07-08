@@ -249,7 +249,7 @@
               </a>
             </li>
             <li v-if="fearIndex?.value !== undefined">
-              <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" style="font-size:0.8rem" :class="['badge', fearIndex.value_classification === 'Fear' ? 'error' : fearIndex.value_classification === 'Greed' ? 'ok' : 'pending']" :title="'Fear & Greed Index: ' + fearIndex.value_classification">
+              <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" style="font-size:0.8rem" :class="['badge', fearIndex.value_classification === 'Extreme Fear' ? 'error' : fearIndex.value_classification === 'Fear' ? 'pending' : fearIndex.value_classification.includes('Greed') ? 'ok' : 'pending']" :title="'Fear & Greed Index: ' + fearIndex.value_classification">
                 {{ fearIndex.value }} {{ fearIndex.value_classification }}
               </a>
             </li>
@@ -1149,9 +1149,16 @@
             </button>
           </div>
 
-          <div class="tabs" style="margin: 0 20px;">
+          <div class="tabs" style="margin: 0 20px; align-items: center;">
             <button :class="['tab', activityTab === 'resources' ? 'active' : '']" @click="activityTab = 'resources'">Resources</button>
             <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
+            <input
+              v-model="filter"
+              type="text"
+              placeholder="Filter…"
+              aria-label="Filter"
+              style="margin-left: auto; width: 170px; padding: 1px 4px; font-size: 0.85rem; height: 25px;"
+            />
           </div>
 
           <!-- Resources tab: project cards -->
@@ -1169,7 +1176,7 @@
 
             <div v-else class="project-grid">
               <ProjectCard
-                v-for="p in projects"
+                v-for="p in filteredProjects"
                 :key="p.id"
                 :project="p"
                 @refreshed="load"
@@ -1207,7 +1214,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in prices" :key="row.project_id">
+                  <tr v-for="row in filteredPrices" :key="row.project_id">
                     <td class="hide-sm">
                       <a :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
                          target="_blank" rel="noopener"
@@ -1261,6 +1268,7 @@
       setup() {
         let pricesRefreshMs = 30_000;
         const activityTab   = ref('prices');
+        const filter        = ref('');
         const projects      = ref([]);
         const prices        = ref([]);
         const pricesLoading = ref(false);
@@ -1406,6 +1414,26 @@
         // Sort state
         const priceSort = ref({ col: null, desc: true });
 
+        const filteredProjects = computed(() => {
+          const q = filter.value.toLowerCase();
+          if (!q) return projects.value;
+          return projects.value.filter(p =>
+            p.name.toLowerCase().includes(q) ||
+            (p.website_url || '').toLowerCase().includes(q) ||
+            (p.github_url || '').toLowerCase().includes(q)
+          );
+        });
+
+        const filteredPrices = computed(() => {
+          const q = filter.value.toLowerCase();
+          if (!q) return prices.value;
+          return prices.value.filter(p =>
+            (p.project_name || '').toLowerCase().includes(q) ||
+            (p.symbol || '').toLowerCase().includes(q) ||
+            (p.chain || '').toLowerCase().includes(q)
+          );
+        });
+
         function sortCol(col) {
           if (priceSort.value.col === col) {
             priceSort.value.desc = !priceSort.value.desc;
@@ -1433,6 +1461,7 @@
           activityTab, projects, prices, pricesLoading,
           logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
+          filter, filteredProjects, filteredPrices,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, checkAll, sortCol, priceSort,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
         };

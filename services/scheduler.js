@@ -318,4 +318,4 @@ function init() {
   console.log(`[${now()}] Scheduler initialized`);
 }
 
-module.exports = { init };
+module.exports = { init, purgeOldLogs };
