@@ -1,6 +1,6 @@
 # Project Checker
 
-Monitor websites, GitHub repos, and Twitter accounts in one dashboard.
+Backend server + Vue 3 SPA that monitors websites, GitHub repositories, Twitter accounts, and crypto token prices. Detects changes, records events, sends alerts via Telegram and Pushbullet, and surfaces everything in a web dashboard.
 
 ## Setup
 
@@ -11,99 +11,145 @@ pnpm start
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## What it monitors
+For live reload during development:
+
+```bash
+pnpm dev      # starts Express + live-reload server
+pnpm dev:log  # same, but also saves output to logs/output.log
+```
+
+## What it does
 
 | Resource | What it checks |
 |----------|----------------|
-| **Website** | HTTP status, response time, detects content changes via MD5 hash |
-| **GitHub org** | Per-repo: latest commit SHA, commit count, stars, last push time, latest tag |
-| **Twitter** | Account accessibility and error states |
+| Website | HTTP status, response time, content fingerprint (title, Open Graph, Twitter tags, canonical, first paragraph) — detects page changes |
+| GitHub | New commits, new tags, deleted repos — per-org via GitHub API |
+| Twitter / X | HTTP status, suspended-account detection via `defuddle` CLI |
+| Token price | USD price, 1h/6h/24h change, liquidity, volume, market cap from DexScreener |
 
-Each resource has a **sticky confirm** pattern: after confirming, the app tracks whether the status has changed since that confirmation. "Last changed" timestamps are recorded in the `event_logs` table.
+Changes are recorded as events in `event_logs` and alerted on configurable intervals via Telegram and/or Pushbullet.
 
 ## Project structure
 
 ```
 project-checker/
-├── index.js              # Entry point, Express server setup
+├── index.js              # Express entry point
+├── package.json
+├── data/
+│   └── project-checker.db  # SQLite database
 ├── services/
-│   ├── db.js            # sqlite3 init, schema, migrations
-│   ├── checker.js       # Website, GitHub, Twitter check logic
-│   ├── github.js        # GitHub API client
-│   ├── migrations.js    # Idempotent schema migrations
-│   └── scheduler.js     # node-cron job scheduling
+│   ├── db.js             # node:sqlite init, schema, promisified proxy
+│   ├── checker.js        # checkWebsite, checkGithubRepo, checkTwitter, logCheck
+│   ├── github.js         # GitHub API: repos, commits, tags (token from DB)
+│   ├── scheduler.js       # node-cron jobs, alert dispatch, log purge
+│   ├── notifications.js  # Telegram + Pushbullet alert sender
+│   └── migrations.js     # Idempotent schema migrations (runs on every init)
 ├── routes/
-│   ├── projects.js      # CRUD for projects + repo management + confirm/check endpoints
-│   ├── dashboard.js     # Aggregated view for the UI
-│   ├── settings.js      # App settings + manual triggers + danger zone
-│   └── checkLogs.js     # Check log and status change retrieval
-└── public/
-    ├── index.html       # Vue 3 SPA
-    └── styles.css       # Pico CSS dark overrides
+│   ├── projects.js       # CRUD, manual checks, repo management
+│   ├── dashboard.js      # Aggregated project status, token prices
+│   ├── settings.js       # Config read/write, trigger-all, danger zone
+│   └── checkLogs.js      # check_logs, event_logs, alert_logs endpoints
+├── public/
+│   ├── index.html        # Vue 3 SPA (CDN)
+│   └── styles.css        # Pico CSS dark overrides + app tokens
+├── utils/
+│   ├── kill-ports.js
+│   ├── dev-log.js
+│   └── log-pipe.js
+├── logs/
+└── .env                  # PORT only (GitHub token is stored via the UI)
 ```
 
 ## Database
 
-SQLite via sqlite3. The database file (`data/project-checker.db`) is created on first run. Migrations run automatically on every startup and are idempotent.
+SQLite via Node.js built-in `node:sqlite`. Database file: `data/project-checker.db`.
 
 Key tables:
-- `projects` — URLs, enabled flags, and per-resource settings
-- `repos` — GitHub repos per project, with commit history and status tracking
-- `check_logs` — every check result ever recorded
-- `event_logs` — only state transitions (changed/confirmed/deleted events)
-- `config` — singleton app settings
+
+- `projects` — name, URLs, enabled flags, token JSON, timestamps
+- `repos` — linked GitHub repos per project with commit/tag state
+- `check_logs` — per-check results: status, HTTP code, response time, content hash
+- `event_logs` — status change events: changed, deleted, tag_changed, confirmed
+- `alert_logs` — alert dispatch records (one row per fired alert)
+- `token_prices` — DexScreener data per project: price, change %, liquidity, volume
+- `config` — singleton row with JSON groups for all settings
 
 ## Settings
 
-| Setting | Description |
-|---------|-------------|
-| `github_check_minutes` | How often to check GitHub repos (default: 360) |
-| `github_token` | GitHub personal access token — higher rate limits (5,000/hr vs 60/hr) and private repo access |
-| `website_check_minutes` | How often to check websites (default: 1440) |
-| `twitter_check_minutes` | How often to check Twitter (default: 1440) |
-| `log_retention_days` | Auto-delete check logs older than N days (0 = disabled) |
-| `ui_refresh_seconds` | Auto-refresh dashboard interval (0 = disabled) |
-| `compact_activity` | Hide the Repositories section in the Activity view |
+All settings are stored in the `config` table as JSON group columns:
+
+| Group key | Contents |
+|-----------|----------|
+| `settings` | `log_retention_days`, `ui_refresh_seconds`, `compact_activity_display`, `github_token` |
+| `check_intervals` | `github`, `website`, `twitter` (minutes) |
+| `alert_intervals` | `github`, `website`, `twitter` (minutes — 0 disables) |
+| `alert_stops` | `github`, `website`, `twitter` (minutes — 0 = indefinite) |
+| `telegram` | `bot_token`, `chat_id`, `enabled` |
+| `pushbullet` | `access_token`, `enabled` |
+| `price_alerts` | Array of alert slots with `price_change`, `price_interval`, `enabled`, `telegram`, `pushbullet`, `log` |
 
 ## Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
+| `SCHEDULER_DEBUG` | `0` | Set to `1` to enable verbose scheduler tick logging |
+| `GITHUB_TOKEN` | — | Not used — GitHub token is stored via the Settings UI in `config.settings.github_token` |
 
 ## API
 
 ### Projects
-- `GET /api/projects` — all projects
-- `POST /api/projects` — create project (no auto-repo-fetch; use ManageRepos to add repos)
+
+- `GET /api/projects` — list all projects
 - `GET /api/projects/:id` — single project with repos and latest check logs
-- `PUT /api/projects/:id` — update project (accepts `repos` array to sync)
-- `DELETE /api/projects/:id` — delete project
-
-### Repo management
-- `GET /api/projects/:id/org-repos` — fetch all repos from the GitHub org (for ManageRepos UI)
-- `POST /api/projects/:id/refresh-repos` — re-fetch all repos from GitHub, detect deleted repos
-- `POST /api/projects/:id/add-repos` — upsert selected repos
-- `DELETE /api/projects/:id/repos/:full_name` — remove a repo (full_name may contain `/`)
-
-### Checks
-- `POST /api/projects/:id/check-website` — run website check
-- `POST /api/projects/:id/check-github` — run check for all active repos
-- `POST /api/projects/:id/check-twitter` — run Twitter check
+- `POST /api/projects` — create project (runs website + Twitter checks immediately)
+- `PUT /api/projects/:id` — update project (optionally sync repos array)
+- `DELETE /api/projects/:id` — delete project (cascades to repos, logs)
+- `GET /api/projects/:id/org-repos` — fetch all repos for the project's GitHub org
+- `POST /api/projects/:id/refresh-repos` — re-fetch all repos, detect deletions
+- `POST /api/projects/:id/add-repos` — upsert selected repos, initial check
+- `DELETE /api/projects/:id/repos/:fullName` — remove a specific repo
+- `POST /api/projects/:id/check-website` — manual website check
+- `POST /api/projects/:id/check-github` — manual GitHub check (all active repos)
+- `POST /api/projects/:id/check-twitter` — manual Twitter check
 
 ### Dashboard
-- `GET /api/dashboard` — all projects with latest check statuses, repos, and deleted repos
+
+- `GET /api/dashboard` — all enabled projects with latest check status per resource and last-change timestamps
+- `GET /api/dashboard/token-prices` — all token prices joined with project names
+
+### Check Logs
+
+- `GET /api/check-logs` — paginated check_logs with project/repo join; filter by `project_id`, `resource_type`
+- `GET /api/check-logs/status-changes` — paginated event_logs (unconfirmed events); filter by `project_id`, `resource_type`
+- `PATCH /api/check-logs/status-changes/:id/confirm` — set `confirmed` 0/1
+- `GET /api/check-logs/alerts` — paginated alert_logs; filter by `project_id`, `resource_type`
 
 ### Settings
-- `GET /api/settings` — app settings (singleton config row)
-- `PUT /api/settings` — update settings (accepts any subset of config fields)
-- `POST /api/settings/trigger-all` — run all checks for all projects now
-- `POST /api/settings/trigger-websites` — run website checks for all projects now
-- `POST /api/settings/trigger-github` — run GitHub checks for all projects now
-- `POST /api/settings/trigger-twitter` — run Twitter checks for all projects now
-- `POST /api/settings/clear-logs` — delete all check logs and status changes
-- `POST /api/settings/clear-data` — delete all projects, repos, and logs; keep settings
 
-### Logs
-- `GET /api/check-logs` — paginated check logs (query params: `project_id`, `resource_type`, `limit`, `offset`)
-- `GET /api/check-logs/status-changes` — paginated status change events (query params: `project_id`, `resource_type`, `limit`, `offset`)
+- `GET /api/settings` — full config snapshot (flat + group shapes)
+- `PUT /api/settings` — update check intervals, alert intervals/stops, log retention, UI refresh, GitHub token, notification channels, price alerts
+- `POST /api/settings/trigger-all` — run all enabled checks for all projects
+- `POST /api/settings/trigger-websites` — run website checks for all projects
+- `POST /api/settings/trigger-github` — run GitHub checks for all projects
+- `POST /api/settings/trigger-twitter` — run Twitter checks for all projects
+- `POST /api/settings/clear-data` — delete all projects, repos, check_logs, event_logs (keeps config)
+- `POST /api/settings/clear-logs` — delete check_logs, event_logs, alert_logs
+- `POST /api/settings/clear-alert-logs` — delete alert_logs only
+
+## Scheduler
+
+Runs via `node-cron`. Expressions are recomputed from config on every change:
+
+| Job | Default interval | What it does |
+|-----|-----------------|--------------|
+| Website tick | Every 1440 min (1 day) | GET each enabled website URL |
+| GitHub tick | Every 360 min (6 hrs) | Fetch org repos, detect deletions, check each active repo |
+| Twitter tick | Every 1440 min (1 day) | GET each Twitter URL, defuddle parse on 200 responses |
+| Token price tick | Every 60 s (setInterval) | DexScreener batch fetch, upsert `token_prices` |
+| Alert tick | Every 1 min (cron grid) | Fire Telegram/Pushbullet for unconfirmed events past their interval |
+| Log purge | Daily at midnight | Delete `check_logs` older than `log_retention_days` |
+
+## License
+
+MIT
