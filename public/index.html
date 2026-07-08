@@ -929,7 +929,7 @@
        Emits 'refreshed' after any manual check completes so the parent can reload.
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectCard = {
-      props: ['project'],
+      props: ['project', 'prices'],
       emits: ['refreshed'],
       components: { RepoList },
 
@@ -1037,6 +1037,16 @@
             </tbody>
           </table>
 
+          <!-- Token price summary (if project has a token) -->
+          <div v-if="token" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 2px;">
+            <a :href="'https://x.com/search?q=%24' + (token.symbol.startsWith('$') ? token.symbol.slice(1) : token.symbol) + '&src=typed_query'" target="_blank" rel="noopener" style="font-weight:600;">{{ token.symbol }}</a>
+            <a :href="'https://dexscreener.com/' + token.chain + '/' + token.contract" target="_blank" rel="noopener">{{ token.price_usd != null ? '$' + parseFloat(token.price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—' }}</a>
+            <span v-if="token.price_change_h1 != null" :class="['badge', token.price_change_h1 < 0 ? 'error' : 'ok']">1h  {{ fmtPct(token.price_change_h1) }}</span>
+            <span v-if="token.price_change_h6 != null" :class="['badge', token.price_change_h6 < 0 ? 'error' : 'ok']">6h {{ fmtPct(token.price_change_h6) }}</span>
+            <span v-if="token.price_change_h24 != null" :class="['badge', token.price_change_h24 < 0 ? 'error' : 'ok']">24h {{ fmtPct(token.price_change_h24) }}</span>
+            <span v-if="token.market_cap != null" >MCap {{ fmtShortNum(token.market_cap) }}</span>
+          </div>
+
           <!-- GitHub repos section with refresh button -->
           <section v-if="!appSettings?.compact_activity" class="repos-section">
             <div class="repos-head">
@@ -1080,6 +1090,11 @@
         const githubLastChanged  = computed(() => props.project.github_last_changed_at  || null);
         const twitterLastChanged = computed(() => props.project.twitter_last_changed_at || null);
 
+        const token = computed(() => {
+          if (!props.prices) return null;
+          return props.prices.find(t => t.project_id === props.project.id) || null;
+        });
+
         /**
          * Run a named check and emit 'refreshed' on success so the parent reloads data.
          * @param {string}   kind  - human-readable name for error messages
@@ -1117,7 +1132,9 @@
           busy,
           website, github, twitter,
           websiteLastChanged, githubLastChanged, twitterLastChanged,
+          token,
           runCheck,
+          fmtPct, fmtShortNum,
           refreshAll,
           relativeTime,
           statusClass,
@@ -1179,6 +1196,7 @@
                 v-for="p in filteredProjects"
                 :key="p.id"
                 :project="p"
+                :prices="prices"
                 @refreshed="load"
               />
             </div>
@@ -1416,7 +1434,7 @@
         });
 
         // Sort state
-        const priceSort = ref({ col: null, desc: true });
+        const priceSort = ref({ col: 'price_change_h6', desc: false });
 
         const filteredProjects = computed(() => {
           const q = filter.value.toLowerCase();
