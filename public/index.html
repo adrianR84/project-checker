@@ -31,7 +31,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick, Transition } = Vue;
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -1281,13 +1281,13 @@
                       </a>
                     </td>
                     <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
-                    <td class="cen">{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</td>
+                    <td class="cen"><b>{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</b></td>
                     <td :class="['cen', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
                     <td :class="['cen', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
                     <td :class="['cen', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
                     <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
-                    <td class="num">{{ fmtShortNum(row.market_cap) }}</td>
+                    <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
                     <td class="hide-sm">{{ row.chain || '—' }}</td>
                   </tr>
                 </tbody>
@@ -1319,7 +1319,7 @@
 
       setup() {
         let pricesRefreshMs = 30_000;
-        const activityTab   = ref('prices');
+        const activityTab   = ref(localStorage.getItem('pc_activity_tab') || 'prices');
         const filter        = ref('');
         const projects      = ref([]);
         const prices        = ref([]);
@@ -1331,7 +1331,7 @@
         const checkingAll   = ref(false);
         const error         = ref('');
         const showLogs      = ref(true);
-        const logTab        = ref('status-changes');
+        const logTab        = ref(localStorage.getItem('pc_log_tab') || 'status-changes');
 
         // Pagination state for each tab
         const logPage   = ref(1);
@@ -1343,6 +1343,9 @@
         const alertPage  = ref(1);
         const alertTotal = ref(0);
         const alertLimit = ref(20);
+
+        watchEffect(() => { localStorage.setItem('pc_activity_tab', activityTab.value); });
+        watchEffect(() => { localStorage.setItem('pc_log_tab', logTab.value); });
 
         /** Load dashboard (projects + status) */
         async function load() {
