@@ -1977,52 +1977,6 @@
 
             </article>
 
-            <!-- Notification Channels -->
-            <article class="force-wide">
-              <h3>Notification Channels</h3>
-              <p class="muted">Send alerts to Telegram and/or Pushbullet when an alert is recorded.</p>
-
-              <div class="grid">
-                <div class="form-group">
-                  <label>
-                    <input type="checkbox" v-model="form.telegram_enabled" />
-                    Enable Telegram
-                  </label>
-                  <input
-                    v-model="form.telegram_bot_token"
-                    type="password"
-                    placeholder="Bot Token"
-                    autocomplete="off"
-                    :disabled="!form.telegram_enabled"
-                  />
-                  <input
-                    v-model="form.telegram_chat_id"
-                    placeholder="Chat ID"
-                    :disabled="!form.telegram_enabled"
-                  />
-                </div>
-
-                <div class="form-group">
-                  <label>
-                    <input type="checkbox" v-model="form.pushbullet_enabled" />
-                    Enable Pushbullet
-                  </label>
-                  <input
-                    v-model="form.pushbullet_access_token"
-                    type="password"
-                    placeholder="Access Token"
-                    autocomplete="off"
-                    :disabled="!form.pushbullet_enabled"
-                  />
-                </div>
-              </div>
-
-              <button :disabled="saving" @click="saveNotificationSettings">
-                <span v-if="!saving">Save</span>
-                <span v-else class="spinner"></span>
-              </button>
-            </article>
-
             <!-- App Settings -->
             <article>
               <h3>App Settings</h3>
@@ -2068,6 +2022,52 @@
               </fieldset>
 
               <button :disabled="saving" @click="saveAppSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </article>
+
+            <!-- Notification Channels -->
+            <article class="force-wide">
+              <h3>Notification Channels</h3>
+              <p class="muted">Send alerts to Telegram and/or Pushbullet when an alert is recorded.</p>
+
+              <div class="grid">
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" v-model="form.telegram_enabled" />
+                    Enable Telegram
+                  </label>
+                  <input
+                    v-model="form.telegram_bot_token"
+                    type="password"
+                    placeholder="Bot Token"
+                    autocomplete="off"
+                    :disabled="!form.telegram_enabled"
+                  />
+                  <input
+                    v-model="form.telegram_chat_id"
+                    placeholder="Chat ID"
+                    :disabled="!form.telegram_enabled"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" v-model="form.pushbullet_enabled" />
+                    Enable Pushbullet
+                  </label>
+                  <input
+                    v-model="form.pushbullet_access_token"
+                    type="password"
+                    placeholder="Access Token"
+                    autocomplete="off"
+                    :disabled="!form.pushbullet_enabled"
+                  />
+                </div>
+              </div>
+
+              <button :disabled="saving" @click="saveNotificationSettings">
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
               </button>
