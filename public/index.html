@@ -31,7 +31,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick, Transition } = Vue;
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -116,6 +116,7 @@
 
     /** Format a timestamp as a human-readable relative string: "3 hours ago" */
     const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    const DTF = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' });
     const UNITS = [
       ['year',   31536e3],
       ['month',  2592e3],
@@ -160,7 +161,7 @@
       if (!v) return '—';
       const d = new Date(v);
       if (isNaN(d)) return '—';
-      return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+      return DTF.format(d);
     }
 
     /** Format a number as short dollar value: 1000 → $1K, 1000000 → $1M, 1000000000 → $1B */
@@ -1191,13 +1192,6 @@
 
           <div class="toolbar">
             <h1>Activity</h1>
-            <button v-if="false" class="secondary" @click="showLogs = !showLogs">
-              {{ showLogs ? 'Hide logs' : 'Show recent logs' }}
-            </button>
-            <button v-if="false" class="primary" :disabled="checkingAll || loading" @click="checkAll">
-              <span v-if="checkingAll" class="spinner"></span>
-              <span v-else>Check All</span>
-            </button>
           </div>
 
           <div class="tabs" style="margin: 0 20px; align-items: center;">
@@ -1296,8 +1290,8 @@
 
           </div>
 
-          <!-- Optional recent logs table -->
-          <section v-if="showLogs" class="logs-section">
+          <!-- Recent logs table -->
+          <section class="logs-section">
             <div class="tabs">
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
               <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
@@ -1307,8 +1301,7 @@
               <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true"
                 :page="logPage" :total="logTotal" :limit="logLimit" @change-page="loadLogs" />
               <StatusChangeList v-else-if="logTab === 'status-changes'" :logs="statusChanges" :show-project="true"
-                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges"
-                @confirm="onConfirmStatusChange" />
+                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges" />
               <AlertLogsList v-else :logs="alertLogs"
                 :page="alertPage" :total="alertTotal" :limit="alertLimit" @change-page="loadAlertLogs" />
             </article>
@@ -1328,9 +1321,7 @@
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
         const loading       = ref(true);
-        const checkingAll   = ref(false);
         const error         = ref('');
-        const showLogs      = ref(true);
         const logTab        = ref(localStorage.getItem('pc_log_tab') || 'status-changes');
 
         // Pagination state for each tab
@@ -1344,8 +1335,9 @@
         const alertTotal = ref(0);
         const alertLimit = ref(20);
 
-        watchEffect(() => { localStorage.setItem('pc_activity_tab', activityTab.value); });
-        watchEffect(() => { localStorage.setItem('pc_log_tab', logTab.value); });
+        watch(activityTab, v => localStorage.setItem('pc_activity_tab', v));
+        watch(logTab, v => localStorage.setItem('pc_log_tab', v));
+        const logLoaders = { 'check-logs': loadLogs, 'status-changes': loadStatusChanges, 'alert-logs': loadAlertLogs };
 
         /** Load dashboard (projects + status) */
         async function load() {
@@ -1358,7 +1350,7 @@
           } finally {
             loading.value = false;
           }
-          ({ 'check-logs': loadLogs, 'status-changes': loadStatusChanges, 'alert-logs': loadAlertLogs }[logTab.value] || (() => {}))(1);
+          logLoaders[logTab.value]?.(1);
         }
 
         /** Load token prices */
@@ -1416,23 +1408,9 @@
           }
         }
 
-        /** Trigger all checks across all projects */
-        async function checkAll() {
-          if (!confirm('Run checks for all projects now?')) return;
-          checkingAll.value = true;
-          try {
-            await api.triggerAll();
-            await load();
-          } catch (e) {
-            error.value = e.message;
-          } finally {
-            checkingAll.value = false;
-          }
-        }
-
+        
         let pollTimer = null;
         let pricesTimer = null;
-        let prevActivityTab = activityTab.value;
 
         onMounted(async () => {
           load();
@@ -1517,10 +1495,10 @@
 
         return {
           activityTab, projects, prices, pricesLoading,
-          logs, statusChanges, alertLogs, loading, checkingAll, error, showLogs, logTab,
+          logs, statusChanges, alertLogs, loading, error, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
           filter, filteredProjects, filteredPrices,
-          load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, checkAll, sortCol, priceSort,
+          load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
         };
       },
@@ -1690,19 +1668,15 @@
           try {
             if (editing.value) {
               await api.updateProject(editing.value.id, payload);
-              showForm.value  = false;
-              editing.value    = null;
-              await load();
             } else {
               const created = await api.createProject(payload);
-              showForm.value = false;
-              await load();
               if (payload.github_url) {
                 const fresh = projects.value.find(p => p.id === created.id);
                 if (fresh) openManageRepos(fresh);
               }
             }
-            editing.value    = null;
+            showForm.value  = false;
+            editing.value   = null;
             await load();
           } catch (e) {
             error.value = e.message;
