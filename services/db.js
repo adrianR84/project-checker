@@ -39,8 +39,8 @@ async function init() {
       twitter_enabled INTEGER NOT NULL DEFAULT 1,
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
       token TEXT,
-      enabled INTEGER NOT NULL DEFAULT 1,
       price_enabled INTEGER NOT NULL DEFAULT 1,
+      enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );

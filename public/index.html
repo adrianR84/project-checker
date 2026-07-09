@@ -1541,7 +1541,7 @@
 
           <div class="toolbar">
             <h1>Projects</h1>
-            <input v-model="projFilter" type="text" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 140px; padding: 2px 6px; font-size: 0.8125rem; height: 30px" />
+            <input v-model="projFilter" type="search" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 160px; padding: 2px 12px 2px 40px; height: 40px" />
             <button @click="exportProjects">Export JSON</button>
             <button @click="importOpen = true">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
