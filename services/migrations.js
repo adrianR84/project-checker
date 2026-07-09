@@ -112,7 +112,7 @@ function fix_rsc_event_type_check(db) {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           project_id INTEGER NOT NULL,
           resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter')),
-          event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed', 'deleted', 'tag_changed')),
+          event_type TEXT NOT NULL CHECK (event_type IN ('changed', 'deleted', 'tag_changed')),
           value TEXT NOT NULL,
           created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
           FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -417,7 +417,7 @@ function add_price_to_event_logs_resource_type(db) {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         project_id INTEGER NOT NULL,
         resource_type TEXT NOT NULL CHECK (resource_type IN ('website', 'github', 'twitter', 'price')),
-        event_type TEXT NOT NULL CHECK (event_type IN ('confirmed', 'changed', 'deleted', 'tag_changed')),
+        event_type TEXT NOT NULL CHECK (event_type IN ('changed', 'deleted', 'tag_changed')),
         value TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         confirmed INTEGER NOT NULL DEFAULT 0,

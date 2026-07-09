@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
     /** Returns the timestamp of the latest non-confirmed status change for a resource type. */
     const latestChanged = async (resourceType) => {
       const row = await db.prepare(
-        "SELECT created_at FROM event_logs WHERE project_id = ? AND resource_type = ? AND event_type != 'confirmed' ORDER BY created_at DESC LIMIT 1"
+        "SELECT created_at FROM event_logs WHERE project_id = ? AND resource_type = ? ORDER BY created_at DESC LIMIT 1"
       ).get(p.id, resourceType);
       return row?.created_at || null;
     };

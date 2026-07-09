@@ -408,7 +408,6 @@
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
     const statusChangeHelpers = {
       badgeClass(eventType) {
-        if (eventType === 'confirmed') return 'ok';
         if (eventType === 'tag_changed') return 'pending';
         if (eventType === 'changed') return 'changed';
         if (eventType === 'deleted') return 'error';
@@ -1200,10 +1199,10 @@
             <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
             <input
               v-model="filter"
-              type="text"
+              type="search"
               placeholder="Filter…"
               aria-label="Filter"
-              style="margin-left: auto; width: 170px; padding: 1px 4px; font-size: 0.85rem; height: 25px;"
+              class="search-input"
             />
           </div>
 
@@ -1297,6 +1296,7 @@
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
               <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
               <button :class="['tab', logTab === 'alert-logs' ? 'active' : '']" @click="logTab = 'alert-logs'">Alert Logs</button>
+              <input class="search-input" type="search" v-model="logSearch" placeholder="Search logs…" aria-label="Search logs" />
             </div>
             <article>
               <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true"
@@ -1335,9 +1335,17 @@
         const alertPage  = ref(1);
         const alertTotal = ref(0);
         const alertLimit = ref(20);
+        const logSearch  = ref('');
+        let logSearchTimer = null;
 
         watch(activityTab, v => localStorage.setItem('pc_activity_tab', v));
         watch(logTab, v => localStorage.setItem('pc_log_tab', v));
+        watch(logSearch, () => {
+          clearTimeout(logSearchTimer);
+          logSearchTimer = setTimeout(() => {
+            logLoaders[logTab.value]?.(1);
+          }, 300);
+        });
         const logLoaders = { 'check-logs': loadLogs, 'status-changes': loadStatusChanges, 'alert-logs': loadAlertLogs };
 
         /** Load dashboard (projects + status) */
@@ -1375,7 +1383,7 @@
           logPage.value = page;
           const offset = (page - 1) * logLimit.value;
           try {
-            const r = await api.getCheckLogs({ limit: logLimit.value, offset });
+            const r = await api.getCheckLogs({ limit: logLimit.value, offset, search: logSearch.value });
             logs.value = r.logs || [];
             logTotal.value = r.total || 0;
           } catch (e) {
@@ -1388,7 +1396,7 @@
           scPage.value = page;
           const offset = (page - 1) * scLimit.value;
           try {
-            const r = await api.getStatusChanges({ limit: scLimit.value, offset });
+            const r = await api.getStatusChanges({ limit: scLimit.value, offset, search: logSearch.value });
             statusChanges.value = r.logs || [];
             scTotal.value = r.total || 0;
           } catch (e) {
@@ -1401,7 +1409,7 @@
           alertPage.value = page;
           const offset = (page - 1) * alertLimit.value;
           try {
-            const r = await api.getAlertLogs({ limit: alertLimit.value, offset });
+            const r = await api.getAlertLogs({ limit: alertLimit.value, offset, search: logSearch.value });
             alertLogs.value = r.logs || [];
             alertTotal.value = r.total || 0;
           } catch (e) {
@@ -1498,6 +1506,7 @@
           activityTab, projects, prices, pricesLoading,
           logs, statusChanges, alertLogs, loading, error, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
+          logSearch,
           filter, filteredProjects, filteredPrices,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           api: window.api, relativeTime, fmtShortNum, fmtPct,

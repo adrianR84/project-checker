@@ -318,6 +318,12 @@ async function checkTwitter(url, projectId) {
       recordStatusChange(projectId, 'twitter', 'changed', { bs: lastStatus, as: newStatus, bhs: lastHttpStatus, ahs: res.status });
     }
 
+    // Record HTTP status changes as events (e.g. 200 → 500) even if status label didn't change
+    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId) {
+      const eventType = res.status === 404 ? 'deleted' : 'changed';
+      recordStatusChange(projectId, 'twitter', eventType, { bhs: lastHttpStatus, ahs: res.status });
+    }
+
     // ponytail: only persist defuddle output on meaningful status (changed/disabled) to keep logs lean
     const finalDetails = (status === 'changed' || status === 'disabled') ? _defuddleDetails : null;
 

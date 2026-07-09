@@ -4,38 +4,44 @@ const db = require('../services/db');
 
 const router = express.Router();
 
-// GET /api/check-logs?project_id=X&resource_type=Y&limit=N&offset=M
+// GET /api/check-logs?project_id=X&resource_type=Y&search=TEXT&limit=N&offset=M
 router.get('/', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
+  const search = req.query.search || null;
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = [];
+  const conditions = ['p.enabled = 1'];
   const params = [];
   if (projectId) {
-    conditions.push('project_id = ?');
+    conditions.push('cl.project_id = ?');
     params.push(projectId);
   }
   if (resourceType) {
-    conditions.push('resource_type = ?');
+    conditions.push('cl.resource_type = ?');
     params.push(resourceType);
   }
+  if (search) {
+    conditions.push("(p.name LIKE ? OR cl.resource_type LIKE ? OR cl.status LIKE ? OR cl.error_message LIKE ?)");
+    const s = `%${search}%`;
+    params.push(s, s, s, s);
+  }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT cl.*, p.name AS project_name,
       r.full_name AS repo_name,
       p.website_url, p.twitter_url, p.github_url
     FROM check_logs cl
-    LEFT JOIN projects p ON p.id = cl.project_id AND p.enabled = 1
+    LEFT JOIN projects p ON p.id = cl.project_id
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
     ${where}
     ORDER BY cl.checked_at DESC, cl.id DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl LEFT JOIN projects p ON p.id = cl.project_id AND p.enabled = 1 ${where}`).get(...params);
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl LEFT JOIN projects p ON p.id = cl.project_id ${where}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
@@ -43,10 +49,11 @@ router.get('/', async (req, res) => {
 router.get('/status-changes', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
+  const search = req.query.search || null;
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = [];
+  const conditions = ['p.enabled = 1'];
   const params = [];
   if (projectId) {
     conditions.push('rsc.project_id = ?');
@@ -56,8 +63,13 @@ router.get('/status-changes', async (req, res) => {
     conditions.push('rsc.resource_type = ?');
     params.push(resourceType);
   }
+  if (search) {
+    conditions.push("(p.name LIKE ? OR rsc.resource_type LIKE ? OR rsc.event_type LIKE ? OR rsc.value LIKE ?)");
+    const s = `%${search}%`;
+    params.push(s, s, s, s);
+  }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed' AND p.enabled = 1` : "WHERE rsc.event_type != 'confirmed' AND p.enabled = 1";
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT rsc.*, p.name AS project_name,
       p.website_url, p.twitter_url, p.github_url
@@ -68,8 +80,7 @@ router.get('/status-changes', async (req, res) => {
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const countWhere = conditions.length ? `WHERE ${conditions.join(' AND ')} AND rsc.event_type != 'confirmed' AND p.enabled = 1` : "WHERE rsc.event_type != 'confirmed' AND p.enabled = 1";
-  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc LEFT JOIN projects p ON p.id = rsc.project_id ${countWhere}`).get(...params);
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
   res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
@@ -87,10 +98,11 @@ router.patch('/status-changes/:id/confirm', async (req, res) => {
 router.get('/alerts', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
+  const search = req.query.search || null;
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = [];
+  const conditions = ['p.enabled = 1'];
   const params = [];
   if (projectId) {
     conditions.push('rsc.project_id = ?');
@@ -100,8 +112,13 @@ router.get('/alerts', async (req, res) => {
     conditions.push('rsc.resource_type = ?');
     params.push(resourceType);
   }
+  if (search) {
+    conditions.push("(p.name LIKE ? OR rsc.resource_type LIKE ? OR rsc.event_type LIKE ? OR rsc.value LIKE ?)");
+    const s = `%${search}%`;
+    params.push(s, s, s, s);
+  }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')} AND p.enabled = 1` : 'WHERE p.enabled = 1';
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value,
       p.website_url, p.twitter_url, p.github_url
