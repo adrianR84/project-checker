@@ -342,6 +342,19 @@ table.compact .details_cell   { min-width: 140px; }
 
 .tabs { display: flex; gap: 2px; margin: 0 20px 0 20px; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border);}
 .tabs .search-input { margin-left: auto; margin-bottom: 0; align-self: center; max-width: 250px; }
+.tabs .refresh-btn {
+  align-self: center;
+  margin-right: 4px;
+  padding: 4px 10px;
+  font-size: 1rem;
+  border-radius: 4px;
+  background: var(--app-bg-hover);
+  color: var(--app-fg);
+  border: 1px solid var(--app-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tabs .refresh-btn:hover { background: var(--app-border); }
 .tab {
   padding: 8px 16px;
   background: none;
