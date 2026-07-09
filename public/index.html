@@ -617,7 +617,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Name *</label>
-                <label data-tooltip="Master switch: disables all checks and alerts are off"><input type="checkbox" v-model="f.project_enabled" /> Project enabled</label>
+                <label data-tooltip="Master switch: disables all checks and alerts are off" data-placement="left"><input type="checkbox" v-model="f.project_enabled" /> Project enabled</label>
               </div>
               <input v-model="f.name" required placeholder="My Project" />
             </div>
@@ -625,8 +625,8 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Website URL</label>
-                <label data-tooltip="Verify page content matches expected value"><input type="checkbox" v-model="f.website_content_check" /> Content Check</label>
-                <label data-tooltip="Perform HTTP checks on this website"><input type="checkbox" v-model="f.website_enabled" /> Enable</label>
+                <label data-tooltip="Verify page content matches expected value" data-placement="top"><input type="checkbox" v-model="f.website_content_check" /> Content Check</label>
+                <label data-tooltip="Perform HTTP checks on this website" data-placement="left"><input type="checkbox" v-model="f.website_enabled" /> Enabled</label>
               </div>
               <input v-model="f.website_url" type="url" placeholder="https://example.com" />
             </div>
@@ -634,7 +634,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label class="muted">GitHub URL (optional)</label>
-                <label data-tooltip="Track repos and monitor commit activity"><input type="checkbox" v-model="f.github_enabled" /> Enable</label>
+                <label data-tooltip="Track repos and monitor commit activity" data-placement="left"><input type="checkbox" v-model="f.github_enabled" /> Enabled</label>
               </div>
               <input v-model="f.github_url" type="url" placeholder="https://github.com/org" />
             </div>
@@ -642,7 +642,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Twitter URL</label>
-                <label data-tooltip="Check Twitter account existence and account suspension"><input type="checkbox" v-model="f.twitter_enabled" /> Enable</label>
+                <label data-tooltip="Check Twitter account existence and account suspension" data-placement="left"><input type="checkbox" v-model="f.twitter_enabled" /> Enabled</label>
               </div>
               <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
             </div>
@@ -658,7 +658,7 @@
               <div class="form-row-header">
                 <label>Token</label>
                 <span v-if="tokenLookupBusy" class="spinner" style="width:1rem;height:1rem;display:inline-block;"></span>
-                <label data-tooltip="Track token price and send alerts"><input type="checkbox" v-model="f.price_enabled" /> Enable</label>
+                <label data-tooltip="Track token price and send alerts" data-placement="left"><input type="checkbox" v-model="f.price_enabled" /> Enabled</label>
               </div>
               <div class="form-row-group">
                 <input v-model="f.token_symbol" placeholder="Symbol (e.g. JTVO)" style="flex: 1;" />
