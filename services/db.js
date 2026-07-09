@@ -87,7 +87,7 @@ async function init() {
       alert_stops TEXT NOT NULL DEFAULT '{"github":1440,"website":1440,"twitter":1440}',
       telegram TEXT NOT NULL DEFAULT '{"bot_token":"","chat_id":"","enabled":false}',
       pushbullet TEXT NOT NULL DEFAULT '{"access_token":"","enabled":false}',
-      price_alerts TEXT NOT NULL DEFAULT '{"alerts":[{"price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}'
+      price_alerts TEXT NOT NULL DEFAULT '{"alerts":[{"price_for":"6h","price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}'
     );
   `);
 

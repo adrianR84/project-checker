@@ -120,6 +120,7 @@ router.put('/', async (req, res) => {
       const merged = {
         alerts: (incoming.alerts && Array.isArray(incoming.alerts))
           ? incoming.alerts.map((a, i) => ({
+              price_for:      typeof a.price_for === 'string' ? a.price_for : cur.alerts[i]?.price_for ?? '6h',
               price_change:   typeof a.price_change === 'number' ? a.price_change : cur.alerts[i]?.price_change ?? 10,
               price_interval: typeof a.price_interval === 'number' ? a.price_interval : cur.alerts[i]?.price_interval ?? 5,
               enabled:        a.enabled === 1 || a.enabled === 0 ? a.enabled : (cur.alerts[i]?.enabled ?? 1),

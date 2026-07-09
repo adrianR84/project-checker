@@ -357,7 +357,7 @@ function add_token_prices_table(db) {
 /** Migration: adds price_alerts column to config if missing. */
 function add_price_alerts_column(db) {
   if (hasColumn(db, 'config', 'price_alerts')) return;
-  db.exec("ALTER TABLE config ADD COLUMN price_alerts TEXT NOT NULL DEFAULT '{\"alerts\":[{\"price_change\":10,\"price_interval\":5,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":25,\"price_interval\":15,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":50,\"price_interval\":60,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1}]}'");
+  db.exec("ALTER TABLE config ADD COLUMN price_alerts TEXT NOT NULL DEFAULT '{\"alerts\":[{\"price_for\":\"6h\",\"price_change\":10,\"price_interval\":5,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_for\":\"6h\",\"price_change\":25,\"price_interval\":15,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_for\":\"6h\",\"price_change\":50,\"price_interval\":60,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1}]}'");
 }
 
 /** Migration: removes price_change_h4 column from token_prices via table rebuild. */
