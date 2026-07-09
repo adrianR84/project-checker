@@ -328,8 +328,23 @@ table.compact .details_cell   { min-width: 140px; }
 .price-table td.num, .price-table th.num { text-align: right; }
 .price-table td.cen, .price-table th.cen { text-align: center; }
 .price-table tr:hover td { background: var(--pico-card-background-color-hover, rgba(255,255,255,0.03)); }
-.price-table .neg { color: #e53e3e; }
-.price-table .pos { color: #38a169; }
+/* Row tint — border all around */
+.price-table tr.row-up   { outline: 1px solid var(--app-ok);   outline-offset: -2px; }
+.price-table tr.row-down { outline: 1px solid var(--app-error); outline-offset: -2px; }
+
+/* Cell tint — up (green), graduated */
+.price-table .cell-up-light   { background-color: color-mix(in srgb, var(--app-ok) 18%, transparent); font-weight: bold; }
+.price-table .cell-up-medium  { background-color: color-mix(in srgb, var(--app-ok) 35%, transparent); font-weight: bold; }
+.price-table .cell-up-strong  { background-color: color-mix(in srgb, var(--app-ok) 55%, transparent); font-weight: bold; }
+
+/* Cell tint — down (red), graduated */
+.price-table .cell-down-light   { background-color: color-mix(in srgb, var(--app-error) 18%, transparent); font-weight: bold; }
+.price-table .cell-down-medium  { background-color: color-mix(in srgb, var(--app-error) 35%, transparent); font-weight: bold; }
+.price-table .cell-down-strong  { background-color: color-mix(in srgb, var(--app-error) 55%, transparent); font-weight: bold; }
+
+/* Text color for neg/pos */
+.price-table .neg { color: var(--app-error); }
+.price-table .pos { color: var(--app-ok);   }
 .price-table a { text-decoration: none; }
 .price-table a:hover { text-decoration: underline; }
 .price-table th { cursor: pointer; user-select: none; }

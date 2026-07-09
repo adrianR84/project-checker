@@ -1261,7 +1261,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in filteredPrices" :key="row.project_id">
+                  <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
                     <td class="hide-sm">
                       <a :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
                          target="_blank" rel="noopener"
@@ -1277,9 +1277,9 @@
                     </td>
                     <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
                     <td class="cen"><b>{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</b></td>
-                    <td :class="['cen', row.price_change_h1 < 0 ? 'neg' : row.price_change_h1 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h1) }}</td>
-                    <td :class="['cen', row.price_change_h6 < 0 ? 'neg' : row.price_change_h6 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h6) }}</td>
-                    <td :class="['cen', row.price_change_h24 < 0 ? 'neg' : row.price_change_h24 > 0 ? 'pos' : '']">{{ fmtPct(row.price_change_h24) }}</td>
+                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h1'] || []]">{{ fmtPct(row.price_change_h1) }}</td>
+                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h6'] || []]">{{ fmtPct(row.price_change_h6) }}</td>
+                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h24'] || []]">{{ fmtPct(row.price_change_h24) }}</td>
                     <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
                     <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                     <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
@@ -1368,6 +1368,7 @@
         /** Load token prices */
         async function loadPrices() {
           pricesLoading.value = true;
+          localSettings.value = window.appSettings?.value || null; // eslint-disable-line
           try {
             prices.value = await api.getTokenPrices();
             // Re-apply active sort after refresh so both rows and th arrow stay
@@ -1445,6 +1446,7 @@
           try {
             const cfg = await api.getSettings();
             window.appSettings.value = cfg;
+            window.dispatchEvent(new Event('settings-updated'));
             pricesRefreshMs = (cfg.ui_refresh_seconds || 30) * 1000;
             // Start prices refresh immediately since Prices is default
             pricesTimer = setInterval(loadPrices, pricesRefreshMs);
@@ -1486,6 +1488,14 @@
           );
         });
 
+        // Local reactive copy of settings, synced via 'settings-updated' event
+        const localSettings = ref(window.appSettings?.value || null);
+        window.addEventListener('settings-updated', () => {
+          localSettings.value = window.appSettings?.value || null; // eslint-disable-line
+        });
+        // Sync immediately in case settings already loaded
+        if (window.appSettings?.value) localSettings.value = window.appSettings.value;
+
         const filteredPrices = computed(() => {
           const q = filter.value.toLowerCase();
           if (!q) return prices.value;
@@ -1494,6 +1504,57 @@
             (p.symbol || '').toLowerCase().includes(q) ||
             (p.chain || '').toLowerCase().includes(q)
           );
+        });
+
+        const priceRowTint = computed(() => {
+          const rows = {};
+          const alerts = localSettings.value?.price_alerts?.alerts || [];
+          for (const row of filteredPrices.value) {
+            let cls = '';
+            for (const a of alerts) {
+              if (!a.enabled) continue;
+              const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
+              const col = `price_change_${norm}`;
+              const val = row[col];
+              if (val == null) continue;
+              if (Math.abs(val) >= a.price_change) {
+                cls = val < 0 ? 'row-down' : 'row-up';
+                break;
+              }
+            }
+            rows[row.project_id] = cls;
+          }
+          return rows;
+        });
+
+        const priceCellTint = computed(() => {
+          const cells = {};
+          const alerts = localSettings.value?.price_alerts?.alerts || [];
+          const suffixes = ['h1', 'h6', 'h24'];
+          for (const row of filteredPrices.value) {
+            for (const suffix of suffixes) {
+              const col = `price_change_${suffix}`;
+              const val = row[col];
+              if (val == null) continue;
+              const key = `${row.project_id}-${col}`;
+              const dir = val < 0 ? 'neg' : 'pos';
+              let tintCls = null;
+              let topThreshold = 0;
+              for (const a of alerts) {
+                if (!a.enabled) continue;
+                // price_for like '6h' -> normalize to suffix 'h6'
+                const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
+                if (norm !== suffix) continue;
+                if (Math.abs(val) >= a.price_change && a.price_change > topThreshold) {
+                  topThreshold = a.price_change;
+                  const intensity = topThreshold === 10 ? 'light' : topThreshold === 25 ? 'medium' : 'strong';
+                  tintCls = `cell-${dir === 'neg' ? 'down' : 'up'}-${intensity}`;
+                }
+              }
+              cells[key] = tintCls ? [dir, tintCls] : [dir];
+            }
+          }
+          return cells;
         });
 
         function applyPriceSort(col, desc) {
@@ -1523,7 +1584,7 @@
           logs, statusChanges, alertLogs, loading, error, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
           logSearch,
-          filter, filteredProjects, filteredPrices,
+          filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint, localSettings,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           pollingPaused, togglePolling, autoRefreshEnabled,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
@@ -2206,6 +2267,7 @@
               })),
             };
             appSettings.value = settings.value;
+            window.dispatchEvent(new Event('settings-updated'));
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -2239,6 +2301,7 @@
           try {
             settings.value = await api.updateSettings(payload);
             appSettings.value = settings.value;
+            window.dispatchEvent(new Event('settings-updated'));
             showToast('Saved.');
           } catch (e) {
             error.value = e.message;
