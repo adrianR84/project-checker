@@ -768,6 +768,7 @@
               if (o.chain !== undefined)   f.value.token_chain   = o.chain;
               if (o.chainId !== undefined) f.value.token_chain   = o.chainId;
               if (o.enabled !== undefined)  f.value.project_enabled = !!o.enabled;
+              if (o.price_enabled !== undefined) f.value.price_enabled = !!o.price_enabled;
             } catch (e) {
               jsonEditError.value = 'Invalid JSON: ' + e.message;
               return;
