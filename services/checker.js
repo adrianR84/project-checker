@@ -172,6 +172,12 @@ async function checkWebsite(url, projectId, contentCheck = true) {
       status = res.ok ? 'ok' : 'error';
     }
 
+    // Record HTTP status changes (e.g. 200 → 404 or 200 → 500) as events
+    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId) {
+      const eventType = res.status === 404 ? 'deleted' : 'changed';
+      recordStatusChange(projectId, 'website', eventType, { bhs: lastHttpStatus, ahs: res.status });
+    }
+
     return {
       status,
       http_status: res.status,
