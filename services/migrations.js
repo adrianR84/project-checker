@@ -292,6 +292,16 @@ function add_website_content_check(db) {
   }
 }
 
+/** Migration: adds price_enabled column to projects if missing. */
+function add_price_enabled(db) {
+  if (hasColumn(db, 'projects', 'price_enabled')) return;
+  try {
+    db.exec('ALTER TABLE projects ADD COLUMN price_enabled INTEGER NOT NULL DEFAULT 1');
+  } catch (err) {
+    console.error(`[${now()}] add_price_enabled failed: ${err.message}`);
+  }
+}
+
 /** Migration: drops unused flat columns log_retention_days, ui_refresh_seconds, compact_activity from config. */
 function drop_old_config_flat_cols(db) {
   const rows = db.prepare("PRAGMA table_info(config)").all();
@@ -457,6 +467,7 @@ async function runMigrations(db) {
   try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_price_alerts_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_price_enabled(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   //try { await add_price_to_check_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   //try { await add_price_to_event_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }

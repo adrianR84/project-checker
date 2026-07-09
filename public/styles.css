@@ -212,7 +212,7 @@ table.compact .details_cell   { min-width: 140px; }
   max-width: 520px;
   width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: visible;
   color: var(--app-text);
 }
 .modal-backdrop {

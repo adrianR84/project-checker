@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
   const projects = await db.prepare(`
     SELECT id, name, website_url, github_url, twitter_url, telegram_url,
            website_enabled, website_content_check, github_enabled, twitter_enabled, telegram_enabled,
-           token, enabled,
+           token, enabled, price_enabled,
            created_at, updated_at
     FROM projects
     ORDER BY id DESC
@@ -102,7 +102,7 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
 // POST /api/projects — create project
 router.post('/', async (req, res) => {
   const { name, website_url, github_url, twitter_url, telegram_url,
-          website_enabled, website_content_check, token, enabled } = req.body || {};
+          website_enabled, website_content_check, token, enabled, price_enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   // Prevent duplicate: same name + website_url
@@ -117,10 +117,10 @@ router.post('/', async (req, res) => {
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
     INSERT INTO projects (name, website_url, github_url, twitter_url, telegram_url,
-      website_enabled, website_content_check, token, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      website_enabled, website_content_check, token, enabled, price_enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
-    website_enabled ? 1 : 0, website_content_check ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, ts, ts);
+    website_enabled ? 1 : 0, website_content_check ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, price_enabled ? 1 : 0, ts, ts);
 
   const projectId = result.lastInsertRowid;
 
@@ -152,7 +152,7 @@ router.put('/:id', async (req, res) => {
 
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
                    'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled',
-                   'token', 'enabled'];
+                   'token', 'enabled', 'price_enabled'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
