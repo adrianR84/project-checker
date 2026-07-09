@@ -220,13 +220,13 @@ async function upsertTokenPrice(projectId, token, data) {
   const ts = now();
   await db.prepare(`
     INSERT INTO token_prices (project_id, symbol, chain, contract, price_usd,
-      price_change_h1, price_change_h4, price_change_h6, price_change_h24,
+      price_change_h1, price_change_h6, price_change_h24,
       liquidity_usd, volume_h24, market_cap, pair_created_at, fetched_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(project_id) DO UPDATE SET
       symbol = excluded.symbol, chain = excluded.chain, contract = excluded.contract,
       price_usd = excluded.price_usd, price_change_h1 = excluded.price_change_h1,
-      price_change_h4 = excluded.price_change_h4, price_change_h6 = excluded.price_change_h6,
+      price_change_h6 = excluded.price_change_h6,
       price_change_h24 = excluded.price_change_h24, liquidity_usd = excluded.liquidity_usd,
       volume_h24 = excluded.volume_h24, market_cap = excluded.market_cap,
       pair_created_at = excluded.pair_created_at, fetched_at = excluded.fetched_at
@@ -237,7 +237,6 @@ async function upsertTokenPrice(projectId, token, data) {
     token.contract,
     pair.priceUsd || null,
     pair.priceChange?.h1 || null,
-    pair.priceChange?.h4 || null,
     pair.priceChange?.h6 || null,
     pair.priceChange?.h24 || null,
     pair.liquidity?.usd || null,

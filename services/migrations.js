@@ -342,7 +342,6 @@ function add_token_prices_table(db) {
       contract TEXT,
       price_usd REAL,
       price_change_h1 REAL,
-      price_change_h4 REAL,
       price_change_h6 REAL,
       price_change_h24 REAL,
       liquidity_usd REAL,
@@ -359,6 +358,34 @@ function add_token_prices_table(db) {
 function add_price_alerts_column(db) {
   if (hasColumn(db, 'config', 'price_alerts')) return;
   db.exec("ALTER TABLE config ADD COLUMN price_alerts TEXT NOT NULL DEFAULT '{\"alerts\":[{\"price_change\":10,\"price_interval\":5,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":25,\"price_interval\":15,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1},{\"price_change\":50,\"price_interval\":60,\"enabled\":1,\"telegram\":1,\"pushbullet\":1,\"log\":1}]}'");
+}
+
+/** Migration: removes price_change_h4 column from token_prices via table rebuild. */
+function drop_price_change_h4_from_token_prices(db) {
+  if (!hasColumn(db, 'token_prices', 'price_change_h4')) return;
+  console.log(`[${now()}] Migration: dropping price_change_h4 from token_prices`);
+  db.exec(`
+    ALTER TABLE token_prices RENAME TO _tp_h4_old;
+    CREATE TABLE token_prices (
+      project_id INTEGER PRIMARY KEY,
+      symbol TEXT,
+      chain TEXT,
+      contract TEXT,
+      price_usd REAL,
+      price_change_h1 REAL,
+      price_change_h6 REAL,
+      price_change_h24 REAL,
+      liquidity_usd REAL,
+      volume_h24 REAL,
+      market_cap REAL,
+      pair_created_at TEXT,
+      fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    INSERT INTO token_prices (project_id, symbol, chain, contract, price_usd, price_change_h1, price_change_h6, price_change_h24, liquidity_usd, volume_h24, market_cap, pair_created_at, fetched_at)
+      SELECT project_id, symbol, chain, contract, price_usd, price_change_h1, price_change_h6, price_change_h24, liquidity_usd, volume_h24, market_cap, pair_created_at, fetched_at FROM _tp_h4_old;
+    DROP TABLE _tp_h4_old;
+  `);
 }
 
 /** Migration: adds 'price' to resource_type CHECK in check_logs via table rebuild. */
@@ -474,6 +501,7 @@ async function runMigrations(db) {
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await drop_price_change_h4_from_token_prices(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

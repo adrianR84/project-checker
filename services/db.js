@@ -153,7 +153,6 @@ async function init() {
       contract TEXT,
       price_usd REAL,
       price_change_h1 REAL,
-      price_change_h4 REAL,
       price_change_h6 REAL,
       price_change_h24 REAL,
       liquidity_usd REAL,
