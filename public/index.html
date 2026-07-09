@@ -1296,7 +1296,7 @@
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
               <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
               <button :class="['tab', logTab === 'alert-logs' ? 'active' : '']" @click="logTab = 'alert-logs'">Alert Logs</button>
-              <button class="refresh-btn" @click="logTab === 'check-logs' ? loadLogs(1) : logTab === 'status-changes' ? loadStatusChanges(1) : loadAlertLogs(1)" aria-label="Refresh current tab">↻</button>
+              <button class="refresh-btn" data-tooltip="Refresh data from current tab" @click="logTab === 'check-logs' ? loadLogs(1) : logTab === 'status-changes' ? loadStatusChanges(1) : loadAlertLogs(1)" aria-label="Refresh current tab">↻</button>
               <input class="search-input" type="search" v-model="logSearch" placeholder="Search logs…" aria-label="Search logs" />
             </div>
             <article>
