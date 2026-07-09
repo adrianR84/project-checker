@@ -1296,7 +1296,8 @@
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
               <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
               <button :class="['tab', logTab === 'alert-logs' ? 'active' : '']" @click="logTab = 'alert-logs'">Alert Logs</button>
-              <button class="refresh-btn" data-tooltip="Refresh data from current tab" @click="logTab === 'check-logs' ? loadLogs(1) : logTab === 'status-changes' ? loadStatusChanges(1) : loadAlertLogs(1)" aria-label="Refresh current tab">↻</button>
+              <button class="refresh-btn" data-tooltip="Refresh data for current tab" @click="logTab === 'check-logs' ? loadLogs(1) : logTab === 'status-changes' ? loadStatusChanges(1) : loadAlertLogs(1)" aria-label="Refresh current tab">↻</button>
+              <button v-if="autoRefreshEnabled" class="refresh-btn" :data-tooltip="pollingPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'" @click="togglePolling" :aria-label="pollingPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'">{{ pollingPaused ? '▶' : '⏸' }}</button>
               <input class="search-input" type="search" v-model="logSearch" placeholder="Search logs…" aria-label="Search logs" />
             </div>
             <article>
@@ -1421,6 +1422,18 @@
         
         let pollTimer = null;
         let pricesTimer = null;
+        const pollingPaused = ref(false);
+        const autoRefreshEnabled = ref(false);
+
+        function togglePolling() {
+          if (pollingPaused.value) {
+            pollingPaused.value = false;
+            pollTimer = setInterval(load, (window.appSettings.value?.ui_refresh_seconds || 30) * 1000);
+          } else {
+            pollingPaused.value = true;
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          }
+        }
 
         onMounted(async () => {
           load();
@@ -1435,6 +1448,7 @@
             // Start prices refresh immediately since Prices is default
             pricesTimer = setInterval(loadPrices, pricesRefreshMs);
             if (cfg.ui_refresh_seconds) {
+              autoRefreshEnabled.value = true;
               pollTimer = setInterval(() => { load(); }, cfg.ui_refresh_seconds * 1000);
             }
           } catch { /* auto-refresh disabled */ }
@@ -1510,6 +1524,7 @@
           logSearch,
           filter, filteredProjects, filteredPrices,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
+          pollingPaused, togglePolling, autoRefreshEnabled,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
         };
       },
