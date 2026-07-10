@@ -3,7 +3,23 @@ const cron = require('node-cron');
 const db = require('./db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange } = require('./checker');
 const { fetchReposForOwner } = require('./github');
-const { sendAlert } = require('./notifications');
+const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY } = require('./notifications');
+
+// ─── Price alert throttle helpers ───────────────────────────────────────────────
+
+async function getTokenPricesAlert(projectId, priceChange) {
+  return db.prepare(
+    'SELECT created_at FROM token_prices_alerts WHERE project_id = ? AND price_change = ?'
+  ).get(projectId, priceChange);
+}
+
+async function upsertTokenPricesAlert(projectId, priceChange, createdAt) {
+  return db.prepare(`
+    INSERT INTO token_prices_alerts (project_id, price_change, created_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(project_id, price_change) DO UPDATE SET created_at = excluded.created_at
+  `).run(projectId, priceChange, createdAt);
+}
 
 const now = () => new Date().toISOString();
 
@@ -247,6 +263,102 @@ async function upsertTokenPrice(projectId, token, data) {
   );
 }
 
+/** Sends price alert notifications for a single project. Gated by price_enabled. */
+async function evaluatePriceAlerts(projectId, projectName) {
+  const priceAlerts = await db.config.getPriceAlerts();
+  if (!priceAlerts?.alerts?.length) return;
+
+  const priceRow = await db.prepare(
+    'SELECT price_usd, price_change_h1, price_change_h6, price_change_h24 FROM token_prices WHERE project_id = ?'
+  ).get(projectId);
+  if (!priceRow) return;
+
+  const cols = { h1: priceRow.price_change_h1, h6: priceRow.price_change_h6, h24: priceRow.price_change_h24 };
+
+  // Build candidates: all enabled alert slots where threshold is crossed
+  const candidates = [];
+  for (const alert of priceAlerts.alerts) {
+    if (!alert.enabled) continue;
+    const suffix = alert.price_for; // '1h', '6h', '24h'
+    const val = cols[suffix];
+    if (val == null) continue;
+    if (Math.abs(val) < alert.price_change) continue;
+    candidates.push({ alert, val });
+  }
+
+  if (!candidates.length) return;
+
+  // Winning slot: highest threshold crossed
+  const winning = candidates.reduce((best, c) => c.alert.price_change > best.alert.price_change ? c : best);
+
+  // Throttle check
+  const prior = await getTokenPricesAlert(projectId, winning.alert.price_change);
+  if (prior) {
+    const elapsed = (Date.now() - new Date(prior.created_at).getTime()) / 1000;
+    if (elapsed < winning.alert.price_interval * 60) return;
+  }
+
+  // Determine direction and tier
+  const direction = winning.val < 0 ? 'down' : 'up';
+  const tier = INTENSITY[getTierIndex(winning.alert.price_change, priceAlerts.alerts)];
+
+  // Fire to enabled channels
+  const [tgCfg, pbCfg] = await Promise.all([db.config.getTelegram(), db.config.getPushbullet()]);
+  const plain = formatPriceAlert(projectName, priceRow.price_usd, winning.val, direction, tier);
+  const html = formatPriceAlertHtml(projectName, priceRow.price_usd, winning.val, direction, tier);
+
+  if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id && winning.alert.telegram) {
+    const r = await (async () => {
+      const url = `https://api.telegram.org/bot${tgCfg.bot_token}/sendMessage`;
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: tgCfg.chat_id, text: html, parse_mode: 'HTML', disable_web_page_preview: true })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` };
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    })();
+    if (!r.ok) console.error(`[${now()}] Price Alert Telegram failed: ${r.error}`);
+  }
+
+  if (pbCfg?.enabled && pbCfg.access_token && winning.alert.pushbullet) {
+    const r = await (async () => {
+      try {
+        const res = await fetch('https://api.pushbullet.com/v2/pushes', {
+          method: 'POST',
+          headers: { 'Access-Token': pbCfg.access_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'note', title: `Price Alert: ${projectName}`, body: plain })
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    })();
+    if (!r.ok) console.error(`[${now()}] Price Alert Pushbullet failed: ${r.error}`);
+  }
+
+  // Persist throttle row
+  await upsertTokenPricesAlert(projectId, winning.alert.price_change, now());
+}
+
+/** Runs price alert evaluation for all projects with enabled=1 and price_enabled=1, scheduled every 1 min. */
+async function runPriceAlertTick() {
+  const projects = await db.prepare('SELECT id, name FROM projects WHERE enabled = 1 and price_enabled = 1').all();
+  if (!projects.length) return;
+  scheduleLog(`[${now()}] Scheduler: price alert tick — ${projects.length} projects`);
+  for (const p of projects) {
+    await evaluatePriceAlerts(p.id, p.name).catch(err =>
+      console.error(`[${now()}] evaluatePriceAlerts failed for project ${p.id}: ${err.message}`)
+    );
+  }
+}
+
 /** Rebuilds all cron schedules from current config. Only rebuilds if any expression changed.
     Also schedules: daily log purge (midnight) and alert tick (every 1 min, interval-throttled). */
 async function reschedule() {
@@ -298,6 +410,11 @@ async function reschedule() {
   const alertJob = cron.schedule('* * * * *', () => { runAlertTick().catch(err => console.error(err)); });
   jobs.push(alertJob);
   scheduleLog(`[${now()}] Scheduler: alert tick job → "* * * * *" (1-min grid)`);
+
+  // Price alert tick: every minute (1-min grid, throttled per-(project, threshold) inside evaluatePriceAlerts)
+  const priceAlertJob = cron.schedule('* * * * *', () => { runPriceAlertTick().catch(err => console.error(err)); });
+  jobs.push(priceAlertJob);
+  scheduleLog(`[${now()}] Scheduler: price alert tick job → "* * * * *" (1-min grid)`);
 
   // Token price tick: every TOKEN_CHECK_INTERVAL_MS ms via setInterval (not cron, for rate-limit control)
   clearInterval(tokenPriceInterval);

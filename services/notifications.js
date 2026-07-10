@@ -144,4 +144,33 @@ async function sendAlert(event, projectName) {
   }
 }
 
-module.exports = { sendAlert, formatAlert, formatAlertHtml, sendTelegramMessage, pushPushbulletNote };
+// Maps threshold → tier index. Sorted descending: [largest]→STRONG, [middle]→MEDIUM, [smallest]→LIGHT.
+function getTierIndex(priceChange, alerts) {
+  const thresholds = [...new Set(alerts.map(a => a.price_change))].sort((a, b) => b - a);
+  const idx = thresholds.indexOf(priceChange);
+  return Math.min(idx, 2); // cap at 2 (STRONG)
+}
+
+const INTENSITY = ['light', 'medium', 'strong'];
+
+// Plain (Pushbullet)
+function formatPriceAlert(projectName, price, priceChange, direction, tier) {
+  const dirEmoji = direction === 'down' ? '📉' : '🚀';
+  const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
+  const sign     = priceChange >= 0 ? '+' : '';
+  return `🟠 ${dirEmoji} ${projectName} [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
+}
+
+// HTML (Telegram)
+function formatPriceAlertHtml(projectName, price, priceChange, direction, tier) {
+  const dirEmoji = direction === 'down' ? '📉' : '🚀';
+  const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
+  const sign     = priceChange >= 0 ? '+' : '';
+  return `🟠 ${dirEmoji} <b>${projectName}</b> [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
+}
+
+module.exports = {
+  sendAlert, formatAlert, formatAlertHtml,
+  sendTelegramMessage, pushPushbulletNote,
+  formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY
+};

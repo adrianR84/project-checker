@@ -164,6 +164,15 @@ async function init() {
     );
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS token_prices_alerts (
+      project_id INTEGER NOT NULL,
+      price_change REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (project_id, price_change)
+    );
+  `);
+
   // Run migrations
   const { runMigrations } = require('./migrations');
   await runMigrations(database);

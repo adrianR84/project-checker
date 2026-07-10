@@ -354,6 +354,20 @@ function add_token_prices_table(db) {
   `);
 }
 
+/** Migration: creates token_prices_alerts table if missing. */
+function add_token_prices_alerts_table(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='token_prices_alerts'").get();
+  if (row) return;
+  db.exec(`
+    CREATE TABLE token_prices_alerts (
+      project_id INTEGER NOT NULL,
+      price_change REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (project_id, price_change)
+    )
+  `);
+}
+
 /** Migration: adds price_alerts column to config if missing. */
 function add_price_alerts_column(db) {
   if (hasColumn(db, 'config', 'price_alerts')) return;
@@ -473,6 +487,7 @@ async function runMigrations(db) {
   try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { await add_token_prices_alerts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };
