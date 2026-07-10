@@ -116,9 +116,7 @@ function formatAlertHtml(event, projectName) {
   return [
     `<b>🔔 ${projectName ?? 'Project'}</b>`,
     `<b>Type:</b> ${resource_type} / <i>${event_type}</i>`,
-    '',
     detail,
-    '',
     `<code>${ts}</code>`,
   ].join('\n');
 }

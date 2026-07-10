@@ -466,28 +466,28 @@ function add_notification_config_cols(db) {
 
 /** Runs all idempotent migrations sequentially, logging errors but never throwing. */
 async function runMigrations(db) {
-  try { await rename_rsc_to_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await fix_alert_logs_fk(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_repos_status(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_repos_latest_tag(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await convert_check_logs_resource_id_to_integer(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await fix_check_logs_status_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await fix_rsc_event_type_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_rsc_confirmed_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_alert_logs_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await drop_redundant_alert_logs_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await fix_alert_logs_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_price_alerts_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_price_enabled(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await rename_rsc_to_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await fix_alert_logs_fk(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_repos_status(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_repos_latest_tag(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await convert_check_logs_resource_id_to_integer(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await fix_check_logs_status_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await fix_rsc_event_type_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_rsc_confirmed_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_alert_logs_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await drop_redundant_alert_logs_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await fix_alert_logs_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await migrate_config_json_groups(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_website_content_check(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_price_alerts_column(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_price_enabled(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   //try { await add_price_to_check_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   //try { await add_price_to_event_logs_resource_type(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { await add_token_prices_alerts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_notification_config_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await drop_old_config_flat_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  // try { await add_token_prices_alerts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };
