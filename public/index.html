@@ -36,6 +36,9 @@
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
 
+    /** Shared ref for edit navigation: set by ProjectCard, watched by ProjectsPage */
+    const editBus = ref(null);
+
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
        live-server proxies /api → Express on port 3000 during development.
@@ -961,7 +964,9 @@
 
           <!-- Card header: project name only -->
           <header class="head">
-            <h2 class="name">{{ project.name }}</h2>
+            <h2 class="name" @click="openProjectEdit">
+              {{ project.name }}
+            </h2>
           </header>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
@@ -1151,6 +1156,11 @@
           }
         }
 
+        function openProjectEdit() {
+          editBus.value = props.project;
+          window.location.hash = '#/projects';
+        }
+
         return {
           busy,
           website, github, twitter,
@@ -1161,6 +1171,7 @@
           refreshAll,
           relativeTime,
           statusClass,
+          openProjectEdit,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
           appSettings: sharedSettings,
@@ -1853,6 +1864,7 @@
                 website_content_check:  hasWebsite,
                 token:                  tok,
                 enabled:                item.enabled !== undefined ? (item.enabled ? 1 : 0) : 1,
+                price_enabled:          item.price_enabled !== undefined ? (item.price_enabled ? 1 : 0) : 1,
               });
               ok++;
               if (item.github) lastGithubImport.value = created;
@@ -1906,6 +1918,9 @@
         }
 
         onMounted(load);
+
+        // Watch editBus so we catch edits triggered from other pages (e.g. card click on Activity)
+        watch(editBus, (p) => { if (p) openEdit(p); }, { immediate: true });
 
         function tok(p) {
           return p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};

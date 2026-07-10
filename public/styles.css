@@ -278,7 +278,7 @@ table.compact .details_cell   { min-width: 140px; }
 .head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 0px; }
 .repos-head { margin-bottom: 8px; overflow: visible; }
 
-.name { font-size: 1rem; font-weight: 600; margin: 0; }
+.name { font-size: 1rem; font-weight: 600; margin: 0; cursor: pointer;}
 
 .repos-section { border-top: 1px solid var(--app-border); padding-top: 12px; }
 .repos-scroll  { max-height: 200px; overflow-y: auto; }
