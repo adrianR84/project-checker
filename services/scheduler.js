@@ -269,7 +269,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
   if (!priceAlerts?.alerts?.length) return;
 
   const priceRow = await db.prepare(
-    'SELECT price_usd, price_change_h1, price_change_h6, price_change_h24 FROM token_prices WHERE project_id = ?'
+    'SELECT price_usd, chain, contract, price_change_h1, price_change_h6, price_change_h24 FROM token_prices WHERE project_id = ?'
   ).get(projectId);
   if (!priceRow) return;
 
@@ -306,7 +306,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
   // Fire to enabled channels
   const [tgCfg, pbCfg] = await Promise.all([db.config.getTelegram(), db.config.getPushbullet()]);
   const plain = formatPriceAlert(projectName, priceRow.price_usd, winning.val, direction, tier);
-  const html = formatPriceAlertHtml(projectName, priceRow.price_usd, winning.val, direction, tier);
+  const html = formatPriceAlertHtml(projectName, priceRow.price_usd, winning.val, direction, tier, priceRow.chain, priceRow.contract);
 
   if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id && winning.alert.telegram) {
     const r = await (async () => {

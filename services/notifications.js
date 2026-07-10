@@ -153,21 +153,32 @@ function getTierIndex(priceChange, alerts) {
 }
 
 const INTENSITY = ['light', 'medium', 'strong'];
+const ANCHOR = {
+  'up-strong':   '🟢',
+  'up-medium':   '🔵',
+  'up-light':    '🟡',
+  'down-strong': '🔴',
+  'down-medium': '🟠',
+  'down-light':  '🟡',
+};
 
 // Plain (Pushbullet)
 function formatPriceAlert(projectName, price, priceChange, direction, tier) {
   const dirEmoji = direction === 'down' ? '🔻' : '🚀';
   const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
   const sign     = priceChange >= 0 ? '+' : '';
-  return `🟠 ${dirEmoji} ${projectName} [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
+  return `${ANCHOR[direction + '-' + tier]} ${dirEmoji} ${projectName} [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
 }
 
-// HTML (Telegram)
-function formatPriceAlertHtml(projectName, price, priceChange, direction, tier) {
+// HTML (Telegram) — chain and contract are optional; price becomes a DexScreener link when provided
+function formatPriceAlertHtml(projectName, price, priceChange, direction, tier, chain, contract) {
   const dirEmoji = direction === 'down' ? '🔻' : '🚀';
   const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
   const sign     = priceChange >= 0 ? '+' : '';
-  return `🟠 ${dirEmoji} <b>${projectName}</b> [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
+  const priceStr = (chain && contract)
+    ? `<a href="https://dexscreener.com/${chain}/${contract}">$${price}</a>`
+    : `$${price}`;
+  return `${ANCHOR[direction + '-' + tier]} ${dirEmoji} <b>${projectName}</b> [${priceStr}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
 }
 
 module.exports = {
