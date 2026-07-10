@@ -2024,7 +2024,6 @@
                   <span data-tooltip="Notification sent every set minutes"><span class="upp">Interval (min)</span></span>
                   <span data-tooltip="Send Telegram notification"><span class="upp">Telegram</span></span>
                   <span data-tooltip="Send Pushbullet notification"><span class="upp">Pushbullet</span></span>
-                  <span data-tooltip="Log the alert event"><span class="upp">Log</span></span>
                   <span data-tooltip="Enable or disable this alert slot"><span class="upp">Enabled</span></span>
                 </div>
                 <div v-for="(alert, i) in form.price_alerts" :key="i" class="price-alert-row" :class="{ 'row-disabled': !alert._enabled }">
@@ -2038,7 +2037,6 @@
                   <input v-model.number="alert.price_interval" type="number" min="1" max="10080" :disabled="!alert._enabled" />
                   <label class="switch"><input type="checkbox" v-model="alert._telegram" @change="alert.telegram = alert._telegram ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
                   <label class="switch"><input type="checkbox" v-model="alert._pushbullet" @change="alert.pushbullet = alert._pushbullet ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
-                  <label class="switch"><input type="checkbox" v-model="alert._log" @change="alert.log = alert._log ? 1 : 0" :disabled="!alert._enabled" /><span class="slider"></span></label>
                   <label class="switch"><input type="checkbox" v-model="alert._enabled" @change="alert.enabled = alert._enabled ? 1 : 0" /><span class="slider"></span></label>
                 </div>
               </div>
@@ -2227,9 +2225,9 @@
           pushbullet_enabled:       false,
           pushbullet_access_token:  '',
           price_alerts: [
-            { price_for: '6h', price_change: 10, price_interval: 5, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
-            { price_for: '6h', price_change: 25, price_interval: 15, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
-            { price_for: '6h', price_change: 50, price_interval: 60, enabled: 1, telegram: 1, pushbullet: 1, log: 1, _enabled: true, _telegram: true, _pushbullet: true, _log: true },
+            { price_for: '6h', price_change: 10, price_interval: 5, enabled: 1, telegram: 1, pushbullet: 1, _enabled: true, _telegram: true, _pushbullet: true },
+            { price_for: '6h', price_change: 25, price_interval: 15, enabled: 1, telegram: 1, pushbullet: 1, _enabled: true, _telegram: true, _pushbullet: true },
+            { price_for: '6h', price_change: 50, price_interval: 60, enabled: 1, telegram: 1, pushbullet: 1, _enabled: true, _telegram: true, _pushbullet: true },
           ],
         });
         const loading   = ref(true);
@@ -2291,11 +2289,9 @@
                 enabled:        a.enabled ?? 1,
                 telegram:       a.telegram ?? 1,
                 pushbullet:     a.pushbullet ?? 0,
-                log:            a.log ?? 1,
                 _enabled:    !!(a.enabled ?? 1),
                 _telegram:   !!(a.telegram ?? 1),
                 _pushbullet: !!(a.pushbullet ?? 0),
-                _log:        !!(a.log ?? 1),
               })),
             };
             sharedSettings.value = settings.value;
@@ -2392,7 +2388,6 @@
                 enabled:        a.enabled,
                 telegram:       a.telegram,
                 pushbullet:     a.pushbullet,
-                log:            a.log,
               })),
             },
           });

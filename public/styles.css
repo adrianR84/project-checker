@@ -405,7 +405,7 @@ table.compact .details_cell   { min-width: 140px; }
 .price-alerts-header,
 .price-alert-row {
   display: grid;
-  grid-template-columns: 40px 80px 1fr 1fr 80px 80px 40px 60px;
+  grid-template-columns: 40px 80px 1fr 1fr 80px 80px 60px;
   align-items: center;
   gap: 8px;
 }
