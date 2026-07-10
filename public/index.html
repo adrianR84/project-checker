@@ -1238,13 +1238,17 @@
                     <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
                     <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
-                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
+                    <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
-                    <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
+                    <th class="hide-sm" :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                     <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
                     <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
                     <th class="hide-sm" :class="['sortable', priceSort.col === 'chain' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('chain')">Chain</th>
+                    <th class="cen" title="Track price changes">
+                      <span class="sr-only">Track</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1264,13 +1268,16 @@
                     </td>
                     <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
                     <td class="cen"><b>{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</b></td>
-                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h1'] || []]">{{ fmtPct(row.price_change_h1) }}</td>
-                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h6'] || []]">{{ fmtPct(row.price_change_h6) }}</td>
-                    <td :class="['cen', priceCellTint[row.project_id + '-price_change_h24'] || []]">{{ fmtPct(row.price_change_h24) }}</td>
-                    <td class="num">{{ fmtShortNum(row.liquidity_usd) }}</td>
+                    <td class="cen hide-sm" :class="priceCellTint[row.project_id + '-price_change_h1'] || []">{{ fmtPct(row.price_change_h1) }}</td>
+                    <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h6'] || []">{{ fmtPct(row.price_change_h6) }}</td>
+                    <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h24'] || []">{{ fmtPct(row.price_change_h24) }}</td>
+                    <td class="num hide-sm">{{ fmtShortNum(row.liquidity_usd) }}</td>
                     <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                     <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
                     <td class="hide-sm">{{ row.chain || '—' }}</td>
+                    <td class="cen">
+                      <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1510,10 +1517,23 @@
         // Intensity tier: 1st matching alert → light, 2nd → medium, 3rd+ → strong
         const INTENSITY = ['light', 'medium', 'strong'];
 
+        const togglePriceEnabled = async (row, evt) => {
+          const newVal = evt.target.checked ? 1 : 0;
+          const prev = row.price_enabled;
+          row.price_enabled = newVal;
+          try {
+            await api.updateProject(row.project_id, { price_enabled: newVal });
+          } catch (e) {
+            row.price_enabled = prev;
+            console.error('Failed to update price_enabled:', e);
+          }
+        };
+
         const priceRowTint = computed(() => {
           const rows = {};
           const bySuffix = alertsBySuffix.value;
           for (const row of filteredPrices.value) {
+            if (!row.price_enabled) { rows[row.project_id] = ''; continue; }
             let cls = '';
             outer:
             for (const [suffix, alerts] of Object.entries(bySuffix)) {
@@ -1543,10 +1563,14 @@
               if (val == null) continue;
               const key = `${row.project_id}-${col}`;
               const dir = val < 0 ? 'neg' : 'pos';
-              const matching = bySuffix[suffix].filter(a => Math.abs(val) >= a.price_change);
-              if (matching.length) {
-                const tier = Math.min(matching.length - 1, 2);
-                cells[key] = [dir, `cell-${dir === 'neg' ? 'down' : 'up'}-${INTENSITY[tier]}`];
+              if (row.price_enabled) {
+                const matching = bySuffix[suffix].filter(a => Math.abs(val) >= a.price_change);
+                if (matching.length) {
+                  const tier = Math.min(matching.length - 1, 2);
+                  cells[key] = [dir, `cell-${dir === 'neg' ? 'down' : 'up'}-${INTENSITY[tier]}`];
+                } else {
+                  cells[key] = [dir];
+                }
               } else {
                 cells[key] = [dir];
               }
@@ -1584,7 +1608,7 @@
           logSearch,
           filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
-          pollingPaused, togglePolling, autoRefreshEnabled,
+          pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
         };
       },
