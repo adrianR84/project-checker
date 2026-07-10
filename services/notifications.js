@@ -156,7 +156,7 @@ const INTENSITY = ['light', 'medium', 'strong'];
 
 // Plain (Pushbullet)
 function formatPriceAlert(projectName, price, priceChange, direction, tier) {
-  const dirEmoji = direction === 'down' ? '📉' : '🚀';
+  const dirEmoji = direction === 'down' ? '🔻' : '🚀';
   const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
   const sign     = priceChange >= 0 ? '+' : '';
   return `🟠 ${dirEmoji} ${projectName} [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
@@ -164,7 +164,7 @@ function formatPriceAlert(projectName, price, priceChange, direction, tier) {
 
 // HTML (Telegram)
 function formatPriceAlertHtml(projectName, price, priceChange, direction, tier) {
-  const dirEmoji = direction === 'down' ? '📉' : '🚀';
+  const dirEmoji = direction === 'down' ? '🔻' : '🚀';
   const dirLabel  = direction === 'down' ? 'Dump' : 'Pump';
   const sign     = priceChange >= 0 ? '+' : '';
   return `🟠 ${dirEmoji} <b>${projectName}</b> [$${price}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
