@@ -344,8 +344,9 @@ async function evaluatePriceAlerts(projectId, projectName) {
     if (!r.ok) console.error(`[${now()}] Price Alert Pushbullet failed: ${r.error}`);
   }
 
+  //console.log(`[${now()}] Price alert FIRED: ${projectName} [$${priceRow.price_usd}] [${direction.toUpperCase()}-${tier.toUpperCase()}]: (${winning.val >= 0 ? '+' : ''}${winning.val.toFixed(2)}%)`);
+  
   // Persist throttle row
-  console.log(`[${now()}] Price alert FIRED: ${projectName} [$${priceRow.price_usd}] [${direction.toUpperCase()}-${tier.toUpperCase()}]: (${winning.val >= 0 ? '+' : ''}${winning.val.toFixed(2)}%)`);
   await upsertTokenPricesAlert(projectId, winning.alert.price_change, now());
 }
 
