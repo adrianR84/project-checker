@@ -176,7 +176,7 @@ function formatPriceAlertHtml(projectName, price, priceChange, direction, tier, 
   const priceStr = (chain && contract)
     ? `<a href="https://dexscreener.com/${chain}/${contract}">$${price}</a>`
     : `$${price}`;
-  return `${ANCHOR[direction + '-' + tier]} ${dirEmoji} <b>${projectName}</b> [${priceStr}] [${dirLabel}-${tier}]: (${sign}${priceChange.toFixed(2)}%)`;
+  return `${ANCHOR[direction + '-' + tier]} ${dirEmoji} <b>${projectName}</b> [${priceStr}] [${dirLabel}-${tier}]: (<b>${sign}${priceChange.toFixed(2)}%</b>)`;
 }
 
 module.exports = {
