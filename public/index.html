@@ -31,7 +31,10 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition } = Vue;
+
+    // Shared reactive settings — single source of truth for all components
+    const sharedSettings = ref(null);
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -91,10 +94,6 @@
 
     // Expose globally so the template can call api.* after we return api: window.api
     window.api = api;
-
-    // Shared settings ref accessible across all components
-    const appSettings = ref(null);
-    window.appSettings = appSettings;
 
     // Fear & Greed Index — fetched once at startup, displayed in navbar
     const fearIndex = ref(null);
@@ -219,10 +218,18 @@
     }
 
     /** Return the URL for a log entry's resource (website, twitter, or github repo) */
-    function resourceUrl(log) {
+    function resourceUrl(log, jsonField = null) {
       if (log.resource_type === 'website' && log.website_url) return log.website_url;
       if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
-      if (log.resource_type === 'github' && log.repo_name) return 'https://github.com/' + log.repo_name;
+      if (log.resource_type === 'github') {
+        const raw = jsonField ? log[jsonField] : log.repo_name;
+        if (!raw) return null;
+        if (jsonField) {
+          try { const v = JSON.parse(raw); if (v.repo_name) return 'https://github.com/' + v.repo_name; } catch (_) {}
+        } else {
+          return 'https://github.com/' + raw;
+        }
+      }
       return null;
     }
 
@@ -433,28 +440,8 @@
           return value;
         } catch (_) { return value; }
       },
-      scResourceUrl(log) {
-        if (log.resource_type === 'website' && log.website_url) return log.website_url;
-        if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
-        if (log.resource_type === 'github' && log.value) {
-          try {
-            const v = JSON.parse(log.value);
-            if (v.repo_name) return 'https://github.com/' + v.repo_name;
-          } catch (_) {}
-        }
-        return null;
-      },
-      alertResourceUrl(log) {
-        if (log.resource_type === 'website' && log.website_url) return log.website_url;
-        if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
-        if (log.resource_type === 'github' && log.change_value) {
-          try {
-            const v = JSON.parse(log.change_value);
-            if (v.repo_name) return 'https://github.com/' + v.repo_name;
-          } catch (_) {}
-        }
-        return null;
-      }
+      scResourceUrl(log)    { return resourceUrl(log, 'value'); },
+      alertResourceUrl(log) { return resourceUrl(log, 'change_value'); },
     };
 
     /* ── StatusChangeList component ────────────────────────────────────────────
@@ -1176,7 +1163,7 @@
           statusClass,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
-          appSettings: window.appSettings,
+          appSettings: sharedSettings,
         };
       },
     };
@@ -1368,13 +1355,21 @@
         /** Load token prices */
         async function loadPrices() {
           pricesLoading.value = true;
-          localSettings.value = window.appSettings?.value || null; // eslint-disable-line
           try {
-            prices.value = await api.getTokenPrices();
-            // Re-apply active sort after refresh so both rows and th arrow stay
+            let fresh = await api.getTokenPrices();
             if (priceSort.value.col) {
-              applyPriceSort(priceSort.value.col, priceSort.value.desc);
+              const col = priceSort.value.col, desc = priceSort.value.desc;
+              const num = v => v == null || isNaN(v) ? -Infinity : parseFloat(v);
+              const str = v => (v == null ? '' : String(v)).toLowerCase();
+              fresh = [...fresh].sort((a, b) => {
+                const va = a[col], vb = b[col];
+                const cmp = ['project_name', 'symbol', 'chain'].includes(col)
+                  ? (str(va) < str(vb) ? -1 : str(va) > str(vb) ? 1 : 0)
+                  : (num(va) < num(vb) ? -1 : num(va) > num(vb) ? 1 : 0);
+                return desc ? -cmp : cmp;
+              });
             }
+            prices.value = fresh;
           } catch (e) {
             console.error(e);
           } finally {
@@ -1430,7 +1425,7 @@
         function togglePolling() {
           if (pollingPaused.value) {
             pollingPaused.value = false;
-            pollTimer = setInterval(load, (window.appSettings.value?.ui_refresh_seconds || 30) * 1000);
+            pollTimer = setInterval(load, (sharedSettings.value?.ui_refresh_seconds || 30) * 1000);
           } else {
             pollingPaused.value = true;
             if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -1445,8 +1440,7 @@
           loadAlertLogs(1);
           try {
             const cfg = await api.getSettings();
-            window.appSettings.value = cfg;
-            window.dispatchEvent(new Event('settings-updated'));
+            sharedSettings.value = cfg;
             pricesRefreshMs = (cfg.ui_refresh_seconds || 30) * 1000;
             // Start prices refresh immediately since Prices is default
             pricesTimer = setInterval(loadPrices, pricesRefreshMs);
@@ -1488,14 +1482,6 @@
           );
         });
 
-        // Local reactive copy of settings, synced via 'settings-updated' event
-        const localSettings = ref(window.appSettings?.value || null);
-        window.addEventListener('settings-updated', () => {
-          localSettings.value = window.appSettings?.value || null; // eslint-disable-line
-        });
-        // Sync immediately in case settings already loaded
-        if (window.appSettings?.value) localSettings.value = window.appSettings.value;
-
         const filteredPrices = computed(() => {
           const q = filter.value.toLowerCase();
           if (!q) return prices.value;
@@ -1506,20 +1492,39 @@
           );
         });
 
+        // Shared: normalize price_for ('6h') to column suffix ('h6')
+        const priceChangeCol = (price_for) =>
+          `price_change_${price_for.endsWith('h') ? 'h' + price_for.slice(0, -1) : price_for}`;
+
+        // Pre-index enabled alerts by suffix — O(1) lookup instead of O(alerts) scan per cell
+        const alertsBySuffix = computed(() => {
+          const map = { h1: [], h6: [], h24: [] };
+          for (const a of sharedSettings.value?.price_alerts?.alerts || []) {
+            if (!a.enabled) continue;
+            const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
+            if (map[norm]) map[norm].push(a);
+          }
+          return map;
+        });
+
+        // Intensity tier: 1st matching alert → light, 2nd → medium, 3rd+ → strong
+        const INTENSITY = ['light', 'medium', 'strong'];
+
         const priceRowTint = computed(() => {
           const rows = {};
-          const alerts = localSettings.value?.price_alerts?.alerts || [];
+          const bySuffix = alertsBySuffix.value;
           for (const row of filteredPrices.value) {
             let cls = '';
-            for (const a of alerts) {
-              if (!a.enabled) continue;
-              const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
-              const col = `price_change_${norm}`;
+            outer:
+            for (const [suffix, alerts] of Object.entries(bySuffix)) {
+              const col = `price_change_${suffix}`;
               const val = row[col];
               if (val == null) continue;
-              if (Math.abs(val) >= a.price_change) {
-                cls = val < 0 ? 'row-down' : 'row-up';
-                break;
+              for (const a of alerts) {
+                if (Math.abs(val) >= a.price_change) {
+                  cls = val < 0 ? 'row-down' : 'row-up';
+                  break outer;
+                }
               }
             }
             rows[row.project_id] = cls;
@@ -1529,7 +1534,7 @@
 
         const priceCellTint = computed(() => {
           const cells = {};
-          const alerts = localSettings.value?.price_alerts?.alerts || [];
+          const bySuffix = alertsBySuffix.value;
           const suffixes = ['h1', 'h6', 'h24'];
           for (const row of filteredPrices.value) {
             for (const suffix of suffixes) {
@@ -1538,20 +1543,13 @@
               if (val == null) continue;
               const key = `${row.project_id}-${col}`;
               const dir = val < 0 ? 'neg' : 'pos';
-              let tintCls = null;
-              let topThreshold = 0;
-              for (const a of alerts) {
-                if (!a.enabled) continue;
-                // price_for like '6h' -> normalize to suffix 'h6'
-                const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
-                if (norm !== suffix) continue;
-                if (Math.abs(val) >= a.price_change && a.price_change > topThreshold) {
-                  topThreshold = a.price_change;
-                  const intensity = topThreshold === 10 ? 'light' : topThreshold === 25 ? 'medium' : 'strong';
-                  tintCls = `cell-${dir === 'neg' ? 'down' : 'up'}-${intensity}`;
-                }
+              const matching = bySuffix[suffix].filter(a => Math.abs(val) >= a.price_change);
+              if (matching.length) {
+                const tier = Math.min(matching.length - 1, 2);
+                cells[key] = [dir, `cell-${dir === 'neg' ? 'down' : 'up'}-${INTENSITY[tier]}`];
+              } else {
+                cells[key] = [dir];
               }
-              cells[key] = tintCls ? [dir, tintCls] : [dir];
             }
           }
           return cells;
@@ -1584,7 +1582,7 @@
           logs, statusChanges, alertLogs, loading, error, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
           logSearch,
-          filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint, localSettings,
+          filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           pollingPaused, togglePolling, autoRefreshEnabled,
           api: window.api, relativeTime, fmtShortNum, fmtPct,
@@ -2266,8 +2264,7 @@
                 _log:        !!(a.log ?? 1),
               })),
             };
-            appSettings.value = settings.value;
-            window.dispatchEvent(new Event('settings-updated'));
+            sharedSettings.value = settings.value;
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -2300,8 +2297,7 @@
           error.value = '';
           try {
             settings.value = await api.updateSettings(payload);
-            appSettings.value = settings.value;
-            window.dispatchEvent(new Event('settings-updated'));
+            sharedSettings.value = settings.value;
             showToast('Saved.');
           } catch (e) {
             error.value = e.message;

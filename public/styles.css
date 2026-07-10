@@ -327,9 +327,9 @@ table.compact .details_cell   { min-width: 140px; }
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
 .price-table td.num, .price-table th.num { text-align: right; }
 .price-table td.cen, .price-table th.cen { text-align: center; }
-.price-table tr:hover td { background: var(--pico-card-background-color-hover, rgba(255,255,255,0.03)); }
+.price-table tr:hover { background: var(--pico-card-background-color-hover, rgba(255,255,255,0.03)); }
 /* Row tint — border all around */
-.price-table tr.row-up   { outline: 1px solid var(--app-ok);   outline-offset: -2px; }
+.price-table tr.row-up   { outline: 1px solid var(--app-ok); outline-offset: -2px; }
 .price-table tr.row-down { outline: 1px solid var(--app-error); outline-offset: -2px; }
 
 /* Cell tint — up (green), graduated */
