@@ -181,7 +181,7 @@ async function runTokenPriceTick() {
     SELECT id, token FROM projects WHERE enabled = 1 AND token IS NOT NULL AND token != ''
   `).all();
   if (!projects.length) return;
-  scheduleLog(`[${now()}] Scheduler: token price tick — ${projects.length} tokens`);
+  //scheduleLog(`[${now()}] Scheduler: token price tick — ${projects.length} tokens`);
 
   const BATCH_SIZE = 5;
   for (let i = 0; i < projects.length; i += BATCH_SIZE) {
