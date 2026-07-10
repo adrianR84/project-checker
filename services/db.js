@@ -238,33 +238,34 @@ const dbProxy = {
     `).run(userId);
   },
 
-  /** Config readers — parse JSON group columns from the singleton config row. */
+  /** Config readers — parse JSON group columns from the singleton config row.
+   *  Defaults to DEFAULT_USER_ID env var so the scheduler (no user context) can read config. */
   config: {
-    async getSettings(userId = '') {
+    async getSettings(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT settings FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.settings) : null;
     },
-    async getCheckIntervals(userId = '') {
+    async getCheckIntervals(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT check_intervals FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.check_intervals) : null;
     },
-    async getAlertIntervals(userId = '') {
+    async getAlertIntervals(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT alert_intervals FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.alert_intervals) : null;
     },
-    async getAlertStops(userId = '') {
+    async getAlertStops(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT alert_stops FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.alert_stops) : null;
     },
-    async getTelegram(userId = '') {
+    async getTelegram(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT telegram FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.telegram) : null;
     },
-    async getPushbullet(userId = '') {
+    async getPushbullet(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT pushbullet FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.pushbullet) : null;
     },
-    async getPriceAlerts(userId = '') {
+    async getPriceAlerts(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT price_alerts FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.price_alerts) : null;
     }

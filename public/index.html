@@ -296,10 +296,10 @@
                 :aria-current="currentRoute === t.to ? 'page' : undefined"
               >{{ t.label }}</a>
             </li>
-            <li v-if="currentUser?.value">
-              <span class="user-email">{{ currentUser.value.email }}</span>
+            <li v-if="currentUser">
+              <span class="user-email">{{ currentUser.email }}</span>
             </li>
-            <li v-if="currentUser?.value">
+            <li v-if="currentUser">
               <a href="#/login" @click.prevent="signOut">Sign out</a>
             </li>
           </ul>
@@ -1256,7 +1256,7 @@
           try {
             await window.api.signIn({ email: email.value, password: password.value });
             const sess = await window.api.getSession();
-            currentUser.value = sess.user;
+            currentUser.value = sess?.user ?? null;
             window.location.hash = '#/';
           } catch (e) {
             err.value = e.message;
@@ -1292,6 +1292,7 @@
             </a>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><hr style="flex:1"/><span class="muted" style="font-size:0.8rem">or</span><hr style="flex:1"/></div>
             <form @submit.prevent="doSignUp">
+              <label>Name <input type="text" v-model="name" required /></label>
               <label>Email <input type="email" v-model="email" required /></label>
               <label>Password <input type="password" v-model="password" required minlength="8" /></label>
               <button type="submit" :disabled="!!busy">Register</button>
@@ -1302,6 +1303,7 @@
         </div>
       `,
       setup() {
+        const name = ref('');
         const email = ref('');
         const password = ref('');
         const busy = ref(false);
@@ -1313,7 +1315,7 @@
         async function doSignUp() {
           busy.value = true; err.value = '';
           try {
-            await window.api.signUp({ email: email.value, password: password.value });
+            await window.api.signUp({ name: name.value, email: email.value, password: password.value });
             await window.api.signIn({ email: email.value, password: password.value });
             const sess = await window.api.getSession();
             currentUser.value = sess.user;
@@ -1324,7 +1326,7 @@
             busy.value = false;
           }
         }
-        return { email, password, busy, err, doSignUp, googleOAuthUrl, githubOAuthUrl, twitterOAuthUrl, facebookOAuthUrl };
+        return { name, email, password, busy, err, doSignUp, googleOAuthUrl, githubOAuthUrl, twitterOAuthUrl, facebookOAuthUrl };
       },
     };
 
