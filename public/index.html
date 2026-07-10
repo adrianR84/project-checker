@@ -1789,7 +1789,7 @@
         }
 
         function openCreate() { editing.value = null; showForm.value = true; }
-        function openEdit(p)   { editing.value = p;    showForm.value = true; }
+        function openEdit(p)   { editing.value = p; editBus.value = null; showForm.value = true; }
         function openManageRepos(p) { manageProject.value = p; }
 
         /** Create or update a project, then reload the list */
