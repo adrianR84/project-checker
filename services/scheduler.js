@@ -279,7 +279,8 @@ async function evaluatePriceAlerts(projectId, projectName) {
   const candidates = [];
   for (const alert of priceAlerts.alerts) {
     if (!alert.enabled) continue;
-    const suffix = alert.price_for; // '1h', '6h', '24h'
+    // Normalize '6h' → 'h6', '24h' → 'h24', '1h' → 'h1'
+    const suffix = alert.price_for.replace(/^(\d+)h$/, 'h$1');
     const val = cols[suffix];
     if (val == null) continue;
     if (Math.abs(val) < alert.price_change) continue;
@@ -344,6 +345,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
   }
 
   // Persist throttle row
+  console.log(`[${now()}] Price alert FIRED: ${projectName} [$${priceRow.price_usd}] [${direction.toUpperCase()}-${tier.toUpperCase()}]: (${winning.val >= 0 ? '+' : ''}${winning.val.toFixed(2)}%)`);
   await upsertTokenPricesAlert(projectId, winning.alert.price_change, now());
 }
 
@@ -351,7 +353,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
 async function runPriceAlertTick() {
   const projects = await db.prepare('SELECT id, name FROM projects WHERE enabled = 1 and price_enabled = 1').all();
   if (!projects.length) return;
-  scheduleLog(`[${now()}] Scheduler: price alert tick — ${projects.length} projects`);
+  //scheduleLog(`[${now()}] Scheduler: price alert tick — ${projects.length} projects`);
   for (const p of projects) {
     await evaluatePriceAlerts(p.id, p.name).catch(err =>
       console.error(`[${now()}] evaluatePriceAlerts failed for project ${p.id}: ${err.message}`)

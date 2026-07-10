@@ -147,8 +147,9 @@ async function sendAlert(event, projectName) {
 // Maps threshold → tier index. Sorted descending: [largest]→STRONG, [middle]→MEDIUM, [smallest]→LIGHT.
 function getTierIndex(priceChange, alerts) {
   const thresholds = [...new Set(alerts.map(a => a.price_change))].sort((a, b) => b - a);
+  if (thresholds.length === 1) return 2; // single threshold → strong
   const idx = thresholds.indexOf(priceChange);
-  return Math.min(idx, 2); // cap at 2 (STRONG)
+  return Math.max(0, thresholds.length - 1 - idx);
 }
 
 const INTENSITY = ['light', 'medium', 'strong'];

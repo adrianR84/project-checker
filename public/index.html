@@ -1514,8 +1514,14 @@
           return map;
         });
 
-        // Intensity tier: 1st matching alert → light, 2nd → medium, 3rd+ → strong
+        // Intensity tier: highest matched threshold → strong, middle → medium, lowest → light
         const INTENSITY = ['light', 'medium', 'strong'];
+        const getTierIndex = (priceChange, alerts) => {
+          const thresholds = [...new Set(alerts.map(a => a.price_change))].sort((a, b) => b - a);
+          if (thresholds.length === 1) return 2; // single threshold → strong
+          const idx = thresholds.indexOf(priceChange);
+          return Math.max(0, thresholds.length - 1 - idx);
+        };
 
         const togglePriceEnabled = async (row, evt) => {
           const newVal = evt.target.checked ? 1 : 0;
@@ -1535,8 +1541,11 @@
           for (const row of filteredPrices.value) {
             if (!row.price_enabled) { rows[row.project_id] = ''; continue; }
             let cls = '';
+            const suffixOrder = ['h24', 'h6', 'h1'];
             outer:
-            for (const [suffix, alerts] of Object.entries(bySuffix)) {
+            for (const suffix of suffixOrder) {
+              const alerts = bySuffix[suffix];
+              if (!alerts?.length) continue;
               const col = `price_change_${suffix}`;
               const val = row[col];
               if (val == null) continue;
@@ -1566,7 +1575,8 @@
               if (row.price_enabled) {
                 const matching = bySuffix[suffix].filter(a => Math.abs(val) >= a.price_change);
                 if (matching.length) {
-                  const tier = Math.min(matching.length - 1, 2);
+                  const winningThreshold = Math.max(...matching.map(a => a.price_change));
+                  const tier = getTierIndex(winningThreshold, bySuffix[suffix]);
                   cells[key] = [dir, `cell-${dir === 'neg' ? 'down' : 'up'}-${INTENSITY[tier]}`];
                 } else {
                   cells[key] = [dir];
