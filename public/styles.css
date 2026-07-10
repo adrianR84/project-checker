@@ -444,3 +444,30 @@ table.compact .details_cell   { min-width: 140px; }
   font-size: 0.875rem;
 }
 
+/* Auth pages */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 2rem;
+}
+.auth-card h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.user-email {
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  padding: 0 0.75rem;
+}
+

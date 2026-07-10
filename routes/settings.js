@@ -1,4 +1,4 @@
-// Settings REST API (config singleton + trigger-all)
+// Settings REST API (per-user config + trigger-all)
 const express = require('express');
 const db = require('../services/db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../services/checker');
@@ -8,14 +8,15 @@ const now = () => new Date().toISOString();
 
 // GET /api/settings
 router.get('/', async (req, res) => {
+  await db.ensureConfig(req.userId);
   const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts] = await Promise.all([
-    db.config.getSettings(),
-    db.config.getCheckIntervals(),
-    db.config.getAlertIntervals(),
-    db.config.getAlertStops(),
-    db.config.getTelegram(),
-    db.config.getPushbullet(),
-    db.config.getPriceAlerts()
+    db.config.getSettings(req.userId),
+    db.config.getCheckIntervals(req.userId),
+    db.config.getAlertIntervals(req.userId),
+    db.config.getAlertStops(req.userId),
+    db.config.getTelegram(req.userId),
+    db.config.getPushbullet(req.userId),
+    db.config.getPriceAlerts(req.userId)
   ]);
   if (!settings) return res.status(500).json({ error: 'config not found' });
   // Return flat shape for frontend compatibility
@@ -45,6 +46,7 @@ router.get('/', async (req, res) => {
 
 // PUT /api/settings — update check intervals and log retention
 router.put('/', async (req, res) => {
+  await db.ensureConfig(req.userId);
   const updates = {};
 
   // Backward compat: accept commit_check_minutes → github_check_minutes
@@ -130,7 +132,7 @@ router.put('/', async (req, res) => {
             }))
           : cur.alerts
       };
-      await db.prepare('UPDATE config SET price_alerts = ? WHERE id = 1').run(JSON.stringify(merged));
+      await db.prepare('UPDATE config SET price_alerts = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
     }
   }
 
@@ -144,7 +146,7 @@ router.put('/', async (req, res) => {
         chat_id:   typeof incoming.chat_id   === 'string' ? incoming.chat_id   : cur.chat_id,
         enabled:   incoming.enabled === true || incoming.enabled === 1 || incoming.enabled === 'true'
       };
-      await db.prepare('UPDATE config SET telegram = ? WHERE id = 1').run(JSON.stringify(merged));
+      await db.prepare('UPDATE config SET telegram = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
     }
   }
 
@@ -157,52 +159,52 @@ router.put('/', async (req, res) => {
         access_token: typeof incoming.access_token === 'string' ? incoming.access_token : cur.access_token,
         enabled:      incoming.enabled === true || incoming.enabled === 1 || incoming.enabled === 'true'
       };
-      await db.prepare('UPDATE config SET pushbullet = ? WHERE id = 1').run(JSON.stringify(merged));
+      await db.prepare('UPDATE config SET pushbullet = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
     }
   }
 
   // Flat columns no longer exist — update JSON groups directly
   if (updates.github_check_minutes || updates.website_check_minutes || updates.twitter_check_minutes) {
-    const ci = await db.config.getCheckIntervals();
+    const ci = await db.config.getCheckIntervals(req.userId);
     if (ci) {
       if (updates.github_check_minutes) ci.github = updates.github_check_minutes;
       if (updates.website_check_minutes) ci.website = updates.website_check_minutes;
       if (updates.twitter_check_minutes) ci.twitter = updates.twitter_check_minutes;
-      await db.prepare('UPDATE config SET check_intervals = ? WHERE id = 1').run(JSON.stringify(ci));
+      await db.prepare('UPDATE config SET check_intervals = ? WHERE user_id = ?').run(JSON.stringify(ci), req.userId);
     }
   }
   if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined) {
-    const s = await db.config.getSettings();
+    const s = await db.config.getSettings(req.userId);
     if (s) {
       if (updates.log_retention_days !== undefined) s.log_retention_days = updates.log_retention_days;
       if (updates.ui_refresh_seconds !== undefined) s.ui_refresh_seconds = updates.ui_refresh_seconds;
       if (updates.compact_activity !== undefined) s.compact_activity_display = updates.compact_activity;
       if (updates.github_token !== undefined) s.github_token = updates.github_token || null;
-      await db.prepare('UPDATE config SET settings = ? WHERE id = 1').run(JSON.stringify(s));
+      await db.prepare('UPDATE config SET settings = ? WHERE user_id = ?').run(JSON.stringify(s), req.userId);
     }
   }
   if (alertKeys.some(k => updates[k])) {
-    const ai = await db.config.getAlertIntervals();
-    const as = await db.config.getAlertStops();
+    const ai = await db.config.getAlertIntervals(req.userId);
+    const as = await db.config.getAlertStops(req.userId);
     if (ai || as) {
       const typeMap = { github_alert_minutes: 'github', website_alert_minutes: 'website', twitter_alert_minutes: 'twitter' };
       const stopMap = { github_alert_stop_minutes: 'github', website_alert_stop_minutes: 'website', twitter_alert_stop_minutes: 'twitter' };
       for (const [k, type] of Object.entries(typeMap)) { if (updates[k] !== undefined && ai) ai[type] = updates[k]; }
       for (const [k, type] of Object.entries(stopMap)) { if (updates[k] !== undefined && as) as[type] = updates[k]; }
-      if (ai) await db.prepare('UPDATE config SET alert_intervals = ? WHERE id = 1').run(JSON.stringify(ai));
-      if (as) await db.prepare('UPDATE config SET alert_stops = ? WHERE id = 1').run(JSON.stringify(as));
+      if (ai) await db.prepare('UPDATE config SET alert_intervals = ? WHERE user_id = ?').run(JSON.stringify(ai), req.userId);
+      if (as) await db.prepare('UPDATE config SET alert_stops = ? WHERE user_id = ?').run(JSON.stringify(as), req.userId);
     }
   }
 
-  const cfg = await db.prepare('SELECT * FROM config WHERE id = 1').get();
+  const cfg = await db.prepare('SELECT * FROM config WHERE user_id = ?').get(req.userId);
   const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts] = await Promise.all([
-    db.config.getSettings(),
-    db.config.getCheckIntervals(),
-    db.config.getAlertIntervals(),
-    db.config.getAlertStops(),
-    db.config.getTelegram(),
-    db.config.getPushbullet(),
-    db.config.getPriceAlerts()
+    db.config.getSettings(req.userId),
+    db.config.getCheckIntervals(req.userId),
+    db.config.getAlertIntervals(req.userId),
+    db.config.getAlertStops(req.userId),
+    db.config.getTelegram(req.userId),
+    db.config.getPushbullet(req.userId),
+    db.config.getPriceAlerts(req.userId)
   ]);
   console.log(`[${now()}] Settings updated: ${JSON.stringify(updates)}`);
   res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts });
@@ -239,7 +241,7 @@ async function runChecksForProject(project) {
 
 // POST /api/settings/trigger-all
 router.post('/trigger-all', async (req, res) => {
-  const projects = await db.prepare('SELECT * FROM projects').all();
+  const projects = await db.prepare('SELECT * FROM projects WHERE user_id = ?').all(req.userId);
   console.log(`[${now()}] Triggering all checks for ${projects.length} projects`);
   const allResults = [];
   for (const project of projects) {
@@ -256,8 +258,8 @@ router.post('/trigger-all', async (req, res) => {
 
 // Trigger a specific resource type across all projects
 /** Runs checks for a single resource type across all projects. */
-async function triggerResourceType(resourceType) {
-  const projects = await db.prepare('SELECT * FROM projects').all();
+async function triggerResourceType(resourceType, userId) {
+  const projects = await db.prepare('SELECT * FROM projects WHERE user_id = ?').all(userId);
   const results = [];
   for (const project of projects) {
     try {
@@ -288,44 +290,52 @@ async function triggerResourceType(resourceType) {
 // POST /api/settings/trigger-websites
 router.post('/trigger-websites', async (req, res) => {
   console.log(`[${now()}] Manual trigger: websites`);
-  const results = await triggerResourceType('website');
+  const results = await triggerResourceType('website', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });
 
 // POST /api/settings/trigger-github
 router.post('/trigger-github', async (req, res) => {
   console.log(`[${now()}] Manual trigger: github`);
-  const results = await triggerResourceType('github');
+  const results = await triggerResourceType('github', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });
 
 // POST /api/settings/trigger-twitter
 router.post('/trigger-twitter', async (req, res) => {
   console.log(`[${now()}] Manual trigger: twitter`);
-  const results = await triggerResourceType('twitter');
+  const results = await triggerResourceType('twitter', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });
 
 // POST /api/settings/clear-data — empty all tables except config
 router.post('/clear-data', async (req, res) => {
-  await db.prepare('DELETE FROM event_logs').run();
-  await db.prepare('DELETE FROM check_logs').run();
-  await db.prepare('DELETE FROM repos').run();
-  await db.prepare('DELETE FROM projects').run();
+  // Cascade through user's projects — repos/check_logs/event_logs are FK-deleted
+  await db.prepare('DELETE FROM projects WHERE user_id = ?').run(req.userId);
   res.json({ ok: true });
 });
 
-// POST /api/settings/clear-logs — delete all check logs and status changes
+// POST /api/settings/clear-logs — delete all check logs and status changes for user's projects
 router.post('/clear-logs', async (req, res) => {
-  await db.prepare('DELETE FROM event_logs').run();
-  await db.prepare('DELETE FROM check_logs').run();
-  await db.prepare('DELETE FROM alert_logs').run();
+  const projectIds = await db.prepare('SELECT id FROM projects WHERE user_id = ?').all(req.userId);
+  const ids = projectIds.map(p => p.id);
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    await db.prepare(`DELETE FROM check_logs WHERE project_id IN (${placeholders})`).run(...ids);
+    await db.prepare(`DELETE FROM event_logs WHERE project_id IN (${placeholders})`).run(...ids);
+    await db.prepare(`DELETE FROM alert_logs WHERE status_change_id IN (SELECT id FROM event_logs WHERE project_id IN (${placeholders}))`).run(...ids);
+  }
   res.json({ ok: true });
 });
 
-// POST /api/settings/clear-alert-logs — delete all alert logs
+// POST /api/settings/clear-alert-logs — delete all alert logs for user's projects
 router.post('/clear-alert-logs', async (req, res) => {
-  await db.prepare('DELETE FROM alert_logs').run();
+  const projectIds = await db.prepare('SELECT id FROM projects WHERE user_id = ?').all(req.userId);
+  const ids = projectIds.map(p => p.id);
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    await db.prepare(`DELETE FROM alert_logs WHERE status_change_id IN (SELECT id FROM event_logs WHERE project_id IN (${placeholders}))`).run(...ids);
+  }
   res.json({ ok: true });
 });
 

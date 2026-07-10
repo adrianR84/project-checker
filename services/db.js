@@ -29,6 +29,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      user_id TEXT NOT NULL DEFAULT '',
       website_url TEXT,
       github_url TEXT,
       twitter_url TEXT,
@@ -81,6 +82,7 @@ async function init() {
   database.exec(`
     CREATE TABLE IF NOT EXISTS config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
+      user_id TEXT NOT NULL DEFAULT '',
       settings TEXT NOT NULL DEFAULT '{"log_retention_days":7,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null}',
       check_intervals TEXT NOT NULL DEFAULT '{"github":360,"website":1440,"twitter":1440}',
       alert_intervals TEXT NOT NULL DEFAULT '{"github":60,"website":60,"twitter":60}',
@@ -220,34 +222,50 @@ const dbProxy = {
     }
     return Promise.resolve();
   },
+  /** Ensures a config row exists for the given userId, creating with defaults if missing. */
+  async ensureConfig(userId = '') {
+    const row = await dbProxy.prepare('SELECT id FROM config WHERE user_id = ?').get(userId);
+    if (row) return;
+    await dbProxy.prepare(`
+      INSERT INTO config (user_id, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts)
+      VALUES (?, '{"log_retention_days":7,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null}',
+              '{"github":360,"website":1440,"twitter":1440}',
+              '{"github":60,"website":60,"twitter":60}',
+              '{"github":1440,"website":1440,"twitter":1440}',
+              '{"bot_token":"","chat_id":"","enabled":false}',
+              '{"access_token":"","enabled":false}',
+              '{"alerts":[{"price_for":"6h","price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}')
+    `).run(userId);
+  },
+
   /** Config readers — parse JSON group columns from the singleton config row. */
   config: {
-    async getSettings() {
-      const row = await dbProxy.prepare('SELECT settings FROM config WHERE id = 1').get();
+    async getSettings(userId = '') {
+      const row = await dbProxy.prepare('SELECT settings FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.settings) : null;
     },
-    async getCheckIntervals() {
-      const row = await dbProxy.prepare('SELECT check_intervals FROM config WHERE id = 1').get();
+    async getCheckIntervals(userId = '') {
+      const row = await dbProxy.prepare('SELECT check_intervals FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.check_intervals) : null;
     },
-    async getAlertIntervals() {
-      const row = await dbProxy.prepare('SELECT alert_intervals FROM config WHERE id = 1').get();
+    async getAlertIntervals(userId = '') {
+      const row = await dbProxy.prepare('SELECT alert_intervals FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.alert_intervals) : null;
     },
-    async getAlertStops() {
-      const row = await dbProxy.prepare('SELECT alert_stops FROM config WHERE id = 1').get();
+    async getAlertStops(userId = '') {
+      const row = await dbProxy.prepare('SELECT alert_stops FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.alert_stops) : null;
     },
-    async getTelegram() {
-      const row = await dbProxy.prepare('SELECT telegram FROM config WHERE id = 1').get();
+    async getTelegram(userId = '') {
+      const row = await dbProxy.prepare('SELECT telegram FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.telegram) : null;
     },
-    async getPushbullet() {
-      const row = await dbProxy.prepare('SELECT pushbullet FROM config WHERE id = 1').get();
+    async getPushbullet(userId = '') {
+      const row = await dbProxy.prepare('SELECT pushbullet FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.pushbullet) : null;
     },
-    async getPriceAlerts() {
-      const row = await dbProxy.prepare('SELECT price_alerts FROM config WHERE id = 1').get();
+    async getPriceAlerts(userId = '') {
+      const row = await dbProxy.prepare('SELECT price_alerts FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.price_alerts) : null;
     }
   }

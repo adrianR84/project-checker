@@ -12,9 +12,9 @@ router.get('/', async (req, res) => {
            website_url, github_url, twitter_url, telegram_url,
            created_at, updated_at
     FROM projects
-    WHERE enabled = 1
+    WHERE enabled = 1 AND user_id = ?
     ORDER BY id
-  `).all();
+  `).all(req.userId);
 
   const result = [];
   for (const p of projects) {
@@ -96,9 +96,9 @@ router.get('/token-prices', async (req, res) => {
   const rows = await db.prepare(`
     SELECT tp.*, p.name AS project_name, p.price_enabled
     FROM token_prices tp
-    JOIN projects p ON p.id = tp.project_id AND p.enabled = 1
+    JOIN projects p ON p.id = tp.project_id AND p.enabled = 1 AND p.user_id = ?
     ORDER BY p.name
-  `).all();
+  `).all(req.userId);
   res.json(rows);
 });
 

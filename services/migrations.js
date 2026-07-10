@@ -464,6 +464,18 @@ function add_notification_config_cols(db) {
   }
 }
 
+/** Migration: adds user_id column to projects if missing. */
+function add_user_id_to_projects(db) {
+  if (hasColumn(db, 'projects', 'user_id')) return;
+  db.exec('ALTER TABLE projects ADD COLUMN user_id TEXT NOT NULL DEFAULT \'\'');
+}
+
+/** Migration: adds user_id column to config if missing. */
+function add_user_id_to_config(db) {
+  if (hasColumn(db, 'config', 'user_id')) return;
+  db.exec('ALTER TABLE config ADD COLUMN user_id TEXT NOT NULL DEFAULT \'\'');
+}
+
 /** Runs all idempotent migrations sequentially, logging errors but never throwing. */
 async function runMigrations(db) {
   // try { await rename_rsc_to_event_logs(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
@@ -488,6 +500,8 @@ async function runMigrations(db) {
   // try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   // try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   // try { await add_token_prices_alerts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_user_id_to_projects(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_user_id_to_config(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

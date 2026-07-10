@@ -8,8 +8,8 @@ const router = express.Router();
 const now = () => new Date().toISOString();
 
 // ponytail: shared helper — loads a project or sends 404 and returns null
-async function loadProjectOr404(res, id) {
-  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+async function loadProjectOr404(res, id, userId) {
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(id, userId);
   if (!project) { res.status(404).json({ error: 'Project not found' }); return null; }
   return project;
 }
@@ -25,15 +25,16 @@ router.get('/', async (req, res) => {
            token, enabled, price_enabled,
            created_at, updated_at
     FROM projects
+    WHERE user_id = ?
     ORDER BY id DESC
-  `).all();
+  `).all(req.userId);
   res.json(projects);
 });
 
 // GET /api/projects/:id — single project with repos + latest check_logs
 router.get('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
 
   const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
@@ -105,21 +106,21 @@ router.post('/', async (req, res) => {
           website_enabled, website_content_check, token, enabled, price_enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
-  // Prevent duplicate: same name + website_url
+  // Prevent duplicate: same name + website_url for this user
   if (website_url) {
     const existing = await db.prepare(
-      'SELECT id FROM projects WHERE name = ? AND website_url = ?'
-    ).get(name, website_url);
+      'SELECT id FROM projects WHERE name = ? AND website_url = ? AND user_id = ?'
+    ).get(name, website_url, req.userId);
     if (existing) return res.status(409).json({ error: 'Project with this name and website already exists' });
   }
 
   const ts = now();
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
-    INSERT INTO projects (name, website_url, github_url, twitter_url, telegram_url,
+    INSERT INTO projects (name, user_id, website_url, github_url, twitter_url, telegram_url,
       website_enabled, website_content_check, token, enabled, price_enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, req.userId, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
     website_enabled ? 1 : 0, website_content_check ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, price_enabled ? 1 : 0, ts, ts);
 
   const projectId = result.lastInsertRowid;
@@ -147,7 +148,7 @@ router.post('/', async (req, res) => {
 // PUT /api/projects/:id — update project (optionally sync repos array)
 router.put('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Project not found' });
 
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
@@ -215,7 +216,7 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/projects/:id — delete project (cascades)
 router.delete('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = await db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT id FROM projects WHERE id = ? AND user_id = ?').get(id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Project not found' });
   await db.prepare('DELETE FROM projects WHERE id = ?').run(id);
   res.json({ ok: true, deleted: id });
@@ -224,7 +225,7 @@ router.delete('/:id', async (req, res) => {
 // GET /api/projects/:id/org-repos — fetch all repos from the org (for RepoManager)
 router.get('/:id/org-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
@@ -239,7 +240,7 @@ router.get('/:id/org-repos', async (req, res) => {
 // POST /api/projects/:id/refresh-repos — re-fetch all repos from GitHub
 router.post('/:id/refresh-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'Project has no github_url' });
@@ -289,7 +290,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
 // POST /api/projects/:id/add-repos — upsert selected repos (fetched from GitHub)
 router.post('/:id/add-repos', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
 
@@ -316,6 +317,9 @@ router.post('/:id/add-repos', async (req, res) => {
 router.delete('/:id/repos/*', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const fullName = decodeURIComponent(req.params[0]);
+  // Verify project belongs to user before deleting repo
+  const project = await db.prepare('SELECT id FROM projects WHERE id = ? AND user_id = ?').get(id, req.userId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
   const existing = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(id, fullName);
   if (!existing) return res.status(404).json({ error: 'Repo not found' });
   await db.prepare('DELETE FROM repos WHERE id = ?').run(existing.id);
@@ -325,7 +329,7 @@ router.delete('/:id/repos/*', async (req, res) => {
 // POST /api/projects/:id/check-website
 router.post('/:id/check-website', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.website_url) {
@@ -342,7 +346,7 @@ router.post('/:id/check-website', async (req, res) => {
 // POST /api/projects/:id/check-github
 router.post('/:id/check-github', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.github_url) return res.status(400).json({ error: 'No github_url' });
@@ -359,7 +363,7 @@ router.post('/:id/check-github', async (req, res) => {
 // POST /api/projects/:id/check-twitter
 router.post('/:id/check-twitter', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const project = await loadProjectOr404(res, id);
+  const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
   if (!project.enabled) return res.status(400).json({ error: 'Project is disabled' });
   if (!project.twitter_url) {

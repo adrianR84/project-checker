@@ -36,6 +36,10 @@
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
 
+    /** Current authenticated user — null when logged out */
+    const currentUser = ref(null);
+    window.currentUser = currentUser;
+
     /** Shared ref for edit navigation: set by ProjectCard, watched by ProjectsPage */
     const editBus = ref(null);
 
@@ -53,8 +57,14 @@
     async function req(path, opts = {}) {
       const r = await fetch(BASE + path, {
         headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        credentials: 'include',  // send cookies for session auth
         ...opts,
       });
+      if (r.status === 401) {
+        currentUser.value = null;
+        window.location.hash = '#/login';
+        throw new Error('Unauthorized');
+      }
       if (!r.ok) {
         // Try to extract { error: "..." } from the JSON body
         let d = '';
@@ -93,6 +103,12 @@
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
       clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
       clearAlertLogs: ()       => req('/settings/clear-alert-logs', { method: 'POST' }),
+
+      // Auth
+      signIn:      (creds)  => req('/auth/sign-in/email',    { method: 'POST', body: JSON.stringify(creds) }),
+      signUp:      (creds)  => req('/auth/sign-up/email',    { method: 'POST', body: JSON.stringify(creds) }),
+      signOut:     ()       => req('/auth/sign-out',          { method: 'POST' }),
+      getSession:  ()       => req('/auth/get-session'),
     };
 
     // Expose globally so the template can call api.* after we return api: window.api
@@ -280,6 +296,12 @@
                 :aria-current="currentRoute === t.to ? 'page' : undefined"
               >{{ t.label }}</a>
             </li>
+            <li v-if="currentUser?.value">
+              <span class="user-email">{{ currentUser.value.email }}</span>
+            </li>
+            <li v-if="currentUser?.value">
+              <a href="#/login" @click.prevent="signOut">Sign out</a>
+            </li>
           </ul>
         </nav>
       `,
@@ -301,6 +323,12 @@
             .catch(() => {});
         }
 
+        async function signOut() {
+          try { await window.api.signOut(); } catch (_) {}
+          currentUser.value = null;
+          window.location.hash = '#/login';
+        }
+
         return {
           leftTabs: [
             { to: '/',         label: 'Activity'  },
@@ -311,6 +339,8 @@
           ],
           currentRoute,
           fearIndex: window.fearIndex,
+          currentUser: window.currentUser,
+          signOut,
         };
       },
     };
@@ -1176,6 +1206,83 @@
           api: window.api,
           appSettings: sharedSettings,
         };
+      },
+    };
+
+    /* ── Login page ─────────────────────────────────────────────────────────── */
+    const LoginPage = {
+      template: `
+        <div class="auth-page">
+          <div class="auth-card">
+            <h2>Sign in</h2>
+            <form @submit.prevent="doSignIn">
+              <label>Email <input type="email" v-model="email" required /></label>
+              <label>Password <input type="password" v-model="password" required /></label>
+              <button type="submit" :disabled="!!busy">Sign in</button>
+              <p class="muted">No account? <a href="#/register">Register</a></p>
+              <p v-if="err" class="error">{{ err }}</p>
+            </form>
+          </div>
+        </div>
+      `,
+      setup() {
+        const email = ref('');
+        const password = ref('');
+        const busy = ref(false);
+        const err = ref('');
+        async function doSignIn() {
+          busy.value = true; err.value = '';
+          try {
+            await window.api.signIn({ email: email.value, password: password.value });
+            const sess = await window.api.getSession();
+            currentUser.value = sess.user;
+            window.location.hash = '#/';
+          } catch (e) {
+            err.value = e.message;
+          } finally {
+            busy.value = false;
+          }
+        }
+        return { email, password, busy, err, doSignIn };
+      },
+    };
+
+    /* ── Register page ────────────────────────────────────────────────────── */
+    const RegisterPage = {
+      template: `
+        <div class="auth-page">
+          <div class="auth-card">
+            <h2>Create account</h2>
+            <form @submit.prevent="doSignUp">
+              <label>Email <input type="email" v-model="email" required /></label>
+              <label>Password <input type="password" v-model="password" required minlength="8" /></label>
+              <button type="submit" :disabled="!!busy">Register</button>
+              <p class="muted">Already have an account? <a href="#/login">Sign in</a></p>
+              <p v-if="err" class="error">{{ err }}</p>
+            </form>
+          </div>
+        </div>
+      `,
+      setup() {
+        const email = ref('');
+        const password = ref('');
+        const busy = ref(false);
+        const err = ref('');
+        async function doSignUp() {
+          busy.value = true; err.value = '';
+          try {
+            await window.api.signUp({ email: email.value, password: password.value });
+            await window.api.signIn({ email: email.value, password: password.value });
+            const sess = await window.api.getSession();
+            currentUser.value = sess.user;
+            window.location.hash = '#/';
+          } catch (e) {
+            err.value = e.message;
+          } finally {
+            busy.value = false;
+          }
+        }
+        return { email, password, busy, err, doSignUp };
       },
     };
 
@@ -2482,14 +2589,22 @@
       '/':          ActivityPage,
       '/projects':  ProjectsPage,
       '/settings':  SettingsPage,
+      '/login':     LoginPage,
+      '/register':  RegisterPage,
     };
 
     function hashRouter() {
-      return {
-        render() {
-          return routes[window.location.hash.slice(1) || '/'] || routes['/'];
-        },
-      };
+      const route = window.location.hash.slice(1) || '/';
+      const isAuthRoute = route === '/login' || route === '/register';
+      // Redirect to login if no user and trying to access a protected route
+      if (!currentUser.value && !isAuthRoute) {
+        return { render() { return LoginPage; } };
+      }
+      // Redirect to home if logged in and trying to access auth pages
+      if (currentUser.value && isAuthRoute) {
+        return { render() { return ActivityPage; } };
+      }
+      return { render() { return routes[route] || routes['/']; } };
     }
 
     /* ── Root App component ────────────────────────────────────────────────────
@@ -2520,8 +2635,15 @@
     };
 
     /* ── Bootstrap ───────────────────────────────────────────────────────────── */
-    const app = createApp(App);
-    app.mount('#app');
+    (async function init() {
+      // Try to restore session from cookie
+      try {
+        const sess = await window.api.getSession();
+        if (sess?.user) currentUser.value = sess.user;
+      } catch (_) {}
+      const app = createApp(App);
+      app.mount('#app');
+    })();
   </script>
 </body>
 </html>

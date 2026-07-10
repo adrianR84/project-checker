@@ -4,12 +4,26 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { toNodeHandler } = require('better-auth/node');
+const auth = require('./services/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.all('/api/auth/*', toNodeHandler(auth));
 app.use(express.json({ limit: '1mb' }));
+
+// Session middleware — extracts userId from cookie and attaches to req
+// All /api/* routes (except /api/auth/*) require authentication
+const { fromNodeHeaders } = require('better-auth/node');
+app.use('/api', async (req, res, next) => {
+  if (req.path.startsWith('/auth')) return next(); // better-auth handles its own routes
+  const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+  req.userId = session.user.id;
+  next();
+});
 
 // Routes — imported after db init so they can use the proxy
 const projectsRouter = require('./routes/projects');

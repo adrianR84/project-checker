@@ -12,8 +12,8 @@ router.get('/', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = ['p.enabled = 1'];
-  const params = [];
+  const conditions = ['p.enabled = 1 AND p.user_id = ?'];
+  const params = [req.userId];
   if (projectId) {
     conditions.push('cl.project_id = ?');
     params.push(projectId);
@@ -53,8 +53,8 @@ router.get('/status-changes', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = ['p.enabled = 1'];
-  const params = [];
+  const conditions = ['p.enabled = 1 AND p.user_id = ?'];
+  const params = [req.userId];
   if (projectId) {
     conditions.push('rsc.project_id = ?');
     params.push(projectId);
@@ -88,7 +88,11 @@ router.get('/status-changes', async (req, res) => {
 router.patch('/status-changes/:id/confirm', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const confirmed = req.body?.confirmed ? 1 : 0;
-  const row = await db.prepare('SELECT id FROM event_logs WHERE id = ?').get(id);
+  const row = await db.prepare(`
+    SELECT rsc.id FROM event_logs rsc
+    JOIN projects p ON p.id = rsc.project_id
+    WHERE rsc.id = ? AND p.user_id = ?
+  `).get(id, req.userId);
   if (!row) return res.status(404).json({ error: 'Status change not found' });
   await db.prepare('UPDATE event_logs SET confirmed = ? WHERE id = ?').run(confirmed, id);
   res.json({ ok: true, id, confirmed });
@@ -102,8 +106,8 @@ router.get('/alerts', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
-  const conditions = ['p.enabled = 1'];
-  const params = [];
+  const conditions = ['p.enabled = 1 AND p.user_id = ?'];
+  const params = [req.userId];
   if (projectId) {
     conditions.push('rsc.project_id = ?');
     params.push(projectId);
