@@ -133,7 +133,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     /** Format a timestamp as a human-readable relative string: "3 hours ago" */
-    const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' });
     const DTF = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' });
     const UNITS = [
       ['year',   31536e3],
@@ -1398,6 +1398,15 @@
                   <tr>
                     <th class="hide-sm" :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
                     <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
+                    <th class="cen" title="GitHub">
+                      <span class="icon icon-github"></span>
+                    </th>
+                    <th class="cen" title="Twitter">
+                      <span class="icon icon-twitter"></span>
+                    </th>
+                    <th class="cen" title="Website">
+                      <span class="icon icon-website"></span>
+                    </th>
                     <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
                     <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
                     <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
@@ -1406,7 +1415,6 @@
                     <th class="hide-sm" :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                     <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
                     <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
-                    <th class="hide-sm" :class="['sortable', priceSort.col === 'chain' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('chain')">Chain</th>
                     <th class="cen" title="Track price changes">
                       <span class="sr-only">Track</span>
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -1416,17 +1424,33 @@
                 <tbody>
                   <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
                     <td class="hide-sm">
-                      <a :href="row.twitter_url || 'https://x.com/search?q=%24' + encodeURIComponent(row.project_name) + '&src=typed_query'"
-                         target="_blank" rel="noopener"
-                         :title="row.project_name">
+                      <span :title="row.project_name">
                         {{ row.project_name.length > 30 ? row.project_name.slice(0, 30) + '…' : row.project_name }}
-                      </a>
+                      </span>
                     </td>
                     <td>
                       <a :href="'https://x.com/search?q=%24' + (row.symbol.startsWith('$') ? row.symbol.slice(1) : row.symbol) + '&src=typed_query'"
                          target="_blank" rel="noopener">
                         {{ row.symbol || '—' }}
                       </a>
+                    </td>
+                    <td class="cen">
+                      <a v-if="row.github_url" :href="row.github_url" target="_blank" rel="noopener" title="GitHub">
+                        <span class="icon icon-github"></span>
+                      </a>
+                      <span v-else>—</span>
+                    </td>
+                    <td class="cen">
+                      <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter">
+                        <span class="icon icon-twitter"></span>
+                      </a>
+                      <span v-else>—</span>
+                    </td>
+                    <td class="cen">
+                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website">
+                        <span class="icon icon-website"></span>
+                      </a>
+                      <span v-else>—</span>
                     </td>
                     <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
                     <td class="cen">
@@ -1443,7 +1467,6 @@
                     <td class="num hide-sm">{{ fmtShortNum(row.liquidity_usd) }}</td>
                     <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                     <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
-                    <td class="hide-sm">{{ row.chain || '—' }}</td>
                     <td class="cen">
                       <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
                     </td>

@@ -101,7 +101,7 @@ router.get('/', async (req, res) => {
 // GET /api/dashboard/token-prices
 router.get('/token-prices', async (req, res) => {
   const rows = await db.prepare(`
-    SELECT tp.*, p.name AS project_name, p.twitter_url, p.price_enabled
+    SELECT tp.*, p.name AS project_name, p.github_url, p.twitter_url, p.website_url, p.price_enabled
     FROM token_prices tp
     JOIN projects p ON p.id = tp.project_id AND p.enabled = 1 AND p.user_id = ?
     ORDER BY p.name
