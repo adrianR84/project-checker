@@ -1787,6 +1787,15 @@
           applyPriceSort(priceSort.value.col, priceSort.value.desc);
         }
 
+        // Sync pagination limits from settings
+        watch(() => sharedSettings.value?.logs_per_page, (val) => {
+          if (val) {
+            logLimit.value = val;
+            scLimit.value = val;
+            alertLimit.value = val;
+          }
+        });
+
         return {
           activityTab, projects, prices, pricesLoading,
           logs, statusChanges, alertLogs, loading, error, logTab,
@@ -2296,6 +2305,14 @@
               </fieldset>
 
               <fieldset role="group">
+                <label data-tooltip="Override the default 20 logs per page for Events, Check Logs, and Alert Logs">
+                  <input type="checkbox" v-model="form.logs_per_page_enabled" />
+                  Logs per page
+                  <input v-show="form.logs_per_page_enabled" v-model.number="form.logs_per_page" type="number" min="5" max="100" style="width:80px" />
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
                 <label data-tooltip="Show or hide the Clear Logs and Clear All Data buttons">
                   <input type="checkbox" v-model="form.showDangerZone" />
                   Show DB options
@@ -2392,6 +2409,8 @@
           ui_refresh_enabled:        false,
           showDangerZone:           false,
           compact_activity:         false,
+          logs_per_page:           20,
+          logs_per_page_enabled:  false,
           github_alert_minutes:       60,
           github_alert_stop_minutes:  1440,
           website_alert_minutes:      60,
@@ -2450,6 +2469,8 @@
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
               compact_activity:     !!settings.value.compact_activity,
+              logs_per_page:       settings.value.logs_per_page || 20,
+              logs_per_page_enabled: settings.value.logs_per_page != null && settings.value.logs_per_page !== 20,
               github_alert_minutes:      settings.value.github_alert_minutes ?? 60,
               github_alert_stop_minutes:  settings.value.github_alert_stop_minutes ?? 1440,
               website_alert_minutes:      settings.value.website_alert_minutes ?? 60,
@@ -2527,6 +2548,9 @@
               ? Number(form.value.ui_refresh_seconds) || 60
               : 0,
             compact_activity: form.value.compact_activity ? 1 : 0,
+            logs_per_page: form.value.logs_per_page_enabled
+              ? Number(form.value.logs_per_page) || 20
+              : 20,
           });
         }
 

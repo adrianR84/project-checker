@@ -25,6 +25,7 @@ router.get('/', async (req, res) => {
     ui_refresh_seconds:         settings.ui_refresh_seconds,
     compact_activity:           settings.compact_activity_display,
     github_token:               settings.github_token,
+    logs_per_page:             settings.logs_per_page,
     github_check_minutes:       check_intervals.github,
     website_check_minutes:      check_intervals.website,
     twitter_check_minutes:      check_intervals.twitter,
@@ -93,6 +94,9 @@ router.put('/', async (req, res) => {
   // Alert config keys
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'github_token')) {
     updates.github_token = String(req.body.github_token || '');
+  }
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'logs_per_page')) {
+    updates.logs_per_page = Math.max(5, Math.min(100, parseInt(req.body.logs_per_page, 10) || 20));
   }
 
   const alertKeys = [
@@ -173,13 +177,14 @@ router.put('/', async (req, res) => {
       await db.prepare('UPDATE config SET check_intervals = ? WHERE user_id = ?').run(JSON.stringify(ci), req.userId);
     }
   }
-  if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined) {
+  if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined) {
     const s = await db.config.getSettings(req.userId);
     if (s) {
       if (updates.log_retention_days !== undefined) s.log_retention_days = updates.log_retention_days;
       if (updates.ui_refresh_seconds !== undefined) s.ui_refresh_seconds = updates.ui_refresh_seconds;
       if (updates.compact_activity !== undefined) s.compact_activity_display = updates.compact_activity;
       if (updates.github_token !== undefined) s.github_token = updates.github_token || null;
+      if (updates.logs_per_page !== undefined) s.logs_per_page = updates.logs_per_page;
       await db.prepare('UPDATE config SET settings = ? WHERE user_id = ?').run(JSON.stringify(s), req.userId);
     }
   }
