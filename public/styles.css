@@ -474,8 +474,8 @@ table.compact .details_cell   { min-width: 140px; }
 /* ── Social icon classes (SVG inline data URIs) ──────────────────────── */
 .icon {
   display: inline-block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   background: no-repeat center;
   background-size: contain;
   flex-shrink: 0;
