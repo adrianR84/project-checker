@@ -1416,7 +1416,7 @@
                 <tbody>
                   <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
                     <td class="hide-sm">
-                      <a :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
+                      <a :href="row.twitter_url || 'https://x.com/search?q=%24' + encodeURIComponent(row.project_name) + '&src=typed_query'"
                          target="_blank" rel="noopener"
                          :title="row.project_name">
                         {{ row.project_name.length > 30 ? row.project_name.slice(0, 30) + '…' : row.project_name }}
@@ -1429,7 +1429,14 @@
                       </a>
                     </td>
                     <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
-                    <td class="cen"><b>{{ row.price_usd ? '$' + parseFloat(row.price_usd).toFixed(6) : '—' }}</b></td>
+                    <td class="cen">
+                      <a v-if="row.price_usd" :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
+                         target="_blank" rel="noopener"
+                         :title="row.symbol + ' on DexScreener'">
+                        <b>{{ '$' + parseFloat(row.price_usd).toFixed(6) }}</b>
+                      </a>
+                      <span v-else>—</span>
+                    </td>
                     <td class="cen hide-sm" :class="priceCellTint[row.project_id + '-price_change_h1'] || []">{{ fmtPct(row.price_change_h1) }}</td>
                     <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h6'] || []">{{ fmtPct(row.price_change_h6) }}</td>
                     <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h24'] || []">{{ fmtPct(row.price_change_h24) }}</td>
@@ -1686,7 +1693,7 @@
             if (!a.enabled) continue;
             const norm = a.price_for.endsWith('h') ? 'h' + a.price_for.slice(0, -1) : a.price_for;
             if (map[norm]) map[norm].push(a);
-          }
+          } 
           return map;
         });
 
