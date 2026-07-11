@@ -37,13 +37,19 @@ router.get('/', async (req, res) => {
       ORDER BY cl.checked_at DESC, cl.id DESC LIMIT 1
     `).get(p.id);
 
-    /** Returns the timestamp of the latest non-confirmed status change for a resource type. */
-    const latestChanged = async (resourceType) => {
+    /** Returns { created_at, confirmed } of the latest event_log for a resource type. */
+    const latestEvent = async (resourceType) => {
       const row = await db.prepare(
-        "SELECT created_at FROM event_logs WHERE project_id = ? AND resource_type = ? ORDER BY created_at DESC LIMIT 1"
+        "SELECT created_at, confirmed FROM event_logs WHERE project_id = ? AND resource_type = ? ORDER BY created_at DESC LIMIT 1"
       ).get(p.id, resourceType);
-      return row?.created_at || null;
+      return row || null;
     };
+
+    const [websiteEvt, githubEvt, twitterEvt] = await Promise.all([
+      latestEvent('website'),
+      latestEvent('github'),
+      latestEvent('twitter'),
+    ]);
 
     const repos = await db.prepare(`
       SELECT repo_name, full_name, repo_url, latest_commit_date, latest_commit_message,
@@ -80,9 +86,10 @@ router.get('/', async (req, res) => {
       website_status: websiteCheck || null,
       github_status:  githubCheck  || null,
       twitter_status: twitterCheck || null,
-      website_last_changed_at: await latestChanged('website'),
-      github_last_changed_at:  await latestChanged('github'),
-      twitter_last_changed_at: await latestChanged('twitter'),
+      website_last_changed_at: websiteEvt?.created_at || null,
+      github_last_changed_at:  githubEvt?.created_at  || null,
+      twitter_last_changed_at: twitterEvt?.created_at  || null,
+      has_unconfirmed: !!(websiteEvt?.confirmed === 0 || githubEvt?.confirmed === 0 || twitterEvt?.confirmed === 0),
       repos,
       deletedRepos
     });

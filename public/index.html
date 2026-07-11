@@ -1490,7 +1490,7 @@
         const logLimit  = ref(20);
         const scPage    = ref(1);
         const scTotal   = ref(0);
-        const scLimit   = ref(15);
+        const scLimit   = ref(20);
         const alertPage  = ref(1);
         const alertTotal = ref(0);
         const alertLimit = ref(20);
@@ -1643,12 +1643,26 @@
 
         const filteredProjects = computed(() => {
           const q = filter.value.toLowerCase();
-          if (!q) return projects.value;
-          return projects.value.filter(p =>
-            p.name.toLowerCase().includes(q) ||
-            (p.website_url || '').toLowerCase().includes(q) ||
-            (p.github_url || '').toLowerCase().includes(q)
-          );
+          const all = q
+            ? projects.value.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                (p.website_url || '').toLowerCase().includes(q) ||
+                (p.github_url || '').toLowerCase().includes(q)
+              )
+            : projects.value;
+
+          // Most recent event timestamp across the three resource types
+          const recentTs = p => {
+            const ts = [p.website_last_changed_at, p.github_last_changed_at, p.twitter_last_changed_at]
+              .filter(Boolean)
+              .sort((a, b) => b.localeCompare(a));
+            return ts[0] || '';
+          };
+
+          return [...all].sort((a, b) => {
+            if (a.has_unconfirmed !== b.has_unconfirmed) return a.has_unconfirmed ? -1 : 1;
+            return recentTs(b).localeCompare(recentTs(a));
+          });
         });
 
         const filteredPrices = computed(() => {
