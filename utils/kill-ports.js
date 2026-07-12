@@ -3,8 +3,23 @@
 // Works on Windows, Linux, and macOS.
 
 const { execSync } = require('child_process');
+const { readFileSync } = require('fs');
 
-const PORTS = [3000, 3001];
+// Read PORT from .env
+function getEnvPort(key, fallback) {
+  try {
+    const env = readFileSync('.env', 'utf8');
+    const match = env.match(new RegExp(`^${key}=(.+)`, 'm'));
+    return match ? parseInt(match[1].trim(), 10) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const PORTS = [
+  getEnvPort('PORT', 3000),
+  getEnvPort('LIVE_RELOAD_PORT', 3001),
+];
 
 /** Returns true when running on Windows. */
 function isWindows() {

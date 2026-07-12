@@ -16,6 +16,7 @@ For live reload during development:
 ```bash
 pnpm dev      # starts Express + live-reload server
 pnpm dev:log  # same, but also saves output to logs/output.log
+pnpm dev | pnpm log:pipe  # same as pnpm dev:log
 ```
 
 ## What it does
