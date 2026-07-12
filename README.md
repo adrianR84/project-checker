@@ -81,7 +81,7 @@ All settings are stored in the `config` table as JSON group columns:
 
 | Group key | Contents |
 |-----------|----------|
-| `settings` | `log_retention_days`, `ui_refresh_seconds`, `compact_activity_display`, `github_token` |
+| `settings` | `log_retention_days`, `ui_refresh_seconds`, `compact_activity_display`, `github_token`, `logs_per_page` |
 | `check_intervals` | `github`, `website`, `twitter` (minutes) |
 | `alert_intervals` | `github`, `website`, `twitter` (minutes — 0 disables) |
 | `alert_stops` | `github`, `website`, `twitter` (minutes — 0 = indefinite) |
@@ -95,7 +95,13 @@ All settings are stored in the `config` table as JSON group columns:
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `SCHEDULER_DEBUG` | `0` | Set to `1` to enable verbose scheduler tick logging |
-| `GITHUB_TOKEN` | — | Not used — GitHub token is stored via the Settings UI in `config.settings.github_token` |
+| `SKIP_AUTH` | — | Set to `true` to bypass authentication (dev mode only) |
+| `DEFAULT_USER_ID` | — | User ID used by scheduler to read config when `SKIP_AUTH=true` |
+| `BETTER_AUTH_URL` | — | OAuth callback origin (e.g. `http://localhost:3001`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Google OAuth credentials |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | GitHub OAuth credentials |
+| `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` | — | Twitter OAuth credentials |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | — | Facebook OAuth credentials |
 
 ## API
 
