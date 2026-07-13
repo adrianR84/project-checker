@@ -2111,20 +2111,27 @@
 
           for (const item of list) {
             try {
-              const hasWebsite = !!item.website;
+              // Normalize URL cols: support both string ("https://...") and object ({ url, cc, pc }) formats
+              const websiteVal = item.website;
+              const twitterVal = item.twitter;
+              const hasWebsite = !!(websiteVal && (websiteVal.url || websiteVal));
               const tok = (item.symbol || item.contractAddress || item.chainId)
                 ? { symbol: item.symbol || null, contract: item.contractAddress || null, chain: item.chainId || null }
                 : null;
               const created = await api.createProject({
                 name:                   item.name,
-                website_url:            item.website,
-                github_url:             item.github,
-                twitter_url:            item.twitter,
-                telegram_url:           item.telegram,
+                website_url:            websiteVal?.url ?? websiteVal ?? null,
+                website_content_check:  item.website_enabled !== undefined
+                  ? (item.website_enabled ? 1 : 0)
+                  : (websiteVal?.cc ?? (hasWebsite ? 1 : 0)),
+                github_url:             githubVal?.url ?? githubVal ?? null,
+                twitter_url:            twitterVal?.url ?? twitterVal ?? null,
+                twitter_enabled:        item.twitter_enabled !== undefined
+                  ? (item.twitter_enabled ? 1 : 0)
+                  : (twitterVal?.pc ?? 1),
+                telegram_url:           item.telegram?.url ?? item.telegram ?? null,
                 website_enabled:        item.website_enabled  !== undefined ? (item.website_enabled  ? 1 : 0) : hasWebsite,
-                website_content_check:  item.website_enabled  !== undefined ? (item.website_enabled  ? 1 : 0) : hasWebsite,
                 github_enabled:         item.github_enabled   !== undefined ? (item.github_enabled   ? 1 : 0) : 1,
-                twitter_enabled:        item.twitter_enabled  !== undefined ? (item.twitter_enabled  ? 1 : 0) : 1,
                 telegram_enabled:       item.telegram_enabled !== undefined ? (item.telegram_enabled ? 1 : 0) : 1,
                 token:                  tok,
                 enabled:                item.enabled        !== undefined ? (item.enabled        ? 1 : 0) : 1,
@@ -2157,6 +2164,10 @@
         async function exportProjects() {
           const withRepos = await Promise.all(projects.value.map(async p => {
             const t = tok(p);
+            const w = col(p, 'website');
+            const g = col(p, 'github');
+            const tw = col(p, 'twitter');
+            const tg = col(p, 'telegram');
             const projectRepos = p.repos || await api.getProjectRepos(p.id);
             const repos = projectRepos.map(r => ({
               full_name: r.full_name,
@@ -2164,9 +2175,10 @@
             }));
             return {
               name:            p.name,
-              website:         p.website_url,
-              github:          p.github_url,
-              twitter:         p.twitter_url,
+              website:         w,
+              github:          g,
+              twitter:         tw,
+              telegram:        tg,
               symbol:          t.symbol || null,
               contractAddress: t.contract || null,
               chainId:         t.chain || null,
@@ -2203,6 +2215,11 @@
 
         function tok(p) {
           return p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
+        }
+        function col(p, key) {
+          const v = p[key];
+          if (!v) return null;
+          return typeof v === 'string' ? JSON.parse(v) : v;
         }
 
         return {
