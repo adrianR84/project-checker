@@ -8,5 +8,4 @@ node_modules/
 .vscode/
 .idea/
 .devlogger/
-data/project-checker.db-wal
-data/project-checker.db-shm
+data/*
