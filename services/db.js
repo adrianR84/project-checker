@@ -25,7 +25,6 @@ async function init() {
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      user_id TEXT NOT NULL DEFAULT '',
       website TEXT,
       github TEXT,
       twitter TEXT,
@@ -37,9 +36,15 @@ async function init() {
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
       token_enabled INTEGER NOT NULL DEFAULT 1,
       enabled INTEGER NOT NULL DEFAULT 1,
+      user_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
+    CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects (user_id);
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_config_user_id ON config (user_id);
   `);
 
   database.exec(`

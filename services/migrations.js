@@ -476,6 +476,20 @@ function add_user_id_to_config(db) {
   db.exec('ALTER TABLE config ADD COLUMN user_id TEXT NOT NULL DEFAULT \'\'');
 }
 
+/** Migration: adds index on projects.user_id. */
+function add_projects_user_id_index(db) {
+  const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_projects_user_id'").get();
+  if (idx) return;
+  db.exec('CREATE INDEX idx_projects_user_id ON projects (user_id)');
+}
+
+/** Migration: adds index on config.user_id. */
+function add_config_user_id_index(db) {
+  const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_config_user_id'").get();
+  if (idx) return;
+  db.exec('CREATE INDEX idx_config_user_id ON config (user_id)');
+}
+
 /** Migration: compacts flat URL/content columns into JSON cols, renames price_enabled → token_enabled. */
 function compact_projects_url_cols(db) {
   const rows = db.prepare("PRAGMA table_info(projects)").all();
@@ -700,6 +714,8 @@ async function runMigrations(db) {
   try { add_user_id_to_config(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { compact_projects_url_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { drop_repos_repo_name_col(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_projects_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_config_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };
