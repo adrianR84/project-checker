@@ -11,7 +11,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.all('/api/auth/*', toNodeHandler(auth));
+// When SKIP_AUTH=1, fake a valid session so the frontend SPA can init without login
+if (process.env.SKIP_AUTH === '1') {
+  app.all('/api/auth/get-session', (req, res) => {
+    res.json({ user: { id: process.env.DEFAULT_USER_ID || '' } });
+  });
+} else {
+  app.all('/api/auth/*', toNodeHandler(auth));
+}
 app.use(express.json({ limit: '1mb' }));
 
 // Session middleware — extracts userId from cookie and attaches to req
@@ -19,6 +26,17 @@ app.use(express.json({ limit: '1mb' }));
 const { fromNodeHeaders } = require('better-auth/node');
 app.use('/api', async (req, res, next) => {
   if (req.path.startsWith('/auth')) return next(); // better-auth handles its own routes
+  // ponytail: dev bypass — use DEFAULT_USER_ID env var or fall back to first user in DB
+  if (process.env.SKIP_AUTH === '1') {
+    req.userId = process.env.DEFAULT_USER_ID || '';
+    if (!req.userId) {
+      const { DatabaseSync } = require('node:sqlite');
+      const devDb = new DatabaseSync(require('path').join(__dirname, 'data', 'project-checker.db'));
+      const row = devDb.prepare('SELECT user_id FROM projects LIMIT 1').get();
+      req.userId = row ? row.user_id : '';
+    }
+    return next();
+  }
   const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
   req.userId = session.user.id;
