@@ -2156,10 +2156,8 @@
             const t = tok(p);
             const projectRepos = p.repos || await api.getProjectRepos(p.id);
             const repos = projectRepos.map(r => ({
-              full_name:      r.full_name,
-              repo_url:       r.repo_url,
-              description:    r.description,
-              default_branch: r.default_branch,
+              full_name: r.full_name,
+              repo_url:  r.repo_url,
             }));
             return {
               name:           p.name,
