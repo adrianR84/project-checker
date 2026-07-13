@@ -9,7 +9,7 @@ pnpm install
 pnpm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3004](http://localhost:3004).
 
 For live reload during development:
 
@@ -93,7 +93,7 @@ All settings are stored in the `config` table as JSON group columns:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3000` | Server port |
+| `PORT` | `3004` | Server port |
 | `SCHEDULER_DEBUG` | `0` | Set to `1` to enable verbose scheduler tick logging |
 | `SKIP_AUTH` | — | Set to `true` to bypass authentication (dev mode only) |
 | `DEFAULT_USER_ID` | — | User ID used by scheduler to read config when `SKIP_AUTH=true` |
