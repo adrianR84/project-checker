@@ -9,6 +9,7 @@
     "dev": "node utils/kill-ports.js && concurrently \"node --watch index.js\" \"live-server --port=3005 --no-browser --proxy=/api:http://localhost:3004/api public\"",
     "dev:log": "node utils/kill-ports.js && node utils/dev-log.js",
     "log:pipe": "node utils/log-pipe.js",
+    "vacuum": "node utils/vacuum-db.js",
     "release": "bash ./utils/deploy.sh"
   },
   "dependencies": {

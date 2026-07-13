@@ -2405,6 +2405,13 @@
               </fieldset>
 
               <fieldset role="group">
+                <label data-tooltip="Run checks immediately when adding a project or repos">
+                  <input type="checkbox" v-model="form.checks_on_new_project" />
+                  Run checks on new projects
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
                 <label data-tooltip="Override the default 20 logs per page for Events, Check Logs, and Alert Logs">
                   <input type="checkbox" v-model="form.logs_per_page_enabled" />
                   Logs per page
@@ -2569,6 +2576,7 @@
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
               compact_activity:     !!settings.value.compact_activity,
+              checks_on_new_project: !!settings.value.checks_on_new_project,
               logs_per_page:       settings.value.logs_per_page || 20,
               logs_per_page_enabled: settings.value.logs_per_page != null && settings.value.logs_per_page !== 20,
               github_alert_minutes:      settings.value.github_alert_minutes ?? 60,
@@ -2648,6 +2656,7 @@
               ? Number(form.value.ui_refresh_seconds) || 60
               : 0,
             compact_activity: form.value.compact_activity ? 1 : 0,
+            checks_on_new_project: form.value.checks_on_new_project ? 1 : 0,
             logs_per_page: form.value.logs_per_page_enabled
               ? Number(form.value.logs_per_page) || 20
               : 20,
