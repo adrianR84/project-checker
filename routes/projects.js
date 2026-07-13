@@ -91,7 +91,7 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
         stars_count = ?, language = ?, latest_tag = ?, updated_at = ?
       WHERE id = ?
     `).run(
-      repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
+      repoInfo.repo_url, repoInfo.description, repoInfo.default_branch ?? 'main',
       h.first_commit_date, h.latest_commit_date, h.total_commits,
       h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
       repoInfo.stars_count ?? 0, repoInfo.language, latestTag, ts,
@@ -106,7 +106,7 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       projectId,
-      repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
+      repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch ?? 'main',
       h.first_commit_date, h.latest_commit_date, h.total_commits,
       h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
       repoInfo.stars_count ?? 0, repoInfo.language, latestTag,
