@@ -10,6 +10,7 @@
     "dev:log": "node utils/kill-ports.js && node utils/dev-log.js",
     "log:pipe": "node utils/log-pipe.js",
     "vacuum": "node utils/vacuum-db.js",
+    "drop-tables": "node utils/drop-tables.js",
     "release": "bash ./utils/deploy.sh"
   },
   "dependencies": {
