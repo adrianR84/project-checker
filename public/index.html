@@ -2121,11 +2121,14 @@
                 github_url:             item.github,
                 twitter_url:            item.twitter,
                 telegram_url:           item.telegram,
-                website_enabled:        hasWebsite,
-                website_content_check:  hasWebsite,
+                website_enabled:        item.website_enabled  !== undefined ? (item.website_enabled  ? 1 : 0) : hasWebsite,
+                website_content_check:  item.website_enabled  !== undefined ? (item.website_enabled  ? 1 : 0) : hasWebsite,
+                github_enabled:         item.github_enabled   !== undefined ? (item.github_enabled   ? 1 : 0) : 1,
+                twitter_enabled:        item.twitter_enabled  !== undefined ? (item.twitter_enabled  ? 1 : 0) : 1,
+                telegram_enabled:       item.telegram_enabled !== undefined ? (item.telegram_enabled ? 1 : 0) : 1,
                 token:                  tok,
-                enabled:                item.enabled !== undefined ? (item.enabled ? 1 : 0) : 1,
-                price_enabled:          item.price_enabled !== undefined ? (item.price_enabled ? 1 : 0) : 1,
+                enabled:                item.enabled        !== undefined ? (item.enabled        ? 1 : 0) : 1,
+                price_enabled:          item.price_enabled   !== undefined ? (item.price_enabled   ? 1 : 0) : 1,
               });
               // Restore repos if present
               if (Array.isArray(item.repos) && item.repos.length) {
@@ -2160,14 +2163,19 @@
               repo_url:  r.repo_url,
             }));
             return {
-              name:           p.name,
-              website:        p.website_url,
-              github:         p.github_url,
-              twitter:        p.twitter_url,
-              symbol:         t.symbol || null,
+              name:            p.name,
+              website:         p.website_url,
+              github:          p.github_url,
+              twitter:         p.twitter_url,
+              symbol:          t.symbol || null,
               contractAddress: t.contract || null,
-              chainId:        t.chain || null,
-              enabled:        p.enabled,
+              chainId:         t.chain || null,
+              enabled:         p.enabled,
+              website_enabled:  p.website_enabled ? 1 : 0,
+              github_enabled:   p.github_enabled  ? 1 : 0,
+              twitter_enabled:  p.twitter_enabled ? 1 : 0,
+              telegram_enabled: p.telegram_enabled ? 1 : 0,
+              price_enabled:   p.price_enabled   ? 1 : 0,
               repos,
             };
           }));
