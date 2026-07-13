@@ -2113,6 +2113,7 @@
             try {
               // Normalize URL cols: support both string ("https://...") and object ({ url, cc, pc }) formats
               const websiteVal = item.website;
+              const githubVal = item.github;
               const twitterVal = item.twitter;
               const hasWebsite = !!(websiteVal && (websiteVal.url || websiteVal));
               // token: prefer full object, fall back to individual fields
