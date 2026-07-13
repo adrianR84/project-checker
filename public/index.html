@@ -2115,9 +2115,11 @@
               const websiteVal = item.website;
               const twitterVal = item.twitter;
               const hasWebsite = !!(websiteVal && (websiteVal.url || websiteVal));
-              const tok = (item.symbol || item.contractAddress || item.chainId)
-                ? { symbol: item.symbol || null, contract: item.contractAddress || null, chain: item.chainId || null }
-                : null;
+              // token: prefer full object, fall back to individual fields
+              const tok = item.token
+                || (item.symbol || item.contractAddress || item.chainId
+                    ? { symbol: item.symbol || null, contract: item.contractAddress || null, chain: item.chainId || null }
+                    : null);
               const created = await api.createProject({
                 name:                   item.name,
                 website_url:            websiteVal?.url ?? websiteVal ?? null,
@@ -2179,9 +2181,7 @@
               github:          g,
               twitter:         tw,
               telegram:        tg,
-              symbol:          t.symbol || null,
-              contractAddress: t.contract || null,
-              chainId:         t.chain || null,
+              token:           t,
               enabled:         p.enabled,
               website_enabled:  p.website_enabled ? 1 : 0,
               github_enabled:   p.github_enabled  ? 1 : 0,
