@@ -4,12 +4,27 @@ const db = require('../services/db');
 
 const router = express.Router();
 
+// Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+function parseProjectRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    website_url:         row.website  ? JSON.parse(row.website).url  : null,
+    website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
+    github_url:          row.github   ? JSON.parse(row.github).url  : null,
+    twitter_url:         row.twitter   ? JSON.parse(row.twitter).url : null,
+    twitter_enabled:     row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    telegram_url:        row.telegram  ? JSON.parse(row.telegram).url : null,
+    price_enabled:       row.token_enabled,
+  };
+}
+
 // GET /api/dashboard
 router.get('/', async (req, res) => {
-  const projects = await db.prepare(`
-    SELECT id, name, enabled, token, price_enabled,
-           website_enabled, website_content_check, github_enabled, twitter_enabled, telegram_enabled,
-           website_url, github_url, twitter_url, telegram_url,
+  const rows = await db.prepare(`
+    SELECT id, name, enabled, token, token_enabled,
+           website, github, twitter, telegram,
+           website_enabled, github_enabled, twitter_enabled, telegram_enabled,
            created_at, updated_at
     FROM projects
     WHERE enabled = 1 AND user_id = ?
@@ -17,7 +32,8 @@ router.get('/', async (req, res) => {
   `).all(req.userId);
 
   const result = [];
-  for (const p of projects) {
+  for (const raw of rows) {
+    const p = parseProjectRow(raw);
     const websiteCheck = await db.prepare(`
       SELECT status, http_status, checked_at FROM check_logs
       WHERE project_id = ? AND resource_type = 'website'
@@ -52,18 +68,18 @@ router.get('/', async (req, res) => {
     ]);
 
     const repos = await db.prepare(`
-      SELECT repo_name, full_name, repo_url, latest_commit_date, latest_commit_message,
+      SELECT full_name, repo_url, latest_commit_date, latest_commit_message,
              latest_commit_sha, total_commits, stars_count, language, pushed_at, latest_tag
       FROM repos
       WHERE project_id = ? AND status = 'active'
-      ORDER BY repo_name
+      ORDER BY full_name
     `).all(p.id);
 
     const deletedRepos = await db.prepare(`
-      SELECT repo_name, full_name, latest_commit_sha, updated_at
+      SELECT full_name, latest_commit_sha, updated_at
       FROM repos
       WHERE project_id = ? AND status = 'deleted'
-      ORDER BY repo_name
+      ORDER BY full_name
     `).all(p.id);
 
     result.push({
@@ -101,12 +117,19 @@ router.get('/', async (req, res) => {
 // GET /api/dashboard/token-prices
 router.get('/token-prices', async (req, res) => {
   const rows = await db.prepare(`
-    SELECT tp.*, p.name AS project_name, p.github_url, p.twitter_url, p.website_url, p.price_enabled
+    SELECT tp.*, p.name AS project_name,
+           p.token_enabled AS price_enabled,
+           p.website, p.github, p.twitter
     FROM token_prices tp
     JOIN projects p ON p.id = tp.project_id AND p.enabled = 1 AND p.user_id = ?
     ORDER BY p.name
   `).all(req.userId);
-  res.json(rows);
+  res.json(rows.map(r => ({
+    ...r,
+    website_url:  r.website  ? JSON.parse(r.website).url  : null,
+    github_url:   r.github   ? JSON.parse(r.github).url  : null,
+    twitter_url:  r.twitter   ? JSON.parse(r.twitter).url : null,
+  })));
 });
 
 module.exports = router;

@@ -59,17 +59,18 @@ async function pushPushbulletNote(accessToken, title, body) {
 /** Formats an event into a detail string. */
 function getDetail(event, v) {
   const { resource_type, event_type } = event;
+  const rn = v.full_name || v.repo_name;
   if (event_type === 'changed' && resource_type === 'github') {
-    return `new commit <code>${v.sha?.slice(0, 7) ?? '?'}</code> in <b>${v.repo_name ?? '?'}</b>`;
+    return `new commit <code>${v.sha?.slice(0, 7) ?? '?'}</code> in <b>${rn ?? '?'}</b>`;
   }
   if (event_type === 'changed' && resource_type === 'website') {
     return `content changed\n<code>${v.bh?.slice(0, 8) ?? '?'}</code> → <code>${v.ah?.slice(0, 8) ?? '?'}</code>`;
   }
   if (event_type === 'tag_changed') {
-    return `<b>${v.repo_name ?? '?'}</b> tag\n<code>${v.ot ?? 'none'}</code> → <code>${v.nt ?? '?'}</code>`;
+    return `<b>${rn ?? '?'}</b> tag\n<code>${v.ot ?? 'none'}</code> → <code>${v.nt ?? '?'}</code>`;
   }
   if (event_type === 'deleted' && resource_type === 'github') {
-    return `<b>${v.repo_name ?? '?'}</b> was deleted`;
+    return `<b>${rn ?? '?'}</b> was deleted`;
   }
   if (event_type === 'changed' && resource_type === 'twitter') {
     return `profile updated`;
@@ -83,14 +84,15 @@ function formatAlert(event, projectName) {
   let detail = '';
   try {
     const v = typeof value === 'string' ? JSON.parse(value) : value;
+    const rn = v.full_name || v.repo_name;
     if (event_type === 'changed' && resource_type === 'github') {
-      detail = `new commit ${v.sha?.slice(0, 7) ?? '?'} in ${v.repo_name ?? '?'}`;
+      detail = `new commit ${v.sha?.slice(0, 7) ?? '?'} in ${rn ?? '?'}`;
     } else if (event_type === 'changed' && resource_type === 'website') {
       detail = `content changed: ${v.bh?.slice(0, 8) ?? '?'} -> ${v.ah?.slice(0, 8) ?? '?'}`;
     } else if (event_type === 'tag_changed') {
-      detail = `${v.repo_name ?? '?'} tag: ${v.ot ?? 'none'} -> ${v.nt ?? '?'}`;
+      detail = `${rn ?? '?'} tag: ${v.ot ?? 'none'} -> ${v.nt ?? '?'}`;
     } else if (event_type === 'deleted' && resource_type === 'github') {
-      detail = `${v.repo_name ?? '?'} was deleted`;
+      detail = `${rn ?? '?'} was deleted`;
     } else if (event_type === 'changed' && resource_type === 'twitter') {
       detail = `profile updated`;
     } else {

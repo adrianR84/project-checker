@@ -215,9 +215,25 @@ router.put('/', async (req, res) => {
   res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts });
 });
 
+// Parse a raw project row: expand JSON group cols back to flat names.
+function parseProjectRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    website_url:         row.website  ? JSON.parse(row.website).url  : null,
+    website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
+    github_url:          row.github   ? JSON.parse(row.github).url  : null,
+    twitter_url:         row.twitter   ? JSON.parse(row.twitter).url : null,
+    twitter_enabled:     row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    telegram_url:        row.telegram  ? JSON.parse(row.telegram).url : null,
+    price_enabled:       row.token_enabled,
+  };
+}
+
 // Run checks for a single project across enabled resources
 /** Runs all enabled checks for one project and logs results. */
 async function runChecksForProject(project) {
+  project = parseProjectRow(project);
   const results = { website: null, github: [], twitter: null };
 
   if (project.website_enabled && project.website_url) {
@@ -266,7 +282,8 @@ router.post('/trigger-all', async (req, res) => {
 async function triggerResourceType(resourceType, userId) {
   const projects = await db.prepare('SELECT * FROM projects WHERE user_id = ?').all(userId);
   const results = [];
-  for (const project of projects) {
+  for (const raw of projects) {
+    const project = parseProjectRow(raw);
     try {
       if (resourceType === 'website' && project.website_enabled && project.website_url) {
         const r = await checkWebsite(project.website_url);

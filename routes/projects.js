@@ -7,11 +7,26 @@ const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChang
 const router = express.Router();
 const now = () => new Date().toISOString();
 
+// Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+function parseProjectRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    website_url:         row.website  ? JSON.parse(row.website).url  : null,
+    website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
+    github_url:           row.github   ? JSON.parse(row.github).url  : null,
+    twitter_url:          row.twitter   ? JSON.parse(row.twitter).url : null,
+    twitter_enabled:      row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    telegram_url:         row.telegram  ? JSON.parse(row.telegram).url : null,
+    price_enabled:        row.token_enabled,
+  };
+}
+
 // ponytail: shared helper — loads a project or sends 404 and returns null
 async function loadProjectOr404(res, id, userId) {
   const project = await db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(id, userId);
   if (!project) { res.status(404).json({ error: 'Project not found' }); return null; }
-  return project;
+  return parseProjectRow(project);
 }
 
 // ponytail: shared unavailable result for when a resource URL is not configured
@@ -19,16 +34,16 @@ const UNAVAILABLE = (msg) => ({ status: 'unavailable', http_status: null, respon
 
 // GET /api/projects — list all projects
 router.get('/', async (req, res) => {
-  const projects = await db.prepare(`
-    SELECT id, name, website_url, github_url, twitter_url, telegram_url,
-           website_enabled, website_content_check, github_enabled, twitter_enabled, telegram_enabled,
-           token, enabled, price_enabled,
+  const rows = await db.prepare(`
+    SELECT id, name, website, github, twitter, telegram,
+           website_enabled, github_enabled, twitter_enabled, telegram_enabled,
+           token, token_enabled, enabled,
            created_at, updated_at
     FROM projects
     WHERE user_id = ?
     ORDER BY id DESC
   `).all(req.userId);
-  res.json(projects);
+  res.json(rows.map(parseProjectRow));
 });
 
 // GET /api/projects/:id — single project with repos + latest check_logs
@@ -37,7 +52,7 @@ router.get('/:id', async (req, res) => {
   const project = await loadProjectOr404(res, id, req.userId);
   if (!project) return;
 
-  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY full_name').all(id);
 
   const latestLogs = await db.prepare(`
     SELECT * FROM check_logs
@@ -50,7 +65,7 @@ router.get('/:id', async (req, res) => {
     ORDER BY resource_type
   `).all(id, id);
 
-  res.json({ ...project, repos, latest_logs: latestLogs });
+  res.json({ ...parseProjectRow(project), repos, latest_logs: latestLogs });
 });
 
 // Helper: store repo with commit history — upsert without ON CONFLICT
@@ -70,31 +85,31 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
   if (existing) {
     await db.prepare(`
       UPDATE repos SET
-        repo_name = ?, repo_url = ?, description = ?, default_branch = ?,
+        repo_url = ?, description = ?, default_branch = ?,
         first_commit_date = ?, latest_commit_date = ?, total_commits = ?,
         latest_commit_sha = ?, latest_commit_message = ?, pushed_at = ?,
         stars_count = ?, language = ?, latest_tag = ?, updated_at = ?
       WHERE id = ?
     `).run(
-      repoInfo.repo_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
+      repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
       h.first_commit_date, h.latest_commit_date, h.total_commits,
       h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
-      repoInfo.stars_count, repoInfo.language, latestTag, ts,
+      repoInfo.stars_count ?? 0, repoInfo.language, latestTag, ts,
       existing.id
     );
   } else {
     await db.prepare(`
       INSERT INTO repos (
-        project_id, repo_name, full_name, repo_url, description, default_branch,
+        project_id, full_name, repo_url, description, default_branch,
         first_commit_date, latest_commit_date, total_commits, latest_commit_sha,
         latest_commit_message, pushed_at, stars_count, language, latest_tag, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       projectId,
-      repoInfo.repo_name, repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
+      repoInfo.full_name, repoInfo.repo_url, repoInfo.description, repoInfo.default_branch,
       h.first_commit_date, h.latest_commit_date, h.total_commits,
       h.latest_commit_sha, h.latest_commit_message, repoInfo.pushed_at,
-      repoInfo.stars_count, repoInfo.language, latestTag,
+      repoInfo.stars_count ?? 0, repoInfo.language, latestTag,
       'active', ts, ts
     );
   }
@@ -106,22 +121,32 @@ router.post('/', async (req, res) => {
           website_enabled, website_content_check, token, enabled, price_enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
+  // Serialize URL fields to JSON
+  const websiteJson  = website_url  ? JSON.stringify({ url: website_url, cc: website_content_check ? 1 : 0 }) : null;
+  const githubJson   = github_url   ? JSON.stringify({ url: github_url })  : null;
+  const twitterJson  = twitter_url  ? JSON.stringify({ url: twitter_url, pc: 1 }) : null;
+  const telegramJson = telegram_url  ? JSON.stringify({ url: telegram_url }) : null;
+
   // Prevent duplicate: same name + website_url for this user
   if (website_url) {
     const existing = await db.prepare(
-      'SELECT id FROM projects WHERE name = ? AND website_url = ? AND user_id = ?'
-    ).get(name, website_url, req.userId);
-    if (existing) return res.status(409).json({ error: 'Project with this name and website already exists' });
+      'SELECT id FROM projects WHERE name = ? AND website IS NOT NULL AND user_id = ?'
+    ).get(name, req.userId);
+    if (existing) {
+      // Re-parse to get the URL for comparison
+      const parsed = parseProjectRow(existing);
+      if (parsed.website_url === website_url) return res.status(409).json({ error: 'Project with this name and website already exists' });
+    }
   }
 
   const ts = now();
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
-    INSERT INTO projects (name, user_id, website_url, github_url, twitter_url, telegram_url,
-      website_enabled, website_content_check, token, enabled, price_enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, req.userId, website_url || null, github_url || null, twitter_url || null, telegram_url || null,
-    website_enabled ? 1 : 0, website_content_check ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, price_enabled ? 1 : 0, ts, ts);
+    INSERT INTO projects (name, user_id, website, github, twitter, telegram,
+      website_enabled, token, enabled, token_enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, req.userId, websiteJson, githubJson, twitterJson, telegramJson,
+    website_enabled ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, price_enabled ? 1 : 0, ts, ts);
 
   const projectId = result.lastInsertRowid;
 
@@ -142,7 +167,7 @@ router.post('/', async (req, res) => {
 
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
   const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ?').all(projectId);
-  res.status(201).json({ ...project, repos });
+  res.status(201).json({ ...parseProjectRow(project), repos });
 });
 
 // PUT /api/projects/:id — update project (optionally sync repos array)
@@ -159,6 +184,44 @@ router.put('/:id', async (req, res) => {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
       updates[key] = req.body[key];
     }
+  }
+
+  // Write adapter: serialize URL fields to JSON, rename price_enabled → token_enabled
+  // Prune flat content/enabled flags that have been merged into JSON cols
+  if ('website_url' in updates) {
+    updates.website = updates.website_url
+      ? JSON.stringify({ url: updates.website_url, cc: updates.website_content_check ? 1 : 0 })
+      : null;
+    delete updates.website_content_check;
+    delete updates.website_url;
+  } else if ('website_content_check' in updates) {
+    // Only cc changing — patch cc in existing website JSON in-place
+    const existingWebsite = existing?.website ? JSON.parse(existing.website) : {};
+    existingWebsite.cc = updates.website_content_check ? 1 : 0;
+    updates.website = JSON.stringify(existingWebsite);
+    delete updates.website_content_check;
+  }
+  if ('github_url' in updates) {
+    updates.github = updates.github_url ? JSON.stringify({ url: updates.github_url }) : null;
+    delete updates.github_url;
+  }
+  if ('twitter_url' in updates) {
+    updates.twitter = updates.twitter_url
+      ? JSON.stringify({ url: updates.twitter_url, pc: updates.twitter_enabled ? 1 : 0 })
+      : null;
+    delete updates.twitter_enabled;
+    delete updates.twitter_url;
+  } else if ('twitter_enabled' in updates) {
+    // twitter_url not being updated — strip the stale flat flag, it lives in twitter.pc now
+    delete updates.twitter_enabled;
+  }
+  if ('telegram_url' in updates) {
+    updates.telegram = updates.telegram_url ? JSON.stringify({ url: updates.telegram_url }) : null;
+    delete updates.telegram_url;
+  }
+  if ('price_enabled' in updates) {
+    updates.token_enabled = updates.price_enabled;
+    delete updates.price_enabled;
   }
 
   // Auto-fill token symbol/chain from DexScreener if contract is provided but symbol or chain is missing
@@ -209,8 +272,8 @@ router.put('/:id', async (req, res) => {
   }
 
   const updated = await db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
-  res.json({ ...updated, repos });
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY full_name').all(id);
+  res.json({ ...parseProjectRow(updated), repos });
 });
 
 // DELETE /api/projects/:id — delete project (cascades)
@@ -257,7 +320,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
       if (!githubFullNames.has(localRepo.full_name)) {
         const ts = now();
         await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, localRepo.id);
-        recordStatusChange(id, 'github', 'deleted', { repo_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
+        recordStatusChange(id, 'github', 'deleted', { full_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
       }
     }
 
@@ -308,7 +371,7 @@ router.post('/:id/add-repos', async (req, res) => {
     }
   }
 
-  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY repo_name').all(id);
+  const repos = await db.prepare('SELECT * FROM repos WHERE project_id = ? ORDER BY full_name').all(id);
   res.json({ ok: true, repos });
 });
 

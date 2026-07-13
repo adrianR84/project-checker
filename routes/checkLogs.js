@@ -4,6 +4,17 @@ const db = require('../services/db');
 
 const router = express.Router();
 
+// Expand JSON project cols to flat URL names for API compatibility.
+function expandProjectUrls(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    website_url:  row.website  ? JSON.parse(row.website).url  : null,
+    github_url:   row.github   ? JSON.parse(row.github).url  : null,
+    twitter_url:  row.twitter   ? JSON.parse(row.twitter).url : null,
+  };
+}
+
 // GET /api/check-logs?project_id=X&resource_type=Y&search=TEXT&limit=N&offset=M
 router.get('/', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
@@ -31,8 +42,8 @@ router.get('/', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT cl.*, p.name AS project_name,
-      r.full_name AS repo_name,
-      p.website_url, p.twitter_url, p.github_url
+      r.full_name,
+      p.website, p.twitter, p.github
     FROM check_logs cl
     LEFT JOIN projects p ON p.id = cl.project_id
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
@@ -42,7 +53,7 @@ router.get('/', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl LEFT JOIN projects p ON p.id = cl.project_id ${where}`).get(...params);
-  res.json({ logs: rows, total: totalRow.c, limit, offset });
+  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
 });
 
 // GET /api/check-logs/status-changes — event_logs entries
@@ -72,7 +83,7 @@ router.get('/status-changes', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT rsc.*, p.name AS project_name,
-      p.website_url, p.twitter_url, p.github_url
+      p.website, p.twitter, p.github
     FROM event_logs rsc
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
@@ -81,7 +92,7 @@ router.get('/status-changes', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
-  res.json({ logs: rows, total: totalRow.c, limit, offset });
+  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
 });
 
 // PATCH /api/check-logs/status-changes/:id/confirm  body: { confirmed: 0|1 }
@@ -125,7 +136,7 @@ router.get('/alerts', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value,
-      p.website_url, p.twitter_url, p.github_url
+      p.website, p.twitter, p.github
     FROM alert_logs al
     LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id
     LEFT JOIN projects p ON p.id = rsc.project_id
@@ -135,7 +146,7 @@ router.get('/alerts', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM alert_logs al LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
-  res.json({ logs: rows, total: totalRow.c, limit, offset });
+  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
 });
 
 module.exports = router;

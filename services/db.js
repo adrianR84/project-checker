@@ -26,17 +26,16 @@ async function init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       user_id TEXT NOT NULL DEFAULT '',
-      website_url TEXT,
-      github_url TEXT,
-      twitter_url TEXT,
-      telegram_url TEXT,
+      website TEXT,
+      github TEXT,
+      twitter TEXT,
+      telegram TEXT,
+      token TEXT,
       website_enabled INTEGER NOT NULL DEFAULT 1,
-      website_content_check INTEGER NOT NULL DEFAULT 1,
       github_enabled INTEGER NOT NULL DEFAULT 1,
       twitter_enabled INTEGER NOT NULL DEFAULT 1,
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
-      token TEXT,
-      price_enabled INTEGER NOT NULL DEFAULT 1,
+      token_enabled INTEGER NOT NULL DEFAULT 1,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -47,7 +46,6 @@ async function init() {
     CREATE TABLE IF NOT EXISTS repos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL,
-      repo_name TEXT NOT NULL,
       full_name TEXT NOT NULL,
       repo_url TEXT,
       description TEXT,
@@ -182,6 +180,7 @@ async function init() {
 // ponytail: coerce types SQLite can't bind — booleans → 0/1, objects/arrays → JSON
 function bindParams(params) {
   return params.map(v => {
+    if (v === undefined || v === null) return null;
     if (typeof v === 'boolean') return v ? 1 : 0;
     if (typeof v === 'object' && v !== null) return JSON.stringify(v);
     return v;

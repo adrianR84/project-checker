@@ -83,7 +83,6 @@ async function fetchReposForOwner(githubUrl) {
 
     for (const r of data) {
       repos.push({
-        repo_name: r.name,
         full_name: r.full_name,
         repo_url: r.html_url,
         description: r.description,

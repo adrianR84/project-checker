@@ -207,7 +207,7 @@ async function checkGithubRepo(fullName, projectId) {
       const ts = now();
       await db.prepare('UPDATE repos SET latest_tag = ?, updated_at = ? WHERE id = ?').run(latestTag, ts, repo.id);
       if (projectId && repo.latest_tag) {
-        recordStatusChange(projectId, 'github', 'tag_changed', { repo_name: fullName, ot: repo.latest_tag, nt: latestTag });
+        recordStatusChange(projectId, 'github', 'tag_changed', { full_name: fullName, ot: repo.latest_tag, nt: latestTag });
       }
       details = { tag_changed: true, old_tag: repo.latest_tag, new_tag: latestTag };
       status = 'changed';
@@ -236,7 +236,7 @@ async function checkGithubRepo(fullName, projectId) {
       );
       details = { ...details, changed: true, previous_sha: repo.latest_commit_sha, new_sha: history.latest_commit_sha };
       if (projectId && repo.latest_commit_sha) {
-        recordStatusChange(projectId, 'github', 'changed', { repo_name: fullName, sha: history.latest_commit_sha });
+        recordStatusChange(projectId, 'github', 'changed', { full_name: fullName, sha: history.latest_commit_sha });
       }
     } else if (!repo) {
       details = { note: 'Repo not in local DB, no update' };
@@ -252,7 +252,7 @@ async function checkGithubRepo(fullName, projectId) {
         await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, repo.id);
         if (projectId) {
           try {
-            recordStatusChange(projectId, 'github', 'deleted', { repo_name: fullName, sha: repo.latest_commit_sha });
+            recordStatusChange(projectId, 'github', 'deleted', { full_name: fullName, sha: repo.latest_commit_sha });
           } catch (insertErr) {
             console.error(`[${now()}] Failed to insert deletion event for ${fullName}: ${insertErr.message}`);
           }

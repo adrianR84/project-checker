@@ -84,6 +84,7 @@
       deleteProject:  (id)     => req(`/projects/${id}`,     { method: 'DELETE' }),
       refreshRepos:   (id)     => req(`/projects/${id}/refresh-repos`, { method: 'POST' }),
       getOrgRepos:    (id)     => req(`/projects/${id}/org-repos`),
+      getProjectRepos:(id)     => req(`/projects/${id}`).then(r => r.repos),
       addRepos:       (id, repos) => req(`/projects/${id}/add-repos`,   { method: 'POST', body: JSON.stringify({ repos }) }),
       removeRepo:     (id, fullName) => req(`/projects/${id}/repos/${encodeURIComponent(fullName)}`, { method: 'DELETE' }),
       checkWebsite:   (id)     => req(`/projects/${id}/check-website`,  { method: 'POST' }),
@@ -225,8 +226,8 @@
 
     /** Format a check_logs row for the detail column */
     function logDetail(log) {
-      const { status, http_status, response_time_ms, error_message, details, resource_type, repo_name } = log || {};
-      const repo = (resource_type === 'github' && repo_name) ? repo_name + ' · ' : '';
+      const { status, http_status, response_time_ms, error_message, details, resource_type, full_name } = log || {};
+      const repo = (resource_type === 'github' && full_name) ? full_name + ' · ' : '';
       if (status === 'ok') return repo + (http_status ? `HTTP ${http_status}${response_time_ms ? ' · ' + response_time_ms + 'ms' : ''}` : (response_time_ms ? response_time_ms + 'ms' : 'OK'));
       if (status === 'error') return repo + (error_message || 'Unknown error');
       if (status === 'disabled') return repo + 'Check disabled';
@@ -247,10 +248,10 @@
       if (log.resource_type === 'website' && log.website_url) return log.website_url;
       if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
       if (log.resource_type === 'github') {
-        const raw = jsonField ? log[jsonField] : log.repo_name;
+        const raw = jsonField ? log[jsonField] : log.full_name;
         if (!raw) return null;
         if (jsonField) {
-          try { const v = JSON.parse(raw); if (v.repo_name) return 'https://github.com/' + v.repo_name; } catch (_) {}
+          try { const v = JSON.parse(raw); if (v.full_name) return 'https://github.com/' + v.full_name; } catch (_) {}
         } else {
           return 'https://github.com/' + raw;
         }
@@ -463,8 +464,9 @@
         if (!value) return '—';
         try {
           const v = JSON.parse(value);
-          if (eventType === 'tag_changed') return `${v.repo_name} · ${v.ot ?? 'none'} → ${v.nt ?? 'none'}`;
-          if (eventType === 'changed' && resourceType === 'github') return `${v.repo_name} · commit ${v.sha?.slice(0, 7) ?? '?'}`;
+          const rn = v.full_name || v.repo_name;
+          if (eventType === 'tag_changed') return `${rn} · ${v.ot ?? 'none'} → ${v.nt ?? 'none'}`;
+          if (eventType === 'changed' && resourceType === 'github') return `${rn} · commit ${v.sha?.slice(0, 7) ?? '?'}`;
           if (eventType === 'changed' && resourceType === 'website') {
             const hs = (v.bhs || v.ahs) ? `${v.bhs ?? ''} → ${v.ahs ?? ''}` : '';
             const hv = (v.bh && v.ah) ? (v.bh !== v.ah ? 'content changed' : `${v.bh.slice(0, 8)}… → ${v.ah.slice(0, 8)}…`) : '';
@@ -475,7 +477,7 @@
             const bs = v.bs && v.as ? (v.as === 'error' ? '<span style="color:#e55">removed</span>' : `${v.bs} → ${v.as}`) : '';
             return [hs, bs].filter(Boolean).join(' · ');
           }
-          if (eventType === 'deleted' && resourceType === 'github') return `${v.repo_name} · <span style="color:#e55">deleted</span>`;
+          if (eventType === 'deleted' && resourceType === 'github') return `${rn} · <span style="color:#e55">deleted</span>`;
           return value;
         } catch (_) { return value; }
       },
@@ -951,7 +953,6 @@
           try {
             await api.addRepos(props.projectId, [{
               full_name: `${owner}/${repo}`,
-              repo_name: repo,
               repo_url: `https://github.com/${owner}/${repo}`,
               description: '',
               default_branch: '',
@@ -1856,6 +1857,9 @@
           <div class="toolbar">
             <h1>Projects</h1>
             <input v-model="projFilter" type="search" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 160px; padding: 2px 12px 2px 40px; height: 40px" />
+            <button v-if="selected.length" class="secondary" @click="onBulkEnable">Enable ({{ selected.length }})</button>
+            <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
+            <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
             <button @click="exportProjects">Export JSON</button>
             <button @click="importOpen = true">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
@@ -1875,6 +1879,7 @@
             <table>
               <thead>
                 <tr>
+                  <th style="width:2.5em"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
                   <th data-tooltip="Project name">Name</th>
                   <th data-tooltip="Website URL">Website</th>
                   <th data-tooltip="GitHub organization URL">GitHub</th>
@@ -1885,6 +1890,7 @@
               </thead>
               <tbody>
                 <tr v-for="p in filteredProjects" :key="p.id" :class="{ disabled: !p.enabled }">
+                  <td><input type="checkbox" :checked="selected.includes(p.id)" @change="toggleSelect(p.id)" /></td>
                   <td>{{ p.name }}</td>
                   <td><a v-if="p.website_url" :href="p.website_url" target="_blank" rel="noopener">{{ urlLabel(p.website_url) }}</a><span v-else>—</span></td>
                   <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
@@ -1973,6 +1979,7 @@
         const manageProject = ref(null); // project for RepoManager modal
         const lastGithubImport = ref(null); // import-created project needing repo setup
         const projFilter = ref('');
+        const selected = ref([]); // ids of selected projects for bulk ops
 
         const filteredProjects = computed(() => {
           const q = projFilter.value.toLowerCase();
@@ -2037,6 +2044,51 @@
           }
         }
 
+        /** Toggle selection of a single project */
+        function toggleSelect(id) {
+          const idx = selected.value.indexOf(id);
+          if (idx >= 0) selected.value.splice(idx, 1);
+          else selected.value.push(id);
+        }
+
+        /** Select or deselect all visible projects */
+        function toggleSelectAll() {
+          if (selected.value.length === filteredProjects.value.length) {
+            selected.value = [];
+          } else {
+            selected.value = filteredProjects.value.map(p => p.id);
+          }
+        }
+
+        /** Enable all selected projects */
+        async function onBulkEnable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { enabled: 1 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Disable all selected projects */
+        async function onBulkDisable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { enabled: 0 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Delete all selected projects after confirmation */
+        async function onBulkDelete() {
+          if (!selected.value.length) return;
+          const n = selected.value.length;
+          if (!confirm(`Delete ${n} project${n > 1 ? 's' : ''}? This removes their repos and check logs.`)) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.deleteProject(id)));
+          selected.value = [];
+          await load();
+        }
+
         /**
          * Import one or more projects from the JSON textarea.
          * Accepts a single object or an array of objects.
@@ -2075,6 +2127,10 @@
                 enabled:                item.enabled !== undefined ? (item.enabled ? 1 : 0) : 1,
                 price_enabled:          item.price_enabled !== undefined ? (item.price_enabled ? 1 : 0) : 1,
               });
+              // Restore repos if present
+              if (Array.isArray(item.repos) && item.repos.length) {
+                await api.addRepos(created.id, item.repos);
+              }
               ok++;
               if (item.github) lastGithubImport.value = created;
             } catch (e) {
@@ -2094,22 +2150,30 @@
           }
         }
 
-        /** Export all projects as JSON (same format as import) */
-        function exportProjects() {
-          const data = projects.value.map(p => {
+        /** Export all projects as JSON (same format as import, with repos) */
+        async function exportProjects() {
+          const withRepos = await Promise.all(projects.value.map(async p => {
             const t = tok(p);
+            const projectRepos = p.repos || await api.getProjectRepos(p.id);
+            const repos = projectRepos.map(r => ({
+              full_name:      r.full_name,
+              repo_url:       r.repo_url,
+              description:    r.description,
+              default_branch: r.default_branch,
+            }));
             return {
-              name:     p.name,
-              website:  p.website_url,
-              github:   p.github_url,
-              twitter:  p.twitter_url,
-              symbol:        t.symbol || null,
+              name:           p.name,
+              website:        p.website_url,
+              github:         p.github_url,
+              twitter:        p.twitter_url,
+              symbol:         t.symbol || null,
               contractAddress: t.contract || null,
-              chainId:       t.chain || null,
-              enabled:       p.enabled,
+              chainId:        t.chain || null,
+              enabled:        p.enabled,
+              repos,
             };
-          });
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          }));
+          const blob = new Blob([JSON.stringify(withRepos, null, 2)], { type: 'application/json' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
           a.download = 'projects.json';
@@ -2138,10 +2202,11 @@
         return {
           projects, filteredProjects, loading, error, showForm, editing, submitting,
           importOpen, importText, importing, manageProject, lastGithubImport,
-          projFilter,
+          projFilter, selected,
           openCreate, openEdit, openManageRepos,
           onSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
+          toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
           api: window.api,
         };
       },

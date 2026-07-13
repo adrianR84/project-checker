@@ -51,13 +51,14 @@ function everyNMinutes(n) {
 /** Runs website checks for all enabled projects, logs results to check_logs. */
 async function runWebsiteTick() {
   const projects = await db.prepare(`
-    SELECT id, website_url, website_content_check FROM projects
-    WHERE enabled = 1 AND website_enabled = 1 AND website_url IS NOT NULL AND website_url != ''
+    SELECT id, website FROM projects
+    WHERE enabled = 1 AND website_enabled = 1 AND website IS NOT NULL AND website != ''
   `).all();
   scheduleLog(`[${now()}] Scheduler: website tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
-      const r = await checkWebsite(p.website_url, p.id, !!p.website_content_check);
+      const parsed = JSON.parse(p.website);
+      const r = await checkWebsite(parsed.url, p.id, !!parsed.cc);
       await logCheck(p.id, 'website', null, r);
     } catch (err) {
       console.error(`[${now()}] website check failed for project ${p.id}: ${err.message}`);
@@ -68,13 +69,14 @@ async function runWebsiteTick() {
 /** Runs Twitter checks for all enabled projects, logs results to check_logs. */
 async function runTwitterTick() {
   const projects = await db.prepare(`
-    SELECT id, twitter_url FROM projects
-    WHERE enabled = 1 AND twitter_enabled = 1 AND twitter_url IS NOT NULL AND twitter_url != ''
+    SELECT id, twitter FROM projects
+    WHERE enabled = 1 AND twitter_enabled = 1 AND twitter IS NOT NULL AND twitter != ''
   `).all();
   scheduleLog(`[${now()}] Scheduler: twitter tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
-      const r = await checkTwitter(p.twitter_url);
+      const parsed = JSON.parse(p.twitter);
+      const r = await checkTwitter(parsed.url, p.id);
       await logCheck(p.id, 'twitter', null, r);
     } catch (err) {
       scheduleLog(`[${now()}] twitter check failed for project ${p.id}: ${err.message}`);
@@ -85,11 +87,12 @@ async function runTwitterTick() {
 /** Fetches GitHub repos for all enabled projects, detects deleted repos (marks status=deleted, records event_logs),
     checks remaining active repos and logs results to check_logs. */
 async function runCommitTick() {
-  const projects = await db.prepare(`SELECT id, github_url FROM projects WHERE enabled = 1 AND github_enabled = 1 AND github_url IS NOT NULL`).all();
+  const projects = await db.prepare(`SELECT id, github FROM projects WHERE enabled = 1 AND github_enabled = 1 AND github IS NOT NULL`).all();
   scheduleLog(`[${now()}] Scheduler: commit tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
-      const githubRepos = await fetchReposForOwner(p.github_url);
+      const githubUrl = JSON.parse(p.github).url;
+      const githubRepos = await fetchReposForOwner(githubUrl);
       const githubFullNames = new Set(githubRepos.map(r => r.full_name));
 
       const localActiveRepos = await db.prepare(
@@ -100,7 +103,7 @@ async function runCommitTick() {
         if (!githubFullNames.has(localRepo.full_name)) {
           const ts = now();
           await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, localRepo.id);
-          recordStatusChange(p.id, 'github', 'deleted', { repo_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
+          recordStatusChange(p.id, 'github', 'deleted', { full_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
         } else {
           const r = await checkGithubRepo(localRepo.full_name, p.id);
           await logCheck(p.id, 'github', localRepo.id, r);
@@ -263,7 +266,7 @@ async function upsertTokenPrice(projectId, token, data) {
   );
 }
 
-/** Sends price alert notifications for a single project. Gated by price_enabled. */
+/** Sends price alert notifications for a single project. Gated by token_enabled. */
 async function evaluatePriceAlerts(projectId, projectName) {
   const priceAlerts = await db.config.getPriceAlerts();
   if (!priceAlerts?.alerts?.length) return;
@@ -350,9 +353,9 @@ async function evaluatePriceAlerts(projectId, projectName) {
   await upsertTokenPricesAlert(projectId, winning.alert.price_change, now());
 }
 
-/** Runs price alert evaluation for all projects with enabled=1 and price_enabled=1, scheduled every 1 min. */
+/** Runs price alert evaluation for all projects with enabled=1 and token_enabled=1, scheduled every 1 min. */
 async function runPriceAlertTick() {
-  const projects = await db.prepare('SELECT id, name FROM projects WHERE enabled = 1 and price_enabled = 1').all();
+  const projects = await db.prepare('SELECT id, name FROM projects WHERE enabled = 1 AND token_enabled = 1').all();
   if (!projects.length) return;
   //scheduleLog(`[${now()}] Scheduler: price alert tick — ${projects.length} projects`);
   for (const p of projects) {
