@@ -2887,6 +2887,7 @@
         const iframeLoading = ref(false);
         const iframeActive  = ref(false);
         const iframeWidth   = ref('');
+        const currentView   = ref(hashRouter().render());
 
         function openIframe(url, title = '', w = '') {
           iframeUrl.value = url;
@@ -2901,9 +2902,25 @@
         }
 
         provide('openIframe', openIframe);
-        provide('closeModal', closeIframe);
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, closeIframe };
+        function onEsc(e) {
+          if (e.key === 'Escape' && iframeActive.value) {
+            iframeActive.value = false;
+            document.dispatchEvent(new CustomEvent('modal:close'));
+          }
+        }
+
+        onMounted(() => {
+          window.addEventListener('hashchange', () => {
+            currentView.value = hashRouter().render();
+          });
+          document.addEventListener('keydown', onEsc);
+        });
+        onUnmounted(() => {
+          document.removeEventListener('keydown', onEsc);
+        });
+
+        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, closeIframe, currentView };
       },
 
       template: `
@@ -2929,22 +2946,6 @@
           </div>
         </div>
       `,
-
-      data() {
-        return { currentView: hashRouter().render() };
-      },
-
-      mounted() {
-        window.addEventListener('hashchange', () => {
-          this.currentView = hashRouter().render();
-        });
-        document.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') {
-            if (iframeActive.value) iframeActive.value = false;
-            document.dispatchEvent(new CustomEvent('modal:close'));
-          }
-        });
-      },
     };
 
     /* ── Bootstrap ───────────────────────────────────────────────────────────── */
