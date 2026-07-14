@@ -260,7 +260,6 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   padding: 5px 10px;
 }
 
-
 .modal-backdrop {
   display: none;
   position: fixed;
