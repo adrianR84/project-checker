@@ -2904,8 +2904,8 @@
         provide('openIframe', openIframe);
 
         function onEsc(e) {
-          if (e.key === 'Escape' && iframeActive.value) {
-            iframeActive.value = false;
+          if (e.key === 'Escape') {
+            if (iframeActive.value) iframeActive.value = false;
             document.dispatchEvent(new CustomEvent('modal:close'));
           }
         }
