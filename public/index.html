@@ -267,37 +267,6 @@
       return 'pending';
     }
 
-    /* ── Shared Modal component ────────────────────────────────────────────────
-       Props: visible (bool), title (string), url (string — iframe mode), showHeader (bool)
-       Slots: default (modal body)
-       Events: @close
-    ───────────────────────────────────────────────────────────────────────── */
-    const Modal = {
-      props: ['visible', 'title', 'url', 'showHeader'],
-      emits: ['close'],
-      setup(props, { emit }) {
-        const loading = ref(false);
-        return { loading, emit };
-      },
-      template: `
-        <div v-if="visible" class="modal-backdrop" @click.self="emit('close')">
-          <div :class="['modal', url ? 'modal-iframe' : '']">
-            <header v-if="showHeader !== false" class="modal-header">
-              <h3>{{ title }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="emit('close')">×</button>
-            </header>
-            <div class="modal-body">
-              <div v-if="url" class="iframe-wrap">
-                <div v-if="loading" class="center-loader"><span>Loading…</span></div>
-                <iframe v-show="!loading" :src="url" @load="loading = false" />
-              </div>
-              <slot v-else />
-            </div>
-          </div>
-        </div>
-      `,
-    };
-
     /* ── NavBar component ──────────────────────────────────────────────────────
        Sticky top bar with a brand mark and navigation tabs.
        currentRoute is a ref that updates whenever the hash changes,
@@ -663,6 +632,10 @@
 
       template: `
         <article>
+          <header class="modal-header">
+            <h3 style="margin:0;font-size:1.1rem;">{{ initial ? 'Edit Project' : 'New Project' }}</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('cancel')">×</button>
+          </header>
 
           <!-- Tab switcher -->
           <div class="tabs">
@@ -738,8 +711,8 @@
           </div>
 
           <div class="modal-actions">
-            <button @click="$emit('cancel')">Cancel</button>
-            <button class="primary" :disabled="busy" @click="onSubmit()">
+            <button type="button" @click="$emit('cancel')">Cancel</button>
+            <button type="button" class="primary" :disabled="busy" @click="onSubmit()">
               <span v-if="busy" class="spinner"></span>
               <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
             </button>
@@ -865,6 +838,10 @@
       emits: ['repos-updated'],
       template: `
         <article style="margin-bottom:0;">
+          <header class="modal-header">
+            <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ projectName }}</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('repos-updated')">×</button>
+          </header>
 
           <!-- Current repos -->
           <div v-if="repos.length" style="margin-bottom:16px;">
@@ -911,6 +888,9 @@
             </button>
           </div>
 
+          <div class="modal-actions" style="margin-top:16px;">
+            <button @click="$emit('repos-updated')">Done</button>
+          </div>
         </article>
       `,
       setup(props, { emit }) {
@@ -1087,7 +1067,7 @@
               <tr v-if="project.website_url">
                 <td>
                   <a :href="project.website_url" target="_blank" rel="noopener" class="res-label">Website</a>
-                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website', '1200px')">
+                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website')">
                     <span class="icon icon-website"></span>
                   </button>
                 </td>
@@ -1493,7 +1473,7 @@
                       <span v-else>—</span>
                     </td>
                     <td class="cen">
-                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
+                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website'))">
                         <span class="icon icon-website"></span>
                       </a>
                       <span v-else>—</span>
@@ -1890,7 +1870,7 @@
        Table list of all projects with Create / Edit / Delete / JSON Import.
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectsPage = {
-      components: { ProjectForm, RepoManager, Modal },
+      components: { ProjectForm, RepoManager },
 
       template: `
         <div class="page">
@@ -1902,7 +1882,7 @@
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
             <button @click="exportProjects">Export JSON</button>
-            <button @click="openModal('import')">Import JSON</button>
+            <button @click="importDialog.showModal()">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
 
@@ -1947,22 +1927,23 @@
             </table>
           </div>
 
-          <!-- Unified modal for form / import / repos -->
-          <Modal :visible="modal.type !== null"
-            :title="modal.type === 'form' ? (editing ? 'Edit Project' : 'New Project') : modal.type === 'import' ? 'Import Projects from JSON' : modal.type === 'repos' ? (modal.data?.name || '') : ''"
-            @close="closeModal">
-
-            <!-- Form modal -->
+          <!-- Create / Edit modal -->
+          <dialog ref="formDialog">
             <ProjectForm
-              v-if="isFormModal"
               :initial="editing"
               :busy="submitting"
               @submit="onFormSubmit"
-              @cancel="closeModal"
+              @cancel="formDialog.close()"
             />
+          </dialog>
 
-            <!-- Import modal -->
-            <template v-else-if="isImportModal">
+          <!-- JSON import modal -->
+          <dialog ref="importDialog">
+            <article style="margin-bottom:0;">
+              <header class="modal-header">
+                <h3 style="margin:0;">Import Projects from JSON</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close" @click="importDialog.close()">×</button>
+              </header>
               <p class="muted">
                 Paste JSON (object or array). Each item needs <code>name</code>;
                 other fields optional.
@@ -1983,6 +1964,7 @@
               </div>
 
               <div class="modal-actions">
+                <button @click="importDialog.close()">Cancel</button>
                 <button
                   class="primary"
                   :disabled="importing || !importText.trim()"
@@ -1992,17 +1974,19 @@
                   <span v-else>Import</span>
                 </button>
               </div>
-            </template>
+            </article>
+          </dialog>
 
-            <!-- Repos modal -->
+          <!-- RepoManager modal -->
+          <dialog ref="reposDialog">
             <RepoManager
-              v-else-if="isReposModal"
-              :projectId="modal.data?.id"
-              :githubUrl="modal.data?.github_url"
-              :projectName="modal.data?.name"
+              v-if="manageProject"
+              :projectId="manageProject.id"
+              :githubUrl="manageProject.github_url"
+              :projectName="manageProject.name"
+              @repos-updated="reposDialog.close(); manageProject = null"
             />
-
-          </Modal>
+          </dialog>
 
         </div>
       `,
@@ -2013,19 +1997,15 @@
         const error     = ref('');
         const editing   = ref(null);    // project being edited (null = create)
         const submitting = ref(false);
-        const modal      = ref({ type: null, data: null }); // 'form' | 'import' | 'repos'
+        const formDialog  = ref(null);
+        const importDialog = ref(null);
+        const reposDialog = ref(null);
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
+        const manageProject = ref(null); // project for RepoManager modal
         const lastGithubImport = ref(null); // import-created project needing repo setup
         const projFilter = ref('');
         const selected = ref([]); // ids of selected projects for bulk ops
-
-        const isFormModal     = computed(() => modal.value.type === 'form');
-        const isImportModal   = computed(() => modal.value.type === 'import');
-        const isReposModal    = computed(() => modal.value.type === 'repos');
-
-        function openModal(type, data = null) { modal.value = { type, data }; }
-        function closeModal() { modal.value = { type: null }; }
 
         const filteredProjects = computed(() => {
           const q = projFilter.value.toLowerCase();
@@ -2050,9 +2030,9 @@
           }
         }
 
-        function openCreate() { editing.value = null; openModal('form'); }
-        function openEdit(p)   { editing.value = p; editBus.value = null; openModal('form'); }
-        function openManageRepos(p) { openModal('repos', p); }
+        function openCreate() { editing.value = null; formDialog.value?.showModal(); }
+        function openEdit(p)   { editing.value = p; formDialog.value?.showModal(); editBus.value = null; }
+        function openManageRepos(p) { manageProject.value = p; reposDialog.value?.showModal(); }
 
         /** Create or update a project, then reload the list */
         async function onFormSubmit(payload) {
@@ -2068,7 +2048,7 @@
                 if (fresh) openManageRepos(fresh);
               }
             }
-            closeModal();
+            formDialog.value?.close();
             editing.value   = null;
             await load();
           } catch (e) {
@@ -2198,7 +2178,7 @@
           }
 
           importing.value   = false;
-          closeModal();
+          importDialog.value?.close();
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
@@ -2271,12 +2251,12 @@
 
         return {
           projects, filteredProjects, loading, error, editing, submitting,
-          importText, importing, lastGithubImport,
-          modal, isFormModal, isImportModal, isReposModal,
-          openModal, closeModal, openCreate, openEdit, openManageRepos,
+          importText, importing, manageProject, lastGithubImport,
+          formDialog, importDialog, reposDialog,
+          projFilter, selected,
+          openCreate, openEdit, openManageRepos,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
-          selected,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
           api: window.api,
         };
@@ -2873,28 +2853,28 @@
        Composes NavBar + the current page view, with a fade transition between views.
     ───────────────────────────────────────────────────────────────────────── */
     const App = {
-      components: { NavBar, Modal },
+      components: { NavBar },
 
       setup() {
-        const iframeUrl      = ref('');
-        const iframeTitle    = ref('');
-        const iframeWidth    = ref('1000px');
-        const iframeVisible  = ref(false);
+        const iframeUrl     = ref('');
+        const iframeTitle   = ref('');
+        const iframeLoading = ref(false);
+        const iframeDialog  = ref(null);
 
-        function openIframe(url, title = '', width = '720px') {
+        function openIframe(url, title = '') {
           iframeUrl.value = url;
           iframeTitle.value = title;
-          iframeWidth.value = width;
-          iframeVisible.value = true;
+          iframeLoading.value = true;
+          iframeDialog.value?.showModal();
         }
         function closeIframe() {
-          iframeVisible.value = false;
+          iframeDialog.value?.close();
           iframeUrl.value = '';
         }
 
         provide('openIframe', openIframe);
 
-        return { iframeUrl, iframeTitle, iframeWidth, iframeVisible, closeIframe };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeDialog, closeIframe };
       },
 
       template: `
@@ -2904,7 +2884,18 @@
             <component :is="currentView" />
           </transition>
 
-          <Modal :visible="iframeVisible" :title="iframeTitle" :url="iframeUrl" :style="{ '--modal-w': iframeWidth }" @close="closeIframe" />
+          <dialog ref="iframeDialog" class="modal-iframe" @click.self="closeIframe">
+            <article style="margin-bottom:0; display:flex; flex-direction:column; height:100%;">
+              <header class="modal-header">
+                <h3 style="margin:0;">{{ iframeTitle }}</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
+              </header>
+              <div class="iframe-wrap">
+                <div v-if="iframeLoading" class="center-loader"><span>Loading…</span></div>
+                <iframe v-show="!iframeLoading" :src="iframeUrl" @load="iframeLoading = false" />
+              </div>
+            </article>
+          </dialog>
         </div>
       `,
 
