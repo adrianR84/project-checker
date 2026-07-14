@@ -31,7 +31,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition, provide, inject } = Vue;
 
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
@@ -1036,7 +1036,12 @@
             </thead>
             <tbody>
               <tr v-if="project.twitter_url">
-                <td><a :href="project.twitter_url" target="_blank" rel="noopener">Twitter</a></td>
+                <td>
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" class="res-label">Twitter</a>
+                  <button class="icon-btn" @click="openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter')">
+                    <span class="icon icon-twitter"></span>
+                  </button>
+                </td>
                 <td><span :class="['badge', project.twitter_enabled ? 'success' : 'secondary']">{{ project.twitter_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(twitter.status)]">{{ twitter.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(twitter.checked_at) }}</span></td>
@@ -1060,7 +1065,12 @@
               </tr>
 
               <tr v-if="project.website_url">
-                <td><a :href="project.website_url" target="_blank" rel="noopener">Website</a></td>
+                <td>
+                  <a :href="project.website_url" target="_blank" rel="noopener" class="res-label">Website</a>
+                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website')">
+                    <span class="icon icon-website"></span>
+                  </button>
+                </td>
                 <td><span :class="['badge', project.website_enabled ? 'success' : 'secondary']">{{ project.website_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(website.status)]">{{ website.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(website.checked_at) }}</span></td>
@@ -1084,7 +1094,9 @@
               </tr>
 
               <tr v-if="project.github_url">
-                <td><a :href="project.github_url" target="_blank" rel="noopener">GitHub</a></td>
+                <td>
+                  <a :href="project.github_url" target="_blank" rel="noopener" class="res-label">GitHub</a>
+                </td>
                 <td><span :class="['badge', project.github_enabled ? 'success' : 'secondary']">{{ project.github_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(github.status)]">{{ github.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(github.checked_at) }}</span></td>
@@ -1152,6 +1164,7 @@
 
       setup(props, { emit }) {
         const busy = ref(null);
+        const openIframe = inject('openIframe');
 
         // project.*_status objects come from the dashboard API (latest check result per resource)
         const website = computed(() => props.project.website_status || {});
@@ -1215,6 +1228,7 @@
           relativeTime,
           statusClass,
           openProjectEdit,
+          openIframe,
           copyContract,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
@@ -2840,12 +2854,47 @@
     const App = {
       components: { NavBar },
 
+      setup() {
+        const iframeUrl     = ref('');
+        const iframeTitle   = ref('');
+        const iframeLoading = ref(false);
+        const iframeDialog  = ref(null);
+
+        function openIframe(url, title = '') {
+          iframeUrl.value = url;
+          iframeTitle.value = title;
+          iframeLoading.value = true;
+          iframeDialog.value?.showModal();
+        }
+        function closeIframe() {
+          iframeDialog.value?.close();
+          iframeUrl.value = '';
+        }
+
+        provide('openIframe', openIframe);
+
+        return { iframeUrl, iframeTitle, iframeLoading, iframeDialog, closeIframe };
+      },
+
       template: `
         <div>
           <NavBar />
           <transition name="fade" mode="out-in">
             <component :is="currentView" />
           </transition>
+
+          <dialog ref="iframeDialog" class="modal-iframe" @click.self="closeIframe">
+            <article style="margin-bottom:0; display:flex; flex-direction:column; height:100%;">
+              <header class="modal-header">
+                <h3 style="margin:0;">{{ iframeTitle }}</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
+              </header>
+              <div class="iframe-wrap">
+                <div v-if="iframeLoading" class="center-loader"><span>Loading…</span></div>
+                <iframe v-show="!iframeLoading" :src="iframeUrl" @load="iframeLoading = false" />
+              </div>
+            </article>
+          </dialog>
         </div>
       `,
 
@@ -2854,7 +2903,6 @@
       },
 
       mounted() {
-        // Re-render whenever the hash changes (i.e., user clicked a nav tab)
         window.addEventListener('hashchange', () => {
           this.currentView = hashRouter().render();
         });
