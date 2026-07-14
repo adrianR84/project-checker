@@ -1868,7 +1868,7 @@
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
             <button @click="exportProjects">Export JSON</button>
-            <button @click="importDialog.classList.add('active')">Import JSON</button>
+            <button @click="openModal('import')">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
 
@@ -1913,27 +1913,29 @@
             </table>
           </div>
 
+          <div class="modal-backdrop" :class="{ active: activeModal !== null }" @click="closeModal"></div>
+
           <!-- Create / Edit modal -->
-          <div ref="formDialog" class="modal">
+          <div class="modal" :class="{ active: isActive('form') }" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(formDialog)">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
             </header>
             <div class="modal-body">
               <ProjectForm
                 :initial="editing"
                 :busy="submitting"
                 @submit="onFormSubmit"
-                @cancel="closeModal(formDialog)"
+                @cancel="closeModal"
               />
             </div>
           </div>
 
           <!-- JSON import modal -->
-          <div ref="importDialog" class="modal">
+          <div class="modal" :class="{ active: isActive('import') }" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;">Import Projects from JSON</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(importDialog)">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
             </header>
             <div class="modal-body">
               <p class="muted">
@@ -1956,7 +1958,7 @@
               </div>
 
               <div class="modal-actions">
-                <button @click="closeModal(importDialog)">Cancel</button>
+                <button @click="closeModal">Cancel</button>
                 <button
                   class="primary"
                   :disabled="importing || !importText.trim()"
@@ -1970,10 +1972,10 @@
           </div>
 
           <!-- RepoManager modal -->
-          <div ref="reposDialog" class="modal">
+          <div class="modal" :class="{ active: isActive('repos') }" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(reposDialog); manageProject = null">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); manageProject = null">×</button>
             </header>
             <div class="modal-body">
               <RepoManager
@@ -1981,7 +1983,7 @@
                 :projectId="manageProject.id"
                 :githubUrl="manageProject.github_url"
                 :projectName="manageProject.name"
-                @repos-updated="closeModal(reposDialog); manageProject = null"
+                @repos-updated="closeModal(); manageProject = null"
               />
             </div>
           </div>
@@ -1995,9 +1997,15 @@
         const error     = ref('');
         const editing   = ref(null);    // project being edited (null = create)
         const submitting = ref(false);
-        const formDialog  = ref(null);
-        const importDialog = ref(null);
-        const reposDialog = ref(null);
+
+        function useModal() {
+          const activeModal = ref(null);
+          function openModal(name) { activeModal.value = name; }
+          function closeModal()    { activeModal.value = null; }
+          function isActive(name)  { return activeModal.value === name; }
+          return { activeModal, openModal, closeModal, isActive };
+        }
+        const { activeModal, openModal, closeModal, isActive } = useModal();
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
@@ -2028,26 +2036,18 @@
           }
         }
 
-        function openCreate(w) {
+        function openCreate() {
           editing.value = null;
-          if (w) formDialog.value?.style.setProperty('width', w);
-          formDialog.value?.classList.add('active');
+          openModal('form');
         }
-        function openEdit(p, w) {
+        function openEdit(p) {
           editing.value = p;
-          if (w) formDialog.value?.style.setProperty('width', w);
-          formDialog.value?.classList.add('active');
           editBus.value = null;
+          openModal('form');
         }
-        function openManageRepos(p, w) {
+        function openManageRepos(p) {
           manageProject.value = p;
-          if (w) reposDialog.value?.style.setProperty('width', w);
-          reposDialog.value?.classList.add('active');
-        }
-
-        function closeModal(el) {
-          el?.classList.remove('active');
-          el?.style.removeProperty('width');
+          openModal('repos');
         }
 
         /** Create or update a project, then reload the list */
@@ -2064,7 +2064,7 @@
                 if (fresh) openManageRepos(fresh);
               }
             }
-            closeModal(formDialog);
+            closeModal();
             editing.value   = null;
             await load();
           } catch (e) {
@@ -2194,7 +2194,7 @@
           }
 
           importing.value   = false;
-          closeModal(importDialog);
+          closeModal();
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
@@ -2268,9 +2268,9 @@
         return {
           projects, filteredProjects, loading, error, editing, submitting,
           importText, importing, manageProject, lastGithubImport,
-          formDialog, importDialog, reposDialog,
+          activeModal, isActive,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos, closeModal,
+          openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
@@ -2875,28 +2875,22 @@
         const iframeUrl     = ref('');
         const iframeTitle   = ref('');
         const iframeLoading = ref(false);
-        const iframeDialog  = ref(null);
+        const iframeActive  = ref(false);
 
-        function closeModal(el) {
-          el?.classList.remove('active');
-          el?.style.removeProperty('width');
-        }
-
-        function openIframe(url, title = '', w = '') {
+        function openIframe(url, title = '') {
           iframeUrl.value = url;
           iframeTitle.value = title;
           iframeLoading.value = true;
-          if (w) iframeDialog.value?.style.setProperty('width', w);
-          iframeDialog.value?.classList.add('active');
+          iframeActive.value = true;
         }
         function closeIframe() {
-          closeModal(iframeDialog.value);
+          iframeActive.value = false;
           iframeUrl.value = '';
         }
 
         provide('openIframe', openIframe);
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeDialog, closeIframe, closeModal };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, closeIframe };
       },
 
       template: `
@@ -2906,7 +2900,9 @@
             <component :is="currentView" />
           </transition>
 
-          <div ref="iframeDialog" class="modal modal-iframe" @click.self="closeIframe">
+          <div class="modal-backdrop" :class="{ active: iframeActive }" @click="closeIframe"></div>
+
+          <div class="modal modal-iframe" :class="{ active: iframeActive }" @click.self="closeIframe">
             <header class="modal-header">
               <h3 style="margin:0;">{{ iframeTitle }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>

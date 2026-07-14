@@ -235,7 +235,7 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   background: var(--app-bg);
   border: 1px solid var(--app-border);
 }
-.modal.active { display: flex; }
+.modal.active { display: flex; z-index: 1001; }
 
 .modal-header {
   flex-shrink: 0;
@@ -266,7 +266,7 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   position: fixed;
   inset: 0;
   background: var(--app-backdrop);
-  z-index: 999;
+  z-index: 1000;
 }
 .modal-backdrop.active { display: block; }
 
