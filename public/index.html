@@ -1053,7 +1053,7 @@
               <tr v-if="project.website_url">
                 <td>
                   <a :href="project.website_url" target="_blank" rel="noopener" class="res-label">Website</a>
-                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website', '1200px')">
+                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website', '1200px', true)">
                     <span class="icon icon-website"></span>
                   </button>
                 </td>
@@ -1459,7 +1459,7 @@
                       <span v-else>—</span>
                     </td>
                     <td class="cen">
-                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
+                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px', true))">
                         <span class="icon icon-website"></span>
                       </a>
                       <span v-else>—</span>
