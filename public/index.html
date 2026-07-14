@@ -1916,7 +1916,7 @@
           <div class="modal-backdrop" :class="{ active: activeModal !== null }" @click="closeModal"></div>
 
           <!-- Create / Edit modal -->
-          <div class="modal" :class="{ active: isActive('form') }" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('form') }" :style="modalWidth ? { width: modalWidth } : {}" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
@@ -1932,7 +1932,7 @@
           </div>
 
           <!-- JSON import modal -->
-          <div class="modal" :class="{ active: isActive('import') }" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('import') }" :style="modalWidth ? { width: modalWidth } : {}" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;">Import Projects from JSON</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
@@ -1972,7 +1972,7 @@
           </div>
 
           <!-- RepoManager modal -->
-          <div class="modal" :class="{ active: isActive('repos') }" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('repos') }" :style="modalWidth ? { width: modalWidth } : {}" @click.self="closeModal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); manageProject = null">×</button>
@@ -2000,12 +2000,16 @@
 
         function useModal() {
           const activeModal = ref(null);
-          function openModal(name) { activeModal.value = name; }
+          const modalWidth = ref('');
+          function openModal(name, w) {
+            activeModal.value = name;
+            modalWidth.value = w || '';
+          }
           function closeModal()    { activeModal.value = null; }
           function isActive(name)  { return activeModal.value === name; }
-          return { activeModal, openModal, closeModal, isActive };
+          return { activeModal, modalWidth, openModal, closeModal, isActive };
         }
-        const { activeModal, openModal, closeModal, isActive } = useModal();
+        const { activeModal, modalWidth, openModal, closeModal, isActive } = useModal();
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
@@ -2036,18 +2040,18 @@
           }
         }
 
-        function openCreate() {
+        function openCreate(w) {
           editing.value = null;
-          openModal('form');
+          openModal('form', w);
         }
-        function openEdit(p) {
+        function openEdit(p, w) {
           editing.value = p;
           editBus.value = null;
-          openModal('form');
+          openModal('form', w);
         }
-        function openManageRepos(p) {
+        function openManageRepos(p, w) {
           manageProject.value = p;
-          openModal('repos');
+          openModal('repos', w);
         }
 
         /** Create or update a project, then reload the list */
@@ -2268,7 +2272,7 @@
         return {
           projects, filteredProjects, loading, error, editing, submitting,
           importText, importing, manageProject, lastGithubImport,
-          activeModal, isActive,
+          activeModal, modalWidth, isActive,
           projFilter, selected,
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
@@ -2876,11 +2880,13 @@
         const iframeTitle   = ref('');
         const iframeLoading = ref(false);
         const iframeActive  = ref(false);
+        const iframeWidth   = ref('');
 
-        function openIframe(url, title = '') {
+        function openIframe(url, title = '', w = '') {
           iframeUrl.value = url;
           iframeTitle.value = title;
           iframeLoading.value = true;
+          iframeWidth.value = w;
           iframeActive.value = true;
         }
         function closeIframe() {
@@ -2890,7 +2896,7 @@
 
         provide('openIframe', openIframe);
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, closeIframe };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, closeIframe };
       },
 
       template: `
@@ -2902,7 +2908,7 @@
 
           <div class="modal-backdrop" :class="{ active: iframeActive }" @click="closeIframe"></div>
 
-          <div class="modal modal-iframe" :class="{ active: iframeActive }" @click.self="closeIframe">
+          <div class="modal modal-iframe" :class="{ active: iframeActive }" :style="iframeWidth ? { width: iframeWidth } : {}" @click.self="closeIframe">
             <header class="modal-header">
               <h3 style="margin:0;">{{ iframeTitle }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
