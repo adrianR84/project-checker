@@ -71,9 +71,6 @@ button, .btn {
 
 .center-loader { display: flex; justify-content: center; padding: 60px 0; }
 
-tr.disabled td { opacity: 0.45; }
-table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
-
 /* ── Vue transitions ─────────────────────────────────────────────────── */
 .fade-enter-active, .fade-leave-active { transition: opacity 180ms; }
 .fade-enter-from, .fade-leave-to        { opacity: 0; }
@@ -122,8 +119,6 @@ nav.navbar a[aria-current="page"] {
   box-shadow: 0 0 8px color-mix(in srgb, var(--app-primary) 60%, transparent);
 }
 
-/* ── Table helpers ───────────────────────────────────────────────────── */
-.col-actions { width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 /* ── Settings grid helpers ──────────────────────────────────────────── */
 /* Force a settings article to span 2 columns in Pico's auto-fit grid */
@@ -140,11 +135,20 @@ article.force-wide {
 .form-row-group { display: flex; gap: 6px; flex-wrap: wrap; }
 .form-row-group input { flex: 1; min-width: 100px; }
 
-/* ── Compact table ───────────────────────────────────────────────────── */
+/* ── tables ───────────────────────────────────────────────────── */
+tr.disabled td { opacity: 0.4; }
+tr.disabled td:last-child {
+  opacity: 1;
+  pointer-events: auto;
+}
+table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
+
 table.compact { table-layout: fixed; font-size: 0.85rem; margin-bottom:0px; width: 100%;}
 table.compact th, table.compact td { padding: 4px 8px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
+table.compact .text-center{text-align: center;}
+table.compact .text-right{text-align: right;}
 
 table.compact .project_cell{ min-width: 150px; max-width: 300px; }
 table.compact .project_cell.alert  { width: 250px; }
@@ -154,6 +158,7 @@ table.compact .time_cell     { min-width: 150px; width: 150px; }
 table.compact .status_cell   { min-width: 70px;  width: 90px;  }
 table.compact .action_cell   { min-width: 40px;  width: 40px;  }
 table.compact .details_cell   { min-width: 140px; }
+table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */
 #toast {
@@ -202,7 +207,7 @@ table.compact .details_cell   { min-width: 140px; }
 }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 
-/* ── Modal (Pico native dialog) ───────────────────────────────────────── */
+/* ── Modal ───────────────────────────────────────── */
 dialog {
   max-width: 620px;
   width: 100%;
@@ -213,13 +218,6 @@ dialog {
 }
 dialog::backdrop {
   background: var(--app-backdrop);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 18px;
 }
 
 .modal-header {
@@ -239,6 +237,13 @@ dialog::backdrop {
   font-size: 1.3rem;
   line-height: 1.1;
   color: var(--app-text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
 }
 
 .error-msg {
@@ -433,7 +438,7 @@ dialog::backdrop {
 }
 .row-disabled input,
 .row-disabled label {
-  opacity: 0.4;
+  opacity: 0.5;
   pointer-events: none;
 }
 .row-disabled label:last-child {

@@ -1882,7 +1882,7 @@
           </div>
 
           <div v-else>
-            <table>
+            <table class="compact">
               <thead>
                 <tr>
                   <th style="width:2.5em"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
@@ -1891,7 +1891,7 @@
                   <th data-tooltip="GitHub organization URL">GitHub</th>
                   <th data-tooltip="Twitter handle or URL">Twitter</th>
                   <th data-tooltip="Token info">Token</th>
-                  <th class="col-actions"></th>
+                  <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
