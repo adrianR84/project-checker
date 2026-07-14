@@ -2012,6 +2012,17 @@
           return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
         }
         const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
+        const closeIframe = inject('closeModal');
+
+        function onKeydown(e) {
+          if (e.key === 'Escape') {
+            if (activeModal.value) { closeModal(); closeIframe?.(); }
+            else closeIframe?.();
+          }
+        }
+        onMounted(() => document.addEventListener('keydown', onKeydown));
+        onUnmounted(() => document.removeEventListener('keydown', onKeydown));
+
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
@@ -2276,7 +2287,7 @@
           importText, importing, manageProject, lastGithubImport,
           activeModal, modalWidth, modalClosable, isActive,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos, openModal, closeModal,
+          openCreate, openEdit, openManageRepos, openModal, closeModal, closeIframe,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
@@ -2897,6 +2908,7 @@
         }
 
         provide('openIframe', openIframe);
+        provide('closeModal', closeIframe);
 
         return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, closeIframe };
       },
