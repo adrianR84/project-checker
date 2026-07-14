@@ -255,7 +255,6 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 
 .modal.modal-iframe {
   max-width: 720px;
-  width: 720px;
   max-height: 95vh;
   height: 95vh;
   padding: 5px 10px;
