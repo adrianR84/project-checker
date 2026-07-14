@@ -631,13 +631,7 @@
       emits: ['submit', 'cancel'],
 
       template: `
-        <article>
-          <header class="modal-header">
-            <h3 style="margin:0;font-size:1.1rem;">{{ initial ? 'Edit Project' : 'New Project' }}</h3>
-            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('cancel')">×</button>
-          </header>
-
-          <!-- Tab switcher -->
+        <!-- Tab switcher -->
           <div class="tabs">
             <button :class="['tab', formTab === 'fields' ? 'active' : '']" @click="formTab = 'fields'">Fields</button>
             <button :class="['tab', formTab === 'json' ? 'active' : '']" @click="formTab = 'json'">JSON</button>
@@ -717,7 +711,6 @@
               <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
             </button>
           </div>
-        </article>
       `,
 
       setup(props, { emit }) {
@@ -837,13 +830,7 @@
       props: ['projectId', 'githubUrl', 'projectName'],
       emits: ['repos-updated'],
       template: `
-        <article style="margin-bottom:0;">
-          <header class="modal-header">
-            <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ projectName }}</h3>
-            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('repos-updated')">×</button>
-          </header>
-
-          <!-- Current repos -->
+        <!-- Current repos -->
           <div v-if="repos.length" style="margin-bottom:16px;">
             <table style="margin:0;">
               <tbody>
@@ -891,7 +878,6 @@
           <div class="modal-actions" style="margin-top:16px;">
             <button @click="$emit('repos-updated')">Done</button>
           </div>
-        </article>
       `,
       setup(props, { emit }) {
         const repos    = ref([]);
@@ -1882,7 +1868,7 @@
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
             <button @click="exportProjects">Export JSON</button>
-            <button @click="importDialog.showModal()">Import JSON</button>
+            <button @click="importDialog.classList.add('active')">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
 
@@ -1928,22 +1914,28 @@
           </div>
 
           <!-- Create / Edit modal -->
-          <dialog ref="formDialog">
-            <ProjectForm
-              :initial="editing"
-              :busy="submitting"
-              @submit="onFormSubmit"
-              @cancel="formDialog.close()"
-            />
-          </dialog>
+          <div ref="formDialog" class="modal">
+            <header class="modal-header">
+              <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="formDialog.classList.remove('active')">×</button>
+            </header>
+            <div class="modal-body">
+              <ProjectForm
+                :initial="editing"
+                :busy="submitting"
+                @submit="onFormSubmit"
+                @cancel="formDialog.classList.remove('active')"
+              />
+            </div>
+          </div>
 
           <!-- JSON import modal -->
-          <dialog ref="importDialog">
-            <article style="margin-bottom:0;">
-              <header class="modal-header">
-                <h3 style="margin:0;">Import Projects from JSON</h3>
-                <button type="button" class="modal-close-btn" aria-label="Close" @click="importDialog.close()">×</button>
-              </header>
+          <div ref="importDialog" class="modal">
+            <header class="modal-header">
+              <h3 style="margin:0;">Import Projects from JSON</h3>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="importDialog.classList.remove('active')">×</button>
+            </header>
+            <div class="modal-body">
               <p class="muted">
                 Paste JSON (object or array). Each item needs <code>name</code>;
                 other fields optional.
@@ -1964,7 +1956,7 @@
               </div>
 
               <div class="modal-actions">
-                <button @click="importDialog.close()">Cancel</button>
+                <button @click="importDialog.classList.remove('active')">Cancel</button>
                 <button
                   class="primary"
                   :disabled="importing || !importText.trim()"
@@ -1974,19 +1966,25 @@
                   <span v-else>Import</span>
                 </button>
               </div>
-            </article>
-          </dialog>
+            </div>
+          </div>
 
           <!-- RepoManager modal -->
-          <dialog ref="reposDialog">
-            <RepoManager
-              v-if="manageProject"
-              :projectId="manageProject.id"
-              :githubUrl="manageProject.github_url"
-              :projectName="manageProject.name"
-              @repos-updated="reposDialog.close(); manageProject = null"
-            />
-          </dialog>
+          <div ref="reposDialog" class="modal">
+            <header class="modal-header">
+              <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="reposDialog.classList.remove('active'); manageProject = null">×</button>
+            </header>
+            <div class="modal-body">
+              <RepoManager
+                v-if="manageProject"
+                :projectId="manageProject.id"
+                :githubUrl="manageProject.github_url"
+                :projectName="manageProject.name"
+                @repos-updated="reposDialog.classList.remove('active'); manageProject = null"
+              />
+            </div>
+          </div>
 
         </div>
       `,
@@ -2030,9 +2028,9 @@
           }
         }
 
-        function openCreate() { editing.value = null; formDialog.value?.showModal(); }
-        function openEdit(p)   { editing.value = p; formDialog.value?.showModal(); editBus.value = null; }
-        function openManageRepos(p) { manageProject.value = p; reposDialog.value?.showModal(); }
+        function openCreate() { editing.value = null; formDialog.value?.classList.add('active'); }
+        function openEdit(p)   { editing.value = p; formDialog.value?.classList.add('active'); editBus.value = null; }
+        function openManageRepos(p) { manageProject.value = p; reposDialog.value?.classList.add('active'); }
 
         /** Create or update a project, then reload the list */
         async function onFormSubmit(payload) {
@@ -2048,7 +2046,7 @@
                 if (fresh) openManageRepos(fresh);
               }
             }
-            formDialog.value?.close();
+            formDialog.value?.classList.remove('active');
             editing.value   = null;
             await load();
           } catch (e) {
@@ -2178,7 +2176,7 @@
           }
 
           importing.value   = false;
-          importDialog.value?.close();
+          importDialog.value?.classList.remove('active');
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
@@ -2865,10 +2863,10 @@
           iframeUrl.value = url;
           iframeTitle.value = title;
           iframeLoading.value = true;
-          iframeDialog.value?.showModal();
+          iframeDialog.value?.classList.add('active');
         }
         function closeIframe() {
-          iframeDialog.value?.close();
+          iframeDialog.value?.classList.remove('active');
           iframeUrl.value = '';
         }
 
@@ -2884,18 +2882,18 @@
             <component :is="currentView" />
           </transition>
 
-          <dialog ref="iframeDialog" class="modal-iframe" @click.self="closeIframe">
-            <article style="margin-bottom:0; display:flex; flex-direction:column; height:100%;">
-              <header class="modal-header">
-                <h3 style="margin:0;">{{ iframeTitle }}</h3>
-                <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
-              </header>
-              <div class="iframe-wrap">
+          <div ref="iframeDialog" class="modal modal-iframe" @click.self="closeIframe">
+            <header class="modal-header">
+              <h3 style="margin:0;">{{ iframeTitle }}</h3>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
+            </header>
+            <div class="modal-body" style="padding:0; display:flex; flex-direction:column;">
+              <div class="iframe-wrap" style="flex:1; min-height:0;">
                 <div v-if="iframeLoading" class="center-loader"><span>Loading…</span></div>
                 <iframe v-show="!iframeLoading" :src="iframeUrl" @load="iframeLoading = false" />
               </div>
-            </article>
-          </dialog>
+            </div>
+          </div>
         </div>
       `,
 
