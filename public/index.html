@@ -2012,16 +2012,9 @@
           return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
         }
         const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
-        const closeIframe = inject('closeModal');
-
-        function onKeydown(e) {
-          if (e.key === 'Escape') {
-            if (activeModal.value) { closeModal(); closeIframe?.(); }
-            else closeIframe?.();
-          }
-        }
-        onMounted(() => document.addEventListener('keydown', onKeydown));
-        onUnmounted(() => document.removeEventListener('keydown', onKeydown));
+        function onEscClose() { closeModal(); }
+        onMounted(() => document.addEventListener('modal:close', onEscClose));
+        onUnmounted(() => document.removeEventListener('modal:close', onEscClose));
 
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
@@ -2287,7 +2280,7 @@
           importText, importing, manageProject, lastGithubImport,
           activeModal, modalWidth, modalClosable, isActive,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos, openModal, closeModal, closeIframe,
+          openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
@@ -2944,6 +2937,12 @@
       mounted() {
         window.addEventListener('hashchange', () => {
           this.currentView = hashRouter().render();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (iframeActive.value) iframeActive.value = false;
+            document.dispatchEvent(new CustomEvent('modal:close'));
+          }
         });
       },
     };
