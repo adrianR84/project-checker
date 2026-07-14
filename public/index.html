@@ -1452,7 +1452,7 @@
                 <tbody>
                   <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
                     <td class="hide-sm" style="cursor:pointer" :title="row.contract" @click="copyContract(row)">
-                      {{ row.project_name.length > 30 ? row.project_name.slice(0, 30) + '…' : row.project_name }}
+                      {{ row.project_name.length > 20 ? row.project_name.slice(0, 20) + '…' : row.project_name }}
                     </td>
                     <td>
                       <a :href="'https://x.com/search?q=%24' + (row.symbol.startsWith('$') ? row.symbol.slice(1) : row.symbol) + '&src=typed_query'"
@@ -1467,13 +1467,13 @@
                       <span v-else>—</span>
                     </td>
                     <td class="cen">
-                      <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter">
+                      <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
                         <span class="icon icon-twitter"></span>
                       </a>
                       <span v-else>—</span>
                     </td>
                     <td class="cen">
-                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website">
+                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website'))">
                         <span class="icon icon-website"></span>
                       </a>
                       <span v-else>—</span>
@@ -1536,6 +1536,7 @@
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
+        const openIframe    = inject('openIframe');
         const loading       = ref(true);
         const error         = ref('');
         const logTab        = ref(localStorage.getItem('pc_log_tab') || 'status-changes');
@@ -1860,7 +1861,7 @@
           filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
-          api: window.api, relativeTime, fmtShortNum, fmtPct, copyContract,
+          api: window.api, relativeTime, fmtShortNum, fmtPct, copyContract, openIframe,
         };
       },
     };
