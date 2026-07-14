@@ -2002,7 +2002,7 @@
           const activeModal = ref(null);
           const modalWidth = ref('');
           const modalClosable = ref(true);
-          function openModal(name, w, closable = true) {
+          function openModal(name, w, closable = false) {
             activeModal.value = name;
             modalWidth.value = w || '';
             modalClosable.value = closable;
