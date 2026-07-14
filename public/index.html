@@ -631,8 +631,11 @@
       emits: ['submit', 'cancel'],
 
       template: `
-        <div class="modal">
-          <h2 style="font-size: 1.2rem;">{{ initial ? 'Edit Project' : 'New Project' }}</h2>
+        <article>
+          <header class="modal-header">
+            <h3 style="margin:0;font-size:1.1rem;">{{ initial ? 'Edit Project' : 'New Project' }}</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('cancel')">×</button>
+          </header>
 
           <!-- Tab switcher -->
           <div class="tabs">
@@ -714,7 +717,7 @@
               <span v-else>{{ initial ? 'Save' : 'Create' }}</span>
             </button>
           </div>
-        </div>
+        </article>
       `,
 
       setup(props, { emit }) {
@@ -834,8 +837,11 @@
       props: ['projectId', 'githubUrl', 'projectName'],
       emits: ['repos-updated'],
       template: `
-        <div class="modal">
-          <h2 style="font-size:1.2rem">Manage Repos — {{ projectName }}</h2>
+        <article style="margin-bottom:0;">
+          <header class="modal-header">
+            <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ projectName }}</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" @click="$emit('repos-updated')">×</button>
+          </header>
 
           <!-- Current repos -->
           <div v-if="repos.length" style="margin-bottom:16px;">
@@ -885,7 +891,7 @@
           <div class="modal-actions" style="margin-top:16px;">
             <button @click="$emit('repos-updated')">Done</button>
           </div>
-        </div>
+        </article>
       `,
       setup(props, { emit }) {
         const repos    = ref([]);
@@ -1195,7 +1201,7 @@
 
         function openProjectEdit() {
           editBus.value = props.project;
-          window.location.hash = '#/projects';
+          setTimeout(() => { window.location.hash = '#/projects'; });
         }
 
         return {
@@ -1861,7 +1867,7 @@
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
             <button @click="exportProjects">Export JSON</button>
-            <button @click="importOpen = true">Import JSON</button>
+            <button @click="importDialog.showModal()">Import JSON</button>
             <button class="primary" @click="openCreate">+ Add Project</button>
           </div>
 
@@ -1907,19 +1913,22 @@
           </div>
 
           <!-- Create / Edit modal -->
-          <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
+          <dialog ref="formDialog">
             <ProjectForm
               :initial="editing"
               :busy="submitting"
-              @submit="onSubmit"
-              @cancel="showForm = false"
+              @submit="onFormSubmit"
+              @cancel="formDialog.close()"
             />
-          </div>
+          </dialog>
 
           <!-- JSON import modal -->
-          <div v-if="importOpen" class="modal-backdrop" @click.self="importOpen = false">
-            <div class="modal">
-              <h2>Import Projects from JSON</h2>
+          <dialog ref="importDialog">
+            <article style="margin-bottom:0;">
+              <header class="modal-header">
+                <h3 style="margin:0;">Import Projects from JSON</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close" @click="importDialog.close()">×</button>
+              </header>
               <p class="muted">
                 Paste JSON (object or array). Each item needs <code>name</code>;
                 other fields optional.
@@ -1940,7 +1949,7 @@
               </div>
 
               <div class="modal-actions">
-                <button @click="importOpen = false">Cancel</button>
+                <button @click="importDialog.close()">Cancel</button>
                 <button
                   class="primary"
                   :disabled="importing || !importText.trim()"
@@ -1950,18 +1959,19 @@
                   <span v-else>Import</span>
                 </button>
               </div>
-            </div>
-          </div>
+            </article>
+          </dialog>
 
           <!-- RepoManager modal -->
-          <div v-if="manageProject" class="modal-backdrop" @click.self="manageProject = null">
+          <dialog ref="reposDialog">
             <RepoManager
+              v-if="manageProject"
               :projectId="manageProject.id"
               :githubUrl="manageProject.github_url"
               :projectName="manageProject.name"
-              @repos-updated="manageProject = null"
+              @repos-updated="reposDialog.close(); manageProject = null"
             />
-          </div>
+          </dialog>
 
         </div>
       `,
@@ -1970,10 +1980,11 @@
         const projects   = ref([]);
         const loading   = ref(true);
         const error     = ref('');
-        const showForm  = ref(false);  // create/edit modal visibility
         const editing   = ref(null);    // project being edited (null = create)
         const submitting = ref(false);
-        const importOpen  = ref(false); // JSON import modal visibility
+        const formDialog  = ref(null);
+        const importDialog = ref(null);
+        const reposDialog = ref(null);
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
@@ -2004,12 +2015,12 @@
           }
         }
 
-        function openCreate() { editing.value = null; showForm.value = true; }
-        function openEdit(p)   { editing.value = p; editBus.value = null; showForm.value = true; }
-        function openManageRepos(p) { manageProject.value = p; }
+        function openCreate() { editing.value = null; formDialog.value?.showModal(); }
+        function openEdit(p)   { editing.value = p; formDialog.value?.showModal(); editBus.value = null; }
+        function openManageRepos(p) { manageProject.value = p; reposDialog.value?.showModal(); }
 
         /** Create or update a project, then reload the list */
-        async function onSubmit(payload) {
+        async function onFormSubmit(payload) {
           submitting.value = true;
           error.value      = '';
           try {
@@ -2022,7 +2033,7 @@
                 if (fresh) openManageRepos(fresh);
               }
             }
-            showForm.value  = false;
+            formDialog.value?.close();
             editing.value   = null;
             await load();
           } catch (e) {
@@ -2152,7 +2163,7 @@
           }
 
           importing.value   = false;
-          importOpen.value   = false;
+          importDialog.value?.close();
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
@@ -2212,7 +2223,7 @@
         onMounted(load);
 
         // Watch editBus so we catch edits triggered from other pages (e.g. card click on Activity)
-        watch(editBus, (p) => { if (p) openEdit(p); }, { immediate: true });
+        onMounted(() => { watch(editBus, (p) => { if (p) openEdit(p); }, { immediate: true }); });
 
         function tok(p) {
           return p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
@@ -2224,11 +2235,12 @@
         }
 
         return {
-          projects, filteredProjects, loading, error, showForm, editing, submitting,
-          importOpen, importText, importing, manageProject, lastGithubImport,
+          projects, filteredProjects, loading, error, editing, submitting,
+          importText, importing, manageProject, lastGithubImport,
+          formDialog, importDialog, reposDialog,
           projFilter, selected,
           openCreate, openEdit, openManageRepos,
-          onSubmit, onDelete, onImport, onFile, exportProjects,
+          onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
           api: window.api,
