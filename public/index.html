@@ -2887,13 +2887,15 @@
         const iframeLoading = ref(false);
         const iframeActive  = ref(false);
         const iframeWidth   = ref('');
+        const iframeClosable = ref(false);
         const currentView   = ref(hashRouter().render());
 
-        function openIframe(url, title = '', w = '') {
+        function openIframe(url, title = '', w = '', closable = false) {
           iframeUrl.value = url;
           iframeTitle.value = title;
           iframeLoading.value = true;
           iframeWidth.value = w;
+          iframeClosable.value = closable;
           iframeActive.value = true;
         }
         function closeIframe() {
@@ -2920,7 +2922,7 @@
           document.removeEventListener('keydown', onEsc);
         });
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, closeIframe, currentView };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, closeIframe, currentView };
       },
 
       template: `
@@ -2930,9 +2932,9 @@
             <component :is="currentView" />
           </transition>
 
-          <div class="modal-backdrop" :class="{ active: iframeActive }" @click="closeIframe"></div>
+          <div class="modal-backdrop" :class="{ active: iframeActive }" @click="iframeClosable && closeIframe()"></div>
 
-          <div class="modal modal-iframe" :class="{ active: iframeActive }" :style="iframeWidth ? { 'max-width': iframeWidth } : {}" @click.self="closeIframe">
+          <div class="modal modal-iframe" :class="{ active: iframeActive }" :style="iframeWidth ? { 'max-width': iframeWidth } : {}" @click.self="iframeClosable && closeIframe()">
             <header class="modal-header">
               <h3 style="margin:0;">{{ iframeTitle }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
