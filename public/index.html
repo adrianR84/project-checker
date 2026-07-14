@@ -1913,10 +1913,10 @@
             </table>
           </div>
 
-          <div class="modal-backdrop" :class="{ active: activeModal !== null }" @click="closeModal"></div>
+          <div class="modal-backdrop" :class="{ active: activeModal !== null }" @click="modalClosable && closeModal()"></div>
 
           <!-- Create / Edit modal -->
-          <div class="modal" :class="{ active: isActive('form') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('form') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
@@ -1932,7 +1932,7 @@
           </div>
 
           <!-- JSON import modal -->
-          <div class="modal" :class="{ active: isActive('import') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('import') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
             <header class="modal-header">
               <h3 style="margin:0;">Import Projects from JSON</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
@@ -1972,7 +1972,7 @@
           </div>
 
           <!-- RepoManager modal -->
-          <div class="modal" :class="{ active: isActive('repos') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="closeModal">
+          <div class="modal" :class="{ active: isActive('repos') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); manageProject = null">×</button>
@@ -2001,15 +2001,17 @@
         function useModal() {
           const activeModal = ref(null);
           const modalWidth = ref('');
-          function openModal(name, w) {
+          const modalClosable = ref(true);
+          function openModal(name, w, closable = true) {
             activeModal.value = name;
             modalWidth.value = w || '';
+            modalClosable.value = closable;
           }
           function closeModal()    { activeModal.value = null; }
           function isActive(name)  { return activeModal.value === name; }
-          return { activeModal, modalWidth, openModal, closeModal, isActive };
+          return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
         }
-        const { activeModal, modalWidth, openModal, closeModal, isActive } = useModal();
+        const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
@@ -2272,7 +2274,7 @@
         return {
           projects, filteredProjects, loading, error, editing, submitting,
           importText, importing, manageProject, lastGithubImport,
-          activeModal, modalWidth, isActive,
+          activeModal, modalWidth, modalClosable, isActive,
           projFilter, selected,
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
