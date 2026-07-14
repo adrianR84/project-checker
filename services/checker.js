@@ -5,6 +5,8 @@ const { execSync } = require('child_process');
 const { JSDOM } = require('jsdom');
 // ponytail: cached defuddle availability, checked once on first Twitter check
 let _defuddleAvailable = undefined;
+// ponytail: set to false before calling checkTwitter to skip defuddle suspended-account check
+let enableDefuddleSuspendedCheck = true;
 
 /** Returns the current ISO timestamp. */
 const now = () => new Date().toISOString();
@@ -291,7 +293,7 @@ async function checkTwitter(url, projectId) {
     let _defuddleDetails = null;
 
     // ponytail: defuddle parse to detect suspended accounts when HTTP 200
-    if (res.ok && _defuddleAvailable !== false) {
+    if (res.ok && _defuddleAvailable !== false && enableDefuddleSuspendedCheck) {
       try {
         if (_defuddleAvailable === undefined) {
           execSync('defuddle --version', { stdio: 'pipe', timeout: 5000, windowsHide: true });
@@ -347,4 +349,6 @@ module.exports = {
   checkTwitter,
   logCheck,
   recordStatusChange,
+  get enableDefuddleSuspendedCheck() { return enableDefuddleSuspendedCheck; },
+  set enableDefuddleSuspendedCheck(v) { enableDefuddleSuspendedCheck = v; },
 };
