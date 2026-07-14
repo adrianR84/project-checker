@@ -324,6 +324,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
         const ts = now();
         await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, localRepo.id);
         recordStatusChange(id, 'github', 'deleted', { full_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
+        await logCheck(id, 'github', localRepo.id, { status: 'deleted', http_status: 404, response_time_ms: 0, error_message: null, details: null });
       }
     }
 

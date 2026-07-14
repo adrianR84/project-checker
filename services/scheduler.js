@@ -104,6 +104,7 @@ async function runCommitTick() {
           const ts = now();
           await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, localRepo.id);
           recordStatusChange(p.id, 'github', 'deleted', { full_name: localRepo.full_name, sha: localRepo.latest_commit_sha });
+          await logCheck(p.id, 'github', localRepo.id, { status: 'deleted', http_status: 404, response_time_ms: 0, error_message: null, details: null });
         } else {
           const r = await checkGithubRepo(localRepo.full_name, p.id);
           await logCheck(p.id, 'github', localRepo.id, r);
