@@ -136,8 +136,9 @@ async function checkWebsite(url, projectId, contentCheck = true) {
   let lastHash = null;
   let lastHttpStatus = null;
   if (contentCheck && projectId) {
+    // Skip 'changed' transition rows — find the last real steady-state status
     const row = await db.prepare(
-      "SELECT details, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'website' ORDER BY checked_at DESC LIMIT 1"
+      "SELECT details, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'website' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
     ).get(projectId);
     if (row?.details) {
       try { lastHash = JSON.parse(row.details).content_hash || null; } catch (_) {}
@@ -272,8 +273,9 @@ async function checkTwitter(url, projectId) {
   let lastStatus = null;
   let lastHttpStatus = null;
   if (projectId) {
+    // Skip 'changed' transition rows — find the last real steady-state status
     const row = await db.prepare(
-      "SELECT status, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'twitter' ORDER BY checked_at DESC LIMIT 1"
+      "SELECT status, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'twitter' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
     ).get(projectId);
     lastStatus = row?.status || null;
     lastHttpStatus = row?.http_status ?? null;
@@ -312,7 +314,6 @@ async function checkTwitter(url, projectId) {
     }
 
     const changed = lastStatus !== null && newStatus !== lastStatus;
-    const status = changed ? 'changed' : newStatus;
 
     if (changed && projectId) {
       recordStatusChange(projectId, 'twitter', 'changed', { bs: lastStatus, as: newStatus, bhs: lastHttpStatus, ahs: res.status });
@@ -324,11 +325,11 @@ async function checkTwitter(url, projectId) {
       recordStatusChange(projectId, 'twitter', eventType, { bhs: lastHttpStatus, ahs: res.status });
     }
 
-    // ponytail: only persist defuddle output on meaningful status (changed/disabled) to keep logs lean
-    const finalDetails = (status === 'changed' || status === 'disabled') ? _defuddleDetails : null;
+    // ponytail: only persist defuddle output on meaningful status (disabled) to keep logs lean
+    const finalDetails = newStatus === 'disabled' ? _defuddleDetails : null;
 
     return {
-      status,
+      status: newStatus,
       http_status: res.status,
       response_time_ms,
       error_message: res.ok ? null : `HTTP ${res.status}`,
