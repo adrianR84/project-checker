@@ -1917,14 +1917,14 @@
           <div ref="formDialog" class="modal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="formDialog.classList.remove('active')">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(formDialog)">×</button>
             </header>
             <div class="modal-body">
               <ProjectForm
                 :initial="editing"
                 :busy="submitting"
                 @submit="onFormSubmit"
-                @cancel="formDialog.classList.remove('active')"
+                @cancel="closeModal(formDialog)"
               />
             </div>
           </div>
@@ -1933,7 +1933,7 @@
           <div ref="importDialog" class="modal">
             <header class="modal-header">
               <h3 style="margin:0;">Import Projects from JSON</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="importDialog.classList.remove('active')">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(importDialog)">×</button>
             </header>
             <div class="modal-body">
               <p class="muted">
@@ -1956,7 +1956,7 @@
               </div>
 
               <div class="modal-actions">
-                <button @click="importDialog.classList.remove('active')">Cancel</button>
+                <button @click="closeModal(importDialog)">Cancel</button>
                 <button
                   class="primary"
                   :disabled="importing || !importText.trim()"
@@ -1973,7 +1973,7 @@
           <div ref="reposDialog" class="modal">
             <header class="modal-header">
               <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="reposDialog.classList.remove('active'); manageProject = null">×</button>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(reposDialog); manageProject = null">×</button>
             </header>
             <div class="modal-body">
               <RepoManager
@@ -1981,7 +1981,7 @@
                 :projectId="manageProject.id"
                 :githubUrl="manageProject.github_url"
                 :projectName="manageProject.name"
-                @repos-updated="reposDialog.classList.remove('active'); manageProject = null"
+                @repos-updated="closeModal(reposDialog); manageProject = null"
               />
             </div>
           </div>
@@ -2028,9 +2028,27 @@
           }
         }
 
-        function openCreate() { editing.value = null; formDialog.value?.classList.add('active'); }
-        function openEdit(p)   { editing.value = p; formDialog.value?.classList.add('active'); editBus.value = null; }
-        function openManageRepos(p) { manageProject.value = p; reposDialog.value?.classList.add('active'); }
+        function openCreate(w) {
+          editing.value = null;
+          if (w) formDialog.value?.style.setProperty('width', w);
+          formDialog.value?.classList.add('active');
+        }
+        function openEdit(p, w) {
+          editing.value = p;
+          if (w) formDialog.value?.style.setProperty('width', w);
+          formDialog.value?.classList.add('active');
+          editBus.value = null;
+        }
+        function openManageRepos(p, w) {
+          manageProject.value = p;
+          if (w) reposDialog.value?.style.setProperty('width', w);
+          reposDialog.value?.classList.add('active');
+        }
+
+        function closeModal(el) {
+          el?.classList.remove('active');
+          el?.style.removeProperty('width');
+        }
 
         /** Create or update a project, then reload the list */
         async function onFormSubmit(payload) {
@@ -2046,7 +2064,7 @@
                 if (fresh) openManageRepos(fresh);
               }
             }
-            formDialog.value?.classList.remove('active');
+            closeModal(formDialog);
             editing.value   = null;
             await load();
           } catch (e) {
@@ -2176,7 +2194,7 @@
           }
 
           importing.value   = false;
-          importDialog.value?.classList.remove('active');
+          closeModal(importDialog);
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
@@ -2252,7 +2270,7 @@
           importText, importing, manageProject, lastGithubImport,
           formDialog, importDialog, reposDialog,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos,
+          openCreate, openEdit, openManageRepos, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
@@ -2859,20 +2877,26 @@
         const iframeLoading = ref(false);
         const iframeDialog  = ref(null);
 
-        function openIframe(url, title = '') {
+        function closeModal(el) {
+          el?.classList.remove('active');
+          el?.style.removeProperty('width');
+        }
+
+        function openIframe(url, title = '', w = '') {
           iframeUrl.value = url;
           iframeTitle.value = title;
           iframeLoading.value = true;
+          if (w) iframeDialog.value?.style.setProperty('width', w);
           iframeDialog.value?.classList.add('active');
         }
         function closeIframe() {
-          iframeDialog.value?.classList.remove('active');
+          closeModal(iframeDialog.value);
           iframeUrl.value = '';
         }
 
         provide('openIframe', openIframe);
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeDialog, closeIframe };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeDialog, closeIframe, closeModal };
       },
 
       template: `

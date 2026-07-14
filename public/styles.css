@@ -224,7 +224,7 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   flex-direction: column;
   max-width: 700px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 95vh;
   overflow: hidden;
   color: var(--app-text);
   position: fixed;
@@ -254,8 +254,8 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 }
 
 .modal.modal-iframe {
-  max-width: 1000px;
-  width: 1000px;
+  max-width: 720px;
+  width: 720px;
   max-height: 95vh;
   height: 95vh;
 }
@@ -270,18 +270,18 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 }
 .modal-backdrop.active { display: block; }
 
-.iframe-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.iframe-wrap iframe {
-  flex: 1;
-  border: none;
-  min-height: 500px;
-  width: 100%;
-}
+  .iframe-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .iframe-wrap iframe {
+    flex: 1;
+    border: none;
+    min-height: 500px;
+    width: 100%;
+  }
 
 
 .modal-close-btn {
