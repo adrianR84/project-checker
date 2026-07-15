@@ -457,7 +457,7 @@
         totalPages() { return Math.ceil(this.total / this.limit) || 1; }
       },
 
-      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceIcon },
+      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceIcon: (t) => `<span class="icon icon-${t}"></span>` },
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
