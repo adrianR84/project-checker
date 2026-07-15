@@ -72,6 +72,9 @@ function getDetail(event, v) {
   if (event_type === 'deleted' && resource_type === 'github') {
     return `<b>${rn ?? '?'}</b> was deleted`;
   }
+  if (event_type === 'changed' && resource_type === 'twitter' && v.new_posts !== undefined) {
+    return `new post${v.new_posts !== 1 ? 's' : ''}: <b>${v.new_posts}</b>\n<code>${v.post_ids?.[0] ?? ''}</code>`;
+  }
   if (event_type === 'changed' && resource_type === 'twitter') {
     return `profile updated`;
   }
@@ -93,6 +96,8 @@ function formatAlert(event, projectName) {
       detail = `${rn ?? '?'} tag: ${v.ot ?? 'none'} -> ${v.nt ?? '?'}`;
     } else if (event_type === 'deleted' && resource_type === 'github') {
       detail = `${rn ?? '?'} was deleted`;
+    } else if (event_type === 'changed' && resource_type === 'twitter' && v.new_posts !== undefined) {
+      detail = `new post${v.new_posts !== 1 ? 's' : ''}: ${v.new_posts} (${v.post_ids?.[0] ?? ''})`;
     } else if (event_type === 'changed' && resource_type === 'twitter') {
       detail = `profile updated`;
     } else {
