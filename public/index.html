@@ -468,6 +468,9 @@
         if (eventType === 'deleted') return 'error';
         return 'pending';
       },
+      resourceIcon(resourceType) {
+        return `<span class="icon icon-${resourceType}"></span>`;
+      },
       formatChangeValue(eventType, resourceType, value) {
         if (!value) return '—';
         try {
@@ -525,7 +528,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.project_id }}</td>
-                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
+                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -555,6 +558,7 @@
       methods: {
         relativeTime, absoluteTime,
         badgeClass: statusChangeHelpers.badgeClass,
+        resourceIcon: statusChangeHelpers.resourceIcon,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
         scResourceUrl: statusChangeHelpers.scResourceUrl,
         twitterIframeUrl(log) {
@@ -607,7 +611,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.status_change_id }}</td>
-                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
+                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -634,6 +638,7 @@
       methods: {
         absoluteTime,
         badgeClass: statusChangeHelpers.badgeClass,
+        resourceIcon: statusChangeHelpers.resourceIcon,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
         alertResourceUrl: statusChangeHelpers.alertResourceUrl,
         twitterIframeUrl(log) {
