@@ -56,8 +56,19 @@ async function pushPushbulletNote(accessToken, title, body) {
 
 // ─── Formatter ────────────────────────────────────────────────────────────────
 
-/** Formats an event into a detail string. */
-function getDetail(event, v) {
+/** Looks up the content of a twitter post for a new-post alert. */
+async function getPostContent(projectId, postId) {
+  if (!projectId || !postId) return null;
+  try {
+    const row = await db.prepare(
+      'SELECT content, author, link FROM twitter_posts WHERE project_id = ? AND post_id = ? LIMIT 1'
+    ).get(projectId, postId);
+    return row || null;
+  } catch { return null; }
+}
+
+/** Formats an event into a detail string (HTML, for Telegram). */
+async function getDetail(event, v) {
   const { resource_type, event_type } = event;
   const rn = v.full_name || v.repo_name;
   if (event_type === 'changed' && resource_type === 'github') {
@@ -73,7 +84,9 @@ function getDetail(event, v) {
     return `<b>${rn ?? '?'}</b> was deleted`;
   }
   if (event_type === 'changed' && resource_type === 'twitter' && v.new_posts !== undefined) {
-    return `new post${v.new_posts !== 1 ? 's' : ''}: <b>${v.new_posts}</b>\n<code>${v.post_ids?.[0] ?? ''}</code>`;
+    const post = await getPostContent(event.project_id, v.post_ids?.[0]);
+    const content = post?.content ? `\n${post.content.slice(0, 280)}` : '';
+    return `new post${v.new_posts !== 1 ? 's' : ''}: <b>${v.new_posts}</b>${content}`;
   }
   if (event_type === 'changed' && resource_type === 'twitter') {
     return `profile updated`;
@@ -82,7 +95,7 @@ function getDetail(event, v) {
 }
 
 /** Plain-text alert string (for Pushbullet). */
-function formatAlert(event, projectName) {
+async function formatAlert(event, projectName) {
   const { resource_type, event_type, value, created_at } = event;
   let detail = '';
   try {
@@ -97,11 +110,13 @@ function formatAlert(event, projectName) {
     } else if (event_type === 'deleted' && resource_type === 'github') {
       detail = `${rn ?? '?'} was deleted`;
     } else if (event_type === 'changed' && resource_type === 'twitter' && v.new_posts !== undefined) {
-      detail = `new post${v.new_posts !== 1 ? 's' : ''}: ${v.new_posts} (${v.post_ids?.[0] ?? ''})`;
+      const post = await getPostContent(event.project_id, v.post_ids?.[0]);
+      const content = post?.content ? ` — "${post.content.slice(0, 280)}"` : '';
+      detail = `new post${v.new_posts !== 1 ? 's' : ''}: ${v.new_posts}${content}`;
     } else if (event_type === 'changed' && resource_type === 'twitter') {
       detail = `profile updated`;
     } else {
-      detail = value && typeof value === 'object' ? JSON.stringify(value) : String(value);
+      detail = value && typeof v === 'object' ? JSON.stringify(v) : String(value);
     }
   } catch {
     detail = String(value);
@@ -110,13 +125,13 @@ function formatAlert(event, projectName) {
 }
 
 /** HTML-formatted alert string for Telegram. */
-function formatAlertHtml(event, projectName) {
+async function formatAlertHtml(event, projectName) {
   const { resource_type, event_type, value, created_at } = event;
   const ts = created_at ? created_at.replace('T', ' ').slice(0, 16) : '?';
   let detail = '';
   try {
     const v = typeof value === 'string' ? JSON.parse(value) : value;
-    detail = getDetail(event, v);
+    detail = await getDetail(event, v);
   } catch {
     detail = String(value);
   }
@@ -136,8 +151,8 @@ async function sendAlert(event, projectName) {
     db.config.getTelegram(),
     db.config.getPushbullet()
   ]);
-  const plain = formatAlert(event, projectName);
-  const html = formatAlertHtml(event, projectName);
+  const plain = await formatAlert(event, projectName);
+  const html = await formatAlertHtml(event, projectName);
 
   if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id) {
     const r = await sendTelegramMessage(tgCfg.bot_token, tgCfg.chat_id, html);
