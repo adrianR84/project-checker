@@ -2575,9 +2575,9 @@
               <p class="muted">Daily maintenance tasks that keep the database small.</p>
 
               <fieldset role="group">
-                <label data-tooltip="Automatically delete check logs older than the specified number of days. Range: 5-10 days.">
+                <label data-tooltip="Automatically delete check logs older than the specified number of days. Range: 1-7 days.">
                   Delete Check Logs older than
-                  <input v-model.number="form.log_retention_days" type="number" min="5" max="10" style="width:80px"/> days
+                  <input v-model.number="form.log_retention_days" type="number" min="1" max="7" style="width:80px"/> days
                 </label>
               </fieldset>
 
@@ -2846,7 +2846,7 @@
         /** Save Database CleanUp settings (log retention + twitter posts cap) */
         async function saveCleanUpSettings() {
           await saveSettings({
-            log_retention_days: Math.max(5, Math.min(10, Number(form.value.log_retention_days) || 7)),
+            log_retention_days: Math.max(1, Math.min(7, Number(form.value.log_retention_days) || 7)),
             event_log_retention_days: Math.max(10, Math.min(60, Number(form.value.event_log_retention_days) || 14)),
             alert_log_retention_days: Math.max(10, Math.min(30, Number(form.value.alert_log_retention_days) || 14)),
             twitter_posts_per_project: Math.max(50, Math.min(100, Number(form.value.twitter_posts_per_project) || 50)),

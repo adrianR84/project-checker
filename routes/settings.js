@@ -76,8 +76,8 @@ router.put('/', async (req, res) => {
 
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'log_retention_days')) {
     const v = parseInt(req.body.log_retention_days, 10);
-    if (!Number.isFinite(v) || v < 5 || v > 10) {
-      return res.status(400).json({ error: 'log_retention_days must be an integer between 5 and 10' });
+    if (!Number.isFinite(v) || v < 1 || v > 7) {
+      return res.status(400).json({ error: 'log_retention_days must be an integer between 1 and 7' });
     }
     updates.log_retention_days = v;
   }
