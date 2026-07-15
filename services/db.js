@@ -97,7 +97,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       user_id TEXT NOT NULL DEFAULT '',
-      settings TEXT NOT NULL DEFAULT '{"log_retention_days":7,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"logs_per_page":20,"checks_on_new_project":1}',
+      settings TEXT NOT NULL DEFAULT '{"log_retention_days":7,"event_log_retention_days":14,"alert_log_retention_days":14,"twitter_posts_per_project":50,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"logs_per_page":20,"checks_on_new_project":1}',
       check_intervals TEXT NOT NULL DEFAULT '{"github":360,"website":1440,"twitter":1440}',
       alert_intervals TEXT NOT NULL DEFAULT '{"github":60,"website":60,"twitter":60}',
       alert_stops TEXT NOT NULL DEFAULT '{"github":1440,"website":1440,"twitter":1440}',
@@ -243,7 +243,7 @@ const dbProxy = {
     if (row) return;
     await dbProxy.prepare(`
       INSERT INTO config (user_id, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts)
-      VALUES (?, '{"log_retention_days":7,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"logs_per_page":20,"checks_on_new_project":1}',
+      VALUES (?, '{"log_retention_days":7,"event_log_retention_days":14,"alert_log_retention_days":14,"twitter_posts_per_project":50,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"logs_per_page":20,"checks_on_new_project":1}',
               '{"github":360,"website":1440,"twitter":1440}',
               '{"github":60,"website":60,"twitter":60}',
               '{"github":1440,"website":1440,"twitter":1440}',

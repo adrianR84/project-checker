@@ -68,7 +68,10 @@ async function start() {
   await db.init(); // db.init exists on the module, not the proxy
 
   // Purge old logs on every startup (catches missed runs while app was down)
-  require('./services/scheduler').purgeOldLogs();
+  const scheduler = require('./services/scheduler');
+  await scheduler.purgeCheckLogs();
+  await scheduler.purgeEventLogs();
+  await scheduler.purgeAlertLogs();
 
   // Initialize scheduler after DB is ready
   require('./services/scheduler').init();

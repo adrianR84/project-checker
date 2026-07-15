@@ -21,7 +21,9 @@ router.get('/', async (req, res) => {
   if (!settings) return res.status(500).json({ error: 'config not found' });
   // Return flat shape for frontend compatibility
   res.json({
-    log_retention_days:         settings.log_retention_days,
+    log_retention_days:          settings.log_retention_days,
+    event_log_retention_days:   settings.event_log_retention_days ?? 14,
+    alert_log_retention_days:   settings.alert_log_retention_days ?? 14,
     twitter_posts_per_project:  settings.twitter_posts_per_project ?? 50,
     ui_refresh_seconds:         settings.ui_refresh_seconds,
     compact_activity:           settings.compact_activity_display,
@@ -74,10 +76,26 @@ router.put('/', async (req, res) => {
 
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'log_retention_days')) {
     const v = parseInt(req.body.log_retention_days, 10);
-    if (!Number.isFinite(v) || v < 0 || v > 365) {
-      return res.status(400).json({ error: 'log_retention_days must be an integer between 0 and 365' });
+    if (!Number.isFinite(v) || v < 5 || v > 10) {
+      return res.status(400).json({ error: 'log_retention_days must be an integer between 5 and 10' });
     }
     updates.log_retention_days = v;
+  }
+
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'event_log_retention_days')) {
+    const v = parseInt(req.body.event_log_retention_days, 10);
+    if (!Number.isFinite(v) || v < 10 || v > 60) {
+      return res.status(400).json({ error: 'event_log_retention_days must be an integer between 10 and 60' });
+    }
+    updates.event_log_retention_days = v;
+  }
+
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'alert_log_retention_days')) {
+    const v = parseInt(req.body.alert_log_retention_days, 10);
+    if (!Number.isFinite(v) || v < 10 || v > 30) {
+      return res.status(400).json({ error: 'alert_log_retention_days must be an integer between 10 and 30' });
+    }
+    updates.alert_log_retention_days = v;
   }
 
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'twitter_posts_per_project')) {
@@ -192,10 +210,12 @@ router.put('/', async (req, res) => {
       await db.prepare('UPDATE config SET check_intervals = ? WHERE user_id = ?').run(JSON.stringify(ci), req.userId);
     }
   }
-  if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined || updates.twitter_posts_per_project !== undefined) {
+  if (updates.log_retention_days || updates.event_log_retention_days || updates.alert_log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined || updates.twitter_posts_per_project !== undefined) {
     const s = await db.config.getSettings(req.userId);
     if (s) {
       if (updates.log_retention_days !== undefined) s.log_retention_days = updates.log_retention_days;
+      if (updates.event_log_retention_days !== undefined) s.event_log_retention_days = updates.event_log_retention_days;
+      if (updates.alert_log_retention_days !== undefined) s.alert_log_retention_days = updates.alert_log_retention_days;
       if (updates.ui_refresh_seconds !== undefined) s.ui_refresh_seconds = updates.ui_refresh_seconds;
       if (updates.compact_activity !== undefined) s.compact_activity_display = updates.compact_activity;
       if (updates.github_token !== undefined) s.github_token = updates.github_token || null;

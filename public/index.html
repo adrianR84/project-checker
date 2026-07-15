@@ -2575,10 +2575,23 @@
               <p class="muted">Daily maintenance tasks that keep the database small.</p>
 
               <fieldset role="group">
-                <label data-tooltip="Automatically delete check logs and status changes older than the specified number of days">
-                  <input type="checkbox" v-model="form.log_retention_enabled" />
-                  Delete logs older than
-                  <input v-show="form.log_retention_enabled" v-model.number="form.log_retention_days" type="number" min="0" max="365" style="width:80px"/> days
+                <label data-tooltip="Automatically delete check logs older than the specified number of days. Range: 5-10 days.">
+                  Delete Check Logs older than
+                  <input v-model.number="form.log_retention_days" type="number" min="5" max="10" style="width:80px"/> days
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
+                <label data-tooltip="Automatically delete event logs older than the specified number of days. Range: 10-60 days.">
+                  Delete Event Logs older than
+                  <input v-model.number="form.event_log_retention_days" type="number" min="10" max="60" style="width:80px"/> days
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
+                <label data-tooltip="Automatically delete alert logs older than the specified number of days. Range: 10-30 days.">
+                  Delete Alert Logs older than
+                  <input v-model.number="form.alert_log_retention_days" type="number" min="10" max="30" style="width:80px"/> days
                 </label>
               </fieldset>
 
@@ -2596,7 +2609,7 @@
             </article>
 
             <!-- Notification Channels -->
-            <article class="force-wide">
+            <article>
               <h3>Notification Channels</h3>
               <p class="muted">Send alerts to Telegram and/or Pushbullet when an alert is recorded.</p>
 
@@ -2673,9 +2686,10 @@
           github_interval_minutes:   360,
           website_interval_minutes:  1440,
           twitter_interval_minutes:  1440,
-          log_retention_days:        7,
-          log_retention_enabled:     false,
-          twitter_posts_per_project: 50,
+          log_retention_days:              7,
+          event_log_retention_days:       14,
+          alert_log_retention_days:       14,
+          twitter_posts_per_project:      50,
           ui_refresh_seconds:        60,
           ui_refresh_enabled:        false,
           showDangerZone:           false,
@@ -2736,7 +2750,8 @@
               website_interval_minutes:  pickMinutes(settings.value, 'website'),
               twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
               log_retention_days:   settings.value.log_retention_days || 7,
-              log_retention_enabled: !!settings.value.log_retention_days,
+              event_log_retention_days:  settings.value.event_log_retention_days ?? 14,
+              alert_log_retention_days:  settings.value.alert_log_retention_days ?? 14,
               twitter_posts_per_project: settings.value.twitter_posts_per_project ?? 50,
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
@@ -2831,9 +2846,9 @@
         /** Save Database CleanUp settings (log retention + twitter posts cap) */
         async function saveCleanUpSettings() {
           await saveSettings({
-            log_retention_days: form.value.log_retention_enabled
-              ? Number(form.value.log_retention_days) || 7
-              : 0,
+            log_retention_days: Math.max(5, Math.min(10, Number(form.value.log_retention_days) || 7)),
+            event_log_retention_days: Math.max(10, Math.min(60, Number(form.value.event_log_retention_days) || 14)),
+            alert_log_retention_days: Math.max(10, Math.min(30, Number(form.value.alert_log_retention_days) || 14)),
             twitter_posts_per_project: Math.max(50, Math.min(100, Number(form.value.twitter_posts_per_project) || 50)),
           });
         }
@@ -2938,7 +2953,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           error,
-          onSave, saveAppSettings, saveAlertSettings, saveNotificationSettings, savePriceAlertsSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, savePriceAlertsSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
           relativeTime,
           api: window.api,
         };

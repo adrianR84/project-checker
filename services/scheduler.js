@@ -116,13 +116,32 @@ async function runCommitTick() {
   }
 }
 
-/** Deletes check_logs rows older than log_retention_days (daily at midnight). */
-async function purgeOldLogs() {
+/** Deletes check_logs rows older than log_retention_days (daily at midnight). 0 = disabled. */
+async function purgeCheckLogs() {
   const settings = await db.config.getSettings();
   if (!settings?.log_retention_days) return;
   const cutoff = new Date(Date.now() - settings.log_retention_days * 86400_000).toISOString();
   await db.prepare('DELETE FROM check_logs WHERE checked_at < ?').run(cutoff);
   scheduleLog(`[${now()}] Scheduler: purged logs older than ${settings.log_retention_days} days`);
+}
+
+/** Deletes event_logs rows older than event_log_retention_days (daily at midnight). */
+async function purgeEventLogs() {
+  const settings = await db.config.getSettings();
+  if (!settings?.event_log_retention_days) return;
+  const cutoff = new Date(Date.now() - settings.event_log_retention_days * 86400_000).toISOString();
+  await db.prepare('DELETE FROM event_logs WHERE created_at < ?').run(cutoff);
+  scheduleLog(`[${now()}] Scheduler: purged event_logs older than ${settings.event_log_retention_days} days`);
+}
+
+/** Deletes alert_logs rows older than alert_log_retention_days (daily at midnight). */
+async function purgeAlertLogs() {
+  const settings = await db.config.getSettings();
+  if (!settings?.alert_log_retention_days) return;
+  const cutoff = new Date(Date.now() - settings.alert_log_retention_days * 86400_000).toISOString();
+  // Cascade FK: alert_logs.status_change_id references event_logs.id ON DELETE CASCADE
+  await db.prepare('DELETE FROM event_logs WHERE created_at < ?').run(cutoff);
+  scheduleLog(`[${now()}] Scheduler: purged alert_logs older than ${settings.alert_log_retention_days} days`);
 }
 
 /** Caps twitter_posts at twitter_posts_per_project (most recent N per project, oldest deleted). Daily at midnight. */
@@ -427,7 +446,9 @@ async function reschedule() {
 
   const purgeExpr = '0 0 * * *';
   const purgeJob = cron.schedule(purgeExpr, async () => {
-    try { await purgeOldLogs(); } catch (err) { console.error(err); }
+    try { await purgeCheckLogs(); } catch (err) { console.error(err); }
+    try { await purgeEventLogs(); } catch (err) { console.error(err); }
+    try { await purgeAlertLogs(); } catch (err) { console.error(err); }
     try { await purgeTwitterPosts(); } catch (err) { console.error(err); }
   });
   jobs.push(purgeJob);
@@ -465,4 +486,4 @@ function init() {
   scheduleLog(`[${now()}] Scheduler initialized`);
 }
 
-module.exports = { init, purgeOldLogs, purgeTwitterPosts };
+module.exports = { init, purgeCheckLogs, purgeEventLogs, purgeAlertLogs, purgeTwitterPosts };
