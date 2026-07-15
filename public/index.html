@@ -680,8 +680,8 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Website URL</label>
-                <label data-tooltip="Verify page content matches expected value" data-placement="top"><input type="checkbox" v-model="f.website_content_check" /> Content Check</label>
-                <label data-tooltip="Perform HTTP checks on this website" data-placement="left"><input type="checkbox" v-model="f.website_enabled" /> Enabled</label>
+                <label data-tooltip="Perform HTTP checks on this website" data-placement="top"><input type="checkbox" v-model="f.website_enabled" /> Enabled</label>
+                <label data-tooltip="Verify page content matches expected value" data-placement="left"><input type="checkbox" v-model="f.website_content_check" :disabled="!f.website_enabled" /> Content Check</label>
               </div>
               <input v-model="f.website_url" type="url" placeholder="https://example.com" />
             </div>
@@ -790,6 +790,11 @@
           },
           { immediate: true }
         );
+
+        // ponytail: website_content_check depends on website_enabled — force off when disabled
+        watch(() => f.value.website_enabled, (enabled) => {
+          if (!enabled) f.value.website_content_check = false;
+        });
 
         async function lookupToken() {
           const contract = f.value.token_contract?.trim();
