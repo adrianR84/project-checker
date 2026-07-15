@@ -607,7 +607,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.status_change_id }}</td>
-                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
+                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
