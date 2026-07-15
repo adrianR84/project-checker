@@ -281,8 +281,9 @@ function handleFromTwitterUrl(url) {
     .trim();
 }
 
-/** Fetches the latest posts for a twitter handle via nitter RSS,
-    inserts new ones (deduped by post_id) into twitter_posts, returns the new ones. */
+// ponytail: how many posts to seed on first run (nitter RSS is newest-first, so cap = oldest of seeded baseline)
+const FIRST_RUN_POST_LIMIT = 20;
+
 async function fetchAndStoreTwitterPosts(projectId, handle) {
   if (!projectId || !handle) return { newPosts: 0, newPostIds: [] };
   const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
@@ -300,6 +301,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   const existing = await db.prepare(
     'SELECT post_id FROM twitter_posts WHERE project_id = ?'
   ).all(projectId);
+  const isFirstRun = existing.length === 0;
   const seen = new Set(existing.map(r => r.post_id));
 
   const insert = db.prepare(`
@@ -307,9 +309,12 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
     VALUES (?, ?, ?, ?, ?, ?)
   `);
   const newPostIds = [];
+  let seeded = 0;
   for (const item of items) {
     const postId = String(item?.guid ?? item?.id ?? item?.link ?? '').trim();
     if (!postId || seen.has(postId)) continue;
+    // ponytail: on first run cap at FIRST_RUN_POST_LIMIT to avoid seeding months of history
+    if (isFirstRun && seeded >= FIRST_RUN_POST_LIMIT) break;
     seen.add(postId);
     await insert.run(
       projectId,
@@ -320,7 +325,12 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
       item?.isoDate ?? item?.pubDate ?? null
     );
     newPostIds.push(postId);
+    seeded++;
   }
+
+  // ponytail: on first run seed the table silently — only fire event for genuinely new subsequent posts
+  if (isFirstRun) return { newPosts: 0, newPostIds: [] };
+
   return { newPosts: newPostIds.length, newPostIds };
 }
 
