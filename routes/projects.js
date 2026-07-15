@@ -16,7 +16,8 @@ function parseProjectRow(row) {
     website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
     github_url:           row.github   ? JSON.parse(row.github).url  : null,
     twitter_url:          row.twitter   ? JSON.parse(row.twitter).url : null,
-    twitter_enabled:      row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    twitter_enabled:      row.twitter_enabled,
+    twitter_posts_check:  row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
     telegram_url:         row.telegram  ? JSON.parse(row.telegram).url : null,
     price_enabled:        row.token_enabled,
   };
@@ -118,13 +119,19 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
 // POST /api/projects — create project
 router.post('/', async (req, res) => {
   const { name, website_url, github_url, twitter_url, telegram_url,
-          website_enabled, website_content_check, token, enabled, price_enabled } = req.body || {};
+          website_enabled, website_content_check, twitter_posts_check,
+          token, enabled, price_enabled } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
+
+  // Default twitter_posts_check to 1 when caller didn't specify (mirrors website_content_check)
+  const twitterPc = req.body && Object.prototype.hasOwnProperty.call(req.body, 'twitter_posts_check')
+    ? (twitter_posts_check ? 1 : 0)
+    : 1;
 
   // Serialize URL fields to JSON
   const websiteJson  = website_url  ? JSON.stringify({ url: website_url, cc: website_content_check ? 1 : 0 }) : null;
   const githubJson   = github_url   ? JSON.stringify({ url: github_url })  : null;
-  const twitterJson  = twitter_url  ? JSON.stringify({ url: twitter_url, pc: 1 }) : null;
+  const twitterJson  = twitter_url  ? JSON.stringify({ url: twitter_url, pc: twitterPc }) : null;
   const telegramJson = telegram_url  ? JSON.stringify({ url: telegram_url }) : null;
 
   // Prevent duplicate: same name + website_url for this user
@@ -159,7 +166,7 @@ router.post('/', async (req, res) => {
         await logCheck(projectId, 'website', null, r);
       }
       if (twitter_url) {
-        const r = await checkTwitter(twitter_url, projectId);
+        const r = await checkTwitter(twitter_url, projectId, { postsCheck: !!twitterPc });
         await logCheck(projectId, 'twitter', null, r);
       }
     } catch (err) {
@@ -181,6 +188,7 @@ router.put('/:id', async (req, res) => {
 
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
                    'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled',
+                   'twitter_posts_check',
                    'token', 'enabled', 'price_enabled'];
   const updates = {};
   for (const key of allowed) {
@@ -209,11 +217,24 @@ router.put('/:id', async (req, res) => {
     delete updates.github_url;
   }
   if ('twitter_url' in updates) {
+    // url changing — pc may also be in the same request, otherwise preserve existing
+    const incomingPc = ('twitter_posts_check' in updates)
+      ? (updates.twitter_posts_check ? 1 : 0)
+      : (existing.twitter ? (JSON.parse(existing.twitter).pc ?? 1) : 1);
     updates.twitter = updates.twitter_url
-      ? JSON.stringify({ url: updates.twitter_url, pc: updates.twitter_enabled ? 1 : 0 })
+      ? JSON.stringify({ url: updates.twitter_url, pc: incomingPc })
       : null;
-    delete updates.twitter_enabled;
     delete updates.twitter_url;
+    delete updates.twitter_posts_check;
+    // twitter_enabled (master flag) lives on the flat column, not in the JSON — strip if present
+    delete updates.twitter_enabled;
+  } else if ('twitter_posts_check' in updates) {
+    // only pc changing — patch in place to preserve url
+    const tw = existing?.twitter ? JSON.parse(existing.twitter) : {};
+    tw.pc = updates.twitter_posts_check ? 1 : 0;
+    updates.twitter = JSON.stringify(tw);
+    delete updates.twitter_posts_check;
+    delete updates.twitter_enabled;
   } else if ('twitter_enabled' in updates) {
     // twitter_url not being updated — strip the stale flat flag, it lives in twitter.pc now
     delete updates.twitter_enabled;
@@ -441,9 +462,20 @@ router.post('/:id/check-twitter', async (req, res) => {
     await logCheck(id, 'twitter', null, result);
     return res.json(result);
   }
-  const result = await checkTwitter(project.twitter_url, id);
+  const result = await checkTwitter(project.twitter_url, id, { postsCheck: !!project.twitter_posts_check });
   await logCheck(id, 'twitter', null, result);
   res.json(result);
+});
+
+// GET /api/projects/:id/twitter-posts — list the latest stored posts for a project
+router.get('/:id/twitter-posts', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = await loadProjectOr404(res, id, req.userId);
+  if (!project) return;
+  const posts = await db.prepare(
+    'SELECT id, post_id, author, link, content, published_at, created_at FROM twitter_posts WHERE project_id = ? ORDER BY published_at DESC, id DESC LIMIT 100'
+  ).all(id);
+  res.json(posts);
 });
 
 

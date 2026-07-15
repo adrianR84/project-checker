@@ -330,6 +330,30 @@ function add_token_and_enabled_columns(db) {
   }
 }
 
+/** Migration: creates twitter_posts table if missing (for posts-check feature). */
+function add_twitter_posts_table(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='twitter_posts'").get();
+  if (row) return;
+  try {
+    db.exec(`
+      CREATE TABLE twitter_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        post_id TEXT NOT NULL,
+        author TEXT,
+        link TEXT,
+        content TEXT,
+        published_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        UNIQUE (project_id, post_id)
+      )
+    `);
+  } catch (err) {
+    console.error(`[${now()}] add_twitter_posts_table failed: ${err.message}`);
+  }
+}
+
 /** Migration: creates token_prices table if missing. */
 function add_token_prices_table(db) {
   const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='token_prices'").get();
@@ -716,6 +740,7 @@ async function runMigrations(db) {
   try { drop_repos_repo_name_col(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_projects_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_config_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_twitter_posts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

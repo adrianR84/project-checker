@@ -246,7 +246,15 @@
     /** Return the URL for a log entry's resource (website, twitter, or github repo) */
     function resourceUrl(log, jsonField = null) {
       if (log.resource_type === 'website' && log.website_url) return log.website_url;
-      if (log.resource_type === 'twitter' && log.twitter_url) return log.twitter_url;
+      if (log.resource_type === 'twitter') {
+        if (jsonField && log[jsonField]) {
+          try {
+            const v = JSON.parse(log[jsonField]);
+            if (v.post_ids?.length) return `https://twitter.com/i/status/${v.post_ids[0]}`;
+          } catch (_) {}
+        }
+        if (log.twitter_url) return log.twitter_url;
+      }
       if (log.resource_type === 'github') {
         const raw = jsonField ? log[jsonField] : log.full_name;
         if (!raw) return null;
@@ -472,6 +480,11 @@
             const hv = (v.bh && v.ah) ? (v.bh !== v.ah ? 'content changed' : `${v.bh.slice(0, 8)}… → ${v.ah.slice(0, 8)}…`) : '';
             return [hs, hv].filter(Boolean).join(' · ');
           }
+          if (eventType === 'changed' && resourceType === 'twitter' && v.new_posts !== undefined) {
+            const n = v.new_posts;
+            const preview = v.post_ids?.[0] ? `…${v.post_ids[0].slice(-10)}` : '';
+            return `new post${n !== 1 ? 's' : ''}: ${n} (${preview})`;
+          }
           if (eventType === 'changed' && resourceType === 'twitter') {
             const hs = (v.bhs || v.ahs) ? `${v.bhs ?? ''} → ${v.ahs ?? ''}` : '';
             const bs = v.bs && v.as ? (v.as === 'error' ? '<span style="color:#e55">removed</span>' : `${v.bs} → ${v.as}`) : '';
@@ -667,6 +680,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Twitter URL</label>
+                <label data-tooltip="Fetch latest posts and alert on new ones" data-placement="top"><input type="checkbox" v-model="f.twitter_posts_check" /> Posts Check</label>
                 <label data-tooltip="Check Twitter account existence and account suspension" data-placement="left"><input type="checkbox" v-model="f.twitter_enabled" /> Enabled</label>
               </div>
               <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
@@ -717,7 +731,7 @@
         // Local form state — starts empty or pre-filled with initial values
         const f = ref({
           name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
-          website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true,
+          website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true, twitter_posts_check: true,
           project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '',
         });
         const jsonEditText  = ref('');
@@ -743,6 +757,7 @@
                 website_content_check: !!v.website_content_check,
                 github_enabled:   !!v.github_enabled,
                 twitter_enabled:  !!v.twitter_enabled,
+                twitter_posts_check: !!v.twitter_posts_check,
                 telegram_enabled: !!v.telegram_enabled,
                 project_enabled: !!v.enabled,
                 price_enabled: !!v.price_enabled,
@@ -752,7 +767,7 @@
               };
             } else {
               f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
-                website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true,
+                website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true, twitter_posts_check: true,
                 project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '' };
             }
           },
@@ -813,6 +828,7 @@
             twitter_url: p.twitter_url, telegram_url: p.telegram_url,
             website_enabled: p.website_enabled, website_content_check: p.website_content_check,
             github_enabled: p.github_enabled, twitter_enabled: p.twitter_enabled, telegram_enabled: p.telegram_enabled,
+            twitter_posts_check: p.twitter_posts_check,
             token, enabled: p.project_enabled ? 1 : 0, price_enabled: p.price_enabled ? 1 : 0,
           });
         }
@@ -2203,6 +2219,9 @@
                 twitter_enabled:        item.twitter_enabled !== undefined
                   ? (item.twitter_enabled ? 1 : 0)
                   : (twitterVal?.pc ?? 1),
+                twitter_posts_check:    item.twitter_posts_check !== undefined
+                  ? (item.twitter_posts_check ? 1 : 0)
+                  : (twitterVal?.pc ?? 1),
                 telegram_url:           item.telegram?.url ?? item.telegram ?? null,
                 website_enabled:        item.website_enabled  !== undefined ? (item.website_enabled  ? 1 : 0) : hasWebsite,
                 github_enabled:         item.github_enabled   !== undefined ? (item.github_enabled   ? 1 : 0) : 1,
@@ -2258,6 +2277,7 @@
               website_enabled:  p.website_enabled ? 1 : 0,
               github_enabled:   p.github_enabled  ? 1 : 0,
               twitter_enabled:  p.twitter_enabled ? 1 : 0,
+              twitter_posts_check: p.twitter_posts_check ? 1 : 0,
               telegram_enabled: p.telegram_enabled ? 1 : 0,
               price_enabled:   p.price_enabled   ? 1 : 0,
               repos,

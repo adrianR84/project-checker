@@ -72,6 +72,21 @@ async function init() {
     );
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS twitter_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      post_id TEXT NOT NULL,
+      author TEXT,
+      link TEXT,
+      content TEXT,
+      published_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE (project_id, post_id)
+    );
+  `);
+
   // Rename old table if it exists
   const checkConfigRow = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='check_configs'").get();
   if (checkConfigRow) {

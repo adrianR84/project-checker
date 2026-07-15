@@ -3,6 +3,10 @@ const db = require('./db');
 const { createHash } = require('crypto');
 const { execSync } = require('child_process');
 const { JSDOM } = require('jsdom');
+// ponytail: rss-parser uses Node's legacy https.get which nitter.net accepts;
+// built-in fetch / node-fetch-native both return empty bodies from nitter.
+const RssParser = require('rss-parser');
+const rssParser = new RssParser();
 // ponytail: cached defuddle availability, checked once on first Twitter check
 let _defuddleAvailable = undefined;
 // ponytail: set to false before calling checkTwitter to skip defuddle suspended-account check
@@ -267,10 +271,66 @@ async function checkGithubRepo(fullName, projectId) {
   }
 }
 
+/** Extracts a Twitter handle (e.g. "anthropicai") from a full URL.
+    Accepts https://twitter.com/handle, https://x.com/handle, with or without www. */
+function handleFromTwitterUrl(url) {
+  return String(url || '')
+    .replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//, '')
+    .replace(/^\/+/, '')
+    .replace(/\/.*$/, '')
+    .trim();
+}
+
+/** Fetches the latest posts for a twitter handle via nitter RSS,
+    inserts new ones (deduped by post_id) into twitter_posts, returns the new ones. */
+async function fetchAndStoreTwitterPosts(projectId, handle) {
+  if (!projectId || !handle) return { newPosts: 0, newPostIds: [] };
+  const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
+  let feed;
+  try {
+    feed = await rssParser.parseURL(rssUrl);
+  } catch (err) {
+    console.error(`[${now()}] rss-parser failed for ${rssUrl}: ${err.message}`);
+    return { newPosts: 0, newPostIds: [] };
+  }
+  const items = Array.isArray(feed?.items) ? feed.items : [];
+  if (!items.length) return { newPosts: 0, newPostIds: [] };
+
+  // Pre-fetch existing post_ids so we can compute the diff (the db proxy doesn't expose run.changes)
+  const existing = await db.prepare(
+    'SELECT post_id FROM twitter_posts WHERE project_id = ?'
+  ).all(projectId);
+  const seen = new Set(existing.map(r => r.post_id));
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO twitter_posts (project_id, post_id, author, link, content, published_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const newPostIds = [];
+  for (const item of items) {
+    const postId = String(item?.guid ?? item?.id ?? item?.link ?? '').trim();
+    if (!postId || seen.has(postId)) continue;
+    seen.add(postId);
+    await insert.run(
+      projectId,
+      postId,
+      String(item?.creator ?? item?.author ?? '').trim() || null,
+      String(item?.link ?? '').trim() || null,
+      String(item?.contentSnippet ?? item?.content ?? '').trim() || null,
+      item?.isoDate ?? item?.pubDate ?? null
+    );
+    newPostIds.push(postId);
+  }
+  return { newPosts: newPostIds.length, newPostIds };
+}
+
 /** Checks a Twitter/X URL via GET and records status changes on transitions. */
-async function checkTwitter(url, projectId) {
+async function checkTwitter(url, projectId, opts = {}) {
   const start = Date.now();
   if (!url) return { ...emptyUrlResult('No URL provided'), details: null };
+
+  const { postsCheck = false } = opts;
+  const handle = opts.handle || handleFromTwitterUrl(url);
 
   let lastStatus = null;
   let lastHttpStatus = null;
@@ -315,7 +375,27 @@ async function checkTwitter(url, projectId) {
       }
     }
 
-    const changed = lastStatus !== null && newStatus !== lastStatus;
+    // ponytail: when posts check is on and the account responded OK, fetch RSS and dedup into twitter_posts
+    let _postsResult = null;
+    let _postsChangedEvent = false; // ponytail: true when posts triggered the changed-status, skips duplicate transition event
+    if (res.ok && postsCheck && handle) {
+      try {
+        _postsResult = await fetchAndStoreTwitterPosts(projectId, handle);
+        if (_postsResult.newPosts > 0) {
+          newStatus = 'changed';
+          _postsChangedEvent = true;
+          recordStatusChange(projectId, 'twitter', 'changed', {
+            new_posts: _postsResult.newPosts,
+            post_ids: _postsResult.newPostIds,
+          });
+        }
+      } catch (err) {
+        console.error(`[${now()}] fetchAndStoreTwitterPosts failed for project ${projectId}: ${err.message}`);
+      }
+    }
+
+    // ponytail: skip if posts branch already recorded the changed event (avoids dup on new posts)
+    const changed = !_postsChangedEvent && lastStatus !== null && newStatus !== lastStatus;
 
     if (changed && projectId) {
       recordStatusChange(projectId, 'twitter', 'changed', { bs: lastStatus, as: newStatus, bhs: lastHttpStatus, ahs: res.status });
@@ -328,7 +408,10 @@ async function checkTwitter(url, projectId) {
     }
 
     // ponytail: only persist defuddle output on meaningful status (disabled) to keep logs lean
-    const finalDetails = newStatus === 'disabled' ? _defuddleDetails : null;
+    let finalDetails = newStatus === 'disabled' ? _defuddleDetails : null;
+    if (_postsResult && _postsResult.newPosts > 0) {
+      finalDetails = { new_posts: _postsResult.newPosts, post_ids: _postsResult.newPostIds };
+    }
 
     return {
       status: newStatus,
@@ -349,6 +432,8 @@ module.exports = {
   checkTwitter,
   logCheck,
   recordStatusChange,
+  fetchAndStoreTwitterPosts,
+  handleFromTwitterUrl,
   get enableDefuddleSuspendedCheck() { return enableDefuddleSuspendedCheck; },
   set enableDefuddleSuspendedCheck(v) { enableDefuddleSuspendedCheck = v; },
 };

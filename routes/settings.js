@@ -231,7 +231,8 @@ function parseProjectRow(row) {
     website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
     github_url:          row.github   ? JSON.parse(row.github).url  : null,
     twitter_url:         row.twitter   ? JSON.parse(row.twitter).url : null,
-    twitter_enabled:     row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    twitter_enabled:     row.twitter_enabled,
+    twitter_posts_check: row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
     telegram_url:        row.telegram  ? JSON.parse(row.telegram).url : null,
     price_enabled:       row.token_enabled,
   };

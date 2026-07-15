@@ -1,7 +1,7 @@
 // Cron-based scheduler for periodic checks
 const cron = require('node-cron');
 const db = require('./db');
-const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange } = require('./checker');
+const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange, handleFromTwitterUrl } = require('./checker');
 const { fetchReposForOwner } = require('./github');
 const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY } = require('./notifications');
 
@@ -76,7 +76,7 @@ async function runTwitterTick() {
   for (const p of projects) {
     try {
       const parsed = JSON.parse(p.twitter);
-      const r = await checkTwitter(parsed.url, p.id);
+      const r = await checkTwitter(parsed.url, p.id, { postsCheck: !!parsed.pc, handle: handleFromTwitterUrl(parsed.url) });
       await logCheck(p.id, 'twitter', null, r);
     } catch (err) {
       scheduleLog(`[${now()}] twitter check failed for project ${p.id}: ${err.message}`);
