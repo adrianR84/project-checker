@@ -1363,7 +1363,7 @@
             <button class="page-nav-btn" @click="scrollToLogs" title="Go to logs">▼</button>
           </div>
 
-          <div class="tabs" id="activity-tabs" style="margin: 0 20px; align-items: center;">
+          <div class="tabs" id="activity-tabs">
             <button :class="['tab', activityTab === 'resources' ? 'active' : '']" @click="activityTab = 'resources'">Resources</button>
             <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
             <input
@@ -1411,86 +1411,84 @@
               No token prices yet. Add tokens to your enabled projects.
             </div>
 
-            <div v-else class="table-wrapper">
-              <table id="price-table" class="price-table">
-                <thead>
-                  <tr>
-                    <th class="hide-sm" :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
-                    <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
-                    <th class="cen" title="GitHub">
+            <table v-else id="price-table" class="price-table">
+              <thead>
+                <tr>
+                  <th class="hide-sm" :class="['sortable', priceSort.col === 'project_name' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('project_name')">Project</th>
+                  <th :class="['sortable', priceSort.col === 'symbol' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('symbol')">Symbol</th>
+                  <th class="cen" title="GitHub">
+                    <span class="icon icon-github"></span>
+                  </th>
+                  <th class="cen" title="Twitter">
+                    <span class="icon icon-twitter"></span>
+                  </th>
+                  <th class="cen" title="Website">
+                    <span class="icon icon-website"></span>
+                  </th>
+                  <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
+                  <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
+                  <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
+                  <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
+                  <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
+                  <th class="hide-sm" :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
+                  <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
+                  <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
+                  <th class="cen" title="Track price changes">
+                    <span class="sr-only">Track</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
+                  <td class="hide-sm" style="cursor:pointer" :title="row.contract" @click="copyContract(row)">
+                    {{ row.project_name.length > 20 ? row.project_name.slice(0, 20) + '…' : row.project_name }}
+                  </td>
+                  <td>
+                    <a :href="'https://x.com/search?q=%24' + (row.symbol.startsWith('$') ? row.symbol.slice(1) : row.symbol) + '&src=typed_query'"
+                        target="_blank" rel="noopener">
+                      {{ row.symbol || '—' }}
+                    </a>
+                  </td>
+                  <td class="cen">
+                    <a v-if="row.github_url" :href="row.github_url" target="_blank" rel="noopener" title="GitHub">
                       <span class="icon icon-github"></span>
-                    </th>
-                    <th class="cen" title="Twitter">
+                    </a>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="cen">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
                       <span class="icon icon-twitter"></span>
-                    </th>
-                    <th class="cen" title="Website">
+                    </a>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="cen">
+                    <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
                       <span class="icon icon-website"></span>
-                    </th>
-                    <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
-                    <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
-                    <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
-                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
-                    <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
-                    <th class="hide-sm" :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
-                    <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
-                    <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
-                    <th class="cen" title="Track price changes">
-                      <span class="sr-only">Track</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in filteredPrices" :key="row.project_id" :class="priceRowTint[row.project_id]">
-                    <td class="hide-sm" style="cursor:pointer" :title="row.contract" @click="copyContract(row)">
-                      {{ row.project_name.length > 20 ? row.project_name.slice(0, 20) + '…' : row.project_name }}
-                    </td>
-                    <td>
-                      <a :href="'https://x.com/search?q=%24' + (row.symbol.startsWith('$') ? row.symbol.slice(1) : row.symbol) + '&src=typed_query'"
-                         target="_blank" rel="noopener">
-                        {{ row.symbol || '—' }}
-                      </a>
-                    </td>
-                    <td class="cen">
-                      <a v-if="row.github_url" :href="row.github_url" target="_blank" rel="noopener" title="GitHub">
-                        <span class="icon icon-github"></span>
-                      </a>
-                      <span v-else>—</span>
-                    </td>
-                    <td class="cen">
-                      <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
-                        <span class="icon icon-twitter"></span>
-                      </a>
-                      <span v-else>—</span>
-                    </td>
-                    <td class="cen">
-                      <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
-                        <span class="icon icon-website"></span>
-                      </a>
-                      <span v-else>—</span>
-                    </td>
-                    <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
-                    <td class="cen">
-                      <a v-if="row.price_usd" :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
-                         target="_blank" rel="noopener"
-                         :title="row.symbol + ' on DexScreener'">
-                        <b>{{ '$' + parseFloat(row.price_usd).toFixed(6) }}</b>
-                      </a>
-                      <span v-else>—</span>
-                    </td>
-                    <td class="cen hide-sm" :class="priceCellTint[row.project_id + '-price_change_h1'] || []">{{ fmtPct(row.price_change_h1) }}</td>
-                    <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h6'] || []">{{ fmtPct(row.price_change_h6) }}</td>
-                    <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h24'] || []">{{ fmtPct(row.price_change_h24) }}</td>
-                    <td class="num hide-sm">{{ fmtShortNum(row.liquidity_usd) }}</td>
-                    <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
-                    <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
-                    <td class="cen">
-                      <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                    </a>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
+                  <td class="cen">
+                    <a v-if="row.price_usd" :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
+                        target="_blank" rel="noopener"
+                        :title="row.symbol + ' on DexScreener'">
+                      <b>{{ '$' + parseFloat(row.price_usd).toFixed(6) }}</b>
+                    </a>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="cen hide-sm" :class="priceCellTint[row.project_id + '-price_change_h1'] || []">{{ fmtPct(row.price_change_h1) }}</td>
+                  <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h6'] || []">{{ fmtPct(row.price_change_h6) }}</td>
+                  <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h24'] || []">{{ fmtPct(row.price_change_h24) }}</td>
+                  <td class="num hide-sm">{{ fmtShortNum(row.liquidity_usd) }}</td>
+                  <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
+                  <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
+                  <td class="cen">
+                    <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
           </div>
 
