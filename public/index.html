@@ -506,6 +506,7 @@
     const StatusChangeList = {
       props: ['logs', 'showProject', 'page', 'total', 'limit'],
       emits: ['changePage', 'refresh'],
+      inject: ['openIframe'],
 
       template: `
         <div>
@@ -524,7 +525,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.project_id }}</td>
-                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
+                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -556,6 +557,11 @@
         badgeClass: statusChangeHelpers.badgeClass,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
         scResourceUrl: statusChangeHelpers.scResourceUrl,
+        twitterIframeUrl(log) {
+          const u = this.scResourceUrl(log);
+          if (!u || log.resource_type !== 'twitter') return null;
+          return 'https://nitter.net' + u.replace('https://x.com', '').replace('https://twitter.com', '');
+        },
         async toggleConfirm(log, event) {
           if (log.confirmed) {
             if (!confirm('Unconfirm this status change?')) {
@@ -583,6 +589,7 @@
     const AlertLogsList = {
       props: ['logs', 'page', 'total', 'limit'],
       emits: ['changePage'],
+      inject: ['openIframe'],
 
       template: `
         <div>
@@ -629,6 +636,11 @@
         badgeClass: statusChangeHelpers.badgeClass,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
         alertResourceUrl: statusChangeHelpers.alertResourceUrl,
+        twitterIframeUrl(log) {
+          const u = this.alertResourceUrl(log);
+          if (!u || log.resource_type !== 'twitter') return null;
+          return 'https://nitter.net' + u.replace('https://x.com', '').replace('https://twitter.com', '');
+        },
       },
     };
 
