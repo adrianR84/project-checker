@@ -1562,7 +1562,7 @@
               <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true"
                 :page="logPage" :total="logTotal" :limit="logLimit" @change-page="loadLogs" />
               <StatusChangeList v-else-if="logTab === 'status-changes'" :logs="statusChanges" :show-project="true"
-                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges" />
+                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges" @refresh="loadStatusChanges(scPage)" />
               <AlertLogsList v-else :logs="alertLogs"
                 :page="alertPage" :total="alertTotal" :limit="alertLimit" @change-page="loadAlertLogs" />
             </article>

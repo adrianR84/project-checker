@@ -169,18 +169,20 @@ async function checkWebsite(url, projectId, contentCheck = true) {
     }
 
     let status;
+    let _contentChangedEvent = false; // ponytail: true when content-change triggered the event, skips dup HTTP status event
     if (contentCheck) {
       const changed = lastHash && contentHash && lastHash !== contentHash;
       status = res.ok ? (changed ? 'changed' : 'ok') : 'error';
       if (changed && projectId) {
+        _contentChangedEvent = true;
         recordStatusChange(projectId, 'website', 'changed', { bh: lastHash, ah: contentHash, bhs: lastHttpStatus, ahs: res.status });
       }
     } else {
       status = res.ok ? 'ok' : 'error';
     }
 
-    // Record HTTP status changes (e.g. 200 → 404 or 200 → 500) as events
-    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId) {
+    // Record HTTP status changes (e.g. 200 → 404 or 200 → 500) as events, skip if content-change already fired
+    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId && !_contentChangedEvent) {
       const eventType = res.status === 404 ? 'deleted' : 'changed';
       recordStatusChange(projectId, 'website', eventType, { bhs: lastHttpStatus, ahs: res.status });
     }
@@ -411,8 +413,8 @@ async function checkTwitter(url, projectId, opts = {}) {
       recordStatusChange(projectId, 'twitter', 'changed', { bs: lastStatus, as: newStatus, bhs: lastHttpStatus, ahs: res.status });
     }
 
-    // Record HTTP status changes as events (e.g. 200 → 500) even if status label didn't change
-    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId) {
+    // ponytail: skip if posts branch already recorded the changed event (avoids dup on new posts)
+    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId && !_postsChangedEvent) {
       const eventType = res.status === 404 ? 'deleted' : 'changed';
       recordStatusChange(projectId, 'twitter', eventType, { bhs: lastHttpStatus, ahs: res.status });
     }
