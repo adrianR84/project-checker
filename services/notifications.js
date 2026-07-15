@@ -85,8 +85,9 @@ async function getDetail(event, v) {
   }
   if (event_type === 'changed' && resource_type === 'twitter' && v.new_posts !== undefined) {
     const post = await getPostContent(event.project_id, v.post_ids?.[0]);
-    const content = post?.content ? `\n${post.content.slice(0, 280)}` : '';
-    return `new post${v.new_posts !== 1 ? 's' : ''}: <b>${v.new_posts}</b>${content}`;
+    const link = post?.link ? `<a href="${post.link}">View post</a>\n` : '';
+    const content = post?.content ? `${post.content.slice(0, 280)}` : '';
+    return `new post${v.new_posts !== 1 ? 's' : ''}: <b>${v.new_posts}</b>\n${link}${content}`;
   }
   if (event_type === 'changed' && resource_type === 'twitter') {
     return `profile updated`;
