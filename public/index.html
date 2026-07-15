@@ -417,6 +417,7 @@
     const CheckLogList = {
       props: ['logs', 'showProject', 'page', 'total', 'limit'],
       emits: ['changePage'],
+      inject: ['openIframe'],
 
       template: `
         <div>
@@ -435,7 +436,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ log.project_name || log.project_id }}</td>
-                <td><a v-if="resourceUrl(log)" :href="resourceUrl(log)" target="_blank" rel="noopener">{{ log.resource_type }}</a><span v-else>{{ log.resource_type }}</span></td>
+                <td><a v-if="resourceUrl(log)" :href="resourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + resourceUrl(log).replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', statusClass(log.status)]">{{ log.status }}</span>
                 </td>
@@ -457,7 +458,7 @@
         totalPages() { return Math.ceil(this.total / this.limit) || 1; }
       },
 
-      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceUrl },
+      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceUrl, resourceIcon },
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
