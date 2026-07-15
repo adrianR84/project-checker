@@ -82,7 +82,7 @@ nav.navbar {
   position: sticky;
   top: 0;
   z-index: 50;
-  padding: 0 24px;
+  padding: 0px;
   max-width: 1200px;
   margin:0pc auto;
 }
@@ -232,9 +232,9 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   align-items: center;
   margin-bottom: 22px;
   flex-wrap: wrap;
-  padding: 0 20px 0 20px;
+  padding: 0 0 0 10px;
 }
-.toolbar h1 { margin: 0; flex: 1; }
+.toolbar h2 { margin: 0; flex: 1; }
 
 .grid {
   display: grid;
@@ -358,11 +358,7 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 
 /* ── Project card ────────────────────────────────────────────────────── */
 
-.project-grid { display: grid; grid-template-columns: 1fr; gap: 18px; padding-top:15px;}
-@media (min-width: 900px) {
-  .project-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
+.project-grid { display: grid; grid-template-columns: repeat(2, 1fr);  gap: 18px; padding-top:15px;}
 
 .project-card { display: flex; flex-direction: column; gap: 14px; overflow: visible; }
 
@@ -446,9 +442,6 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 .price-table th.sort-asc::after { content: ' ↑' !important; }
 .price-table th.sort-desc::after { content: ' ↓' !important; }
 
-@media (max-width: 900px) {
-  .price-table .hide-sm { display: none; }
-}
 
 .tabs { display: flex; gap: 2px; margin: 0px; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border);}
 .tabs .search-input { margin-left: auto; margin-bottom: 0; align-self: center; max-width: 250px; }
@@ -587,3 +580,13 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' stroke='%23e6e8ec' fill='none' stroke-width='3'%3E%3Cpath d='M39.93 55.72A24.86 24.86 0 1 1 56.86 32.15a37.24 37.24 0 0 1-.73 6'/%3E%3Cpath d='M37.86 51.1A47 47 0 0 1 32 56.7'/%3E%3Cpath d='M32 7A34.14 34.14 0 0 1 43.57 30a34.07 34.07 0 0 1 .09 4.85'/%3E%3Cpath d='M32 7A34.09 34.09 0 0 0 20.31 32.46c0 16.2 7.28 21 11.66 24.24'/%3E%3Cline x1='10.37' y1='19.9' x2='53.75' y2='19.9'/%3E%3Cline x1='32' y1='6.99' x2='32' y2='56.7'/%3E%3Cline x1='11.05' y1='45.48' x2='37.04' y2='45.48'/%3E%3Cline x1='7.14' y1='32.46' x2='56.86' y2='31.85'/%3E%3Cpath d='M53.57 57 58 52.56l-8-8 4.55-2.91a.38.38 0 0 0-.12-.7L39.14 37.37a.39.39 0 0 0-.46.46L42 53.41a.39.39 0 0 0 .71.13L45.57 49Z'/%3E%3C/svg%3E");
 }
 
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .page-nav-arrows { display: none; }
+  .price-table .hide-sm { display: none; }
+  .project-grid {  grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1240px) {
+  .page-nav-arrows { display: none; }
+}

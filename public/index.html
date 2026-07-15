@@ -1355,7 +1355,7 @@
         <div class="page">
 
           <div class="toolbar">
-            <h1>Activity</h1>
+            <h2>Activity</h2>
           </div>
 
           <div class="page-nav-arrows">
@@ -1881,7 +1881,7 @@
         <div class="page">
 
           <div class="toolbar">
-            <h1>Projects</h1>
+            <h2>Projects</h2>
             <input v-model="projFilter" type="search" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 160px; padding: 2px 12px 2px 40px; height: 40px" />
             <button v-if="selected.length" class="secondary" @click="onBulkEnable">Enable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
@@ -2318,7 +2318,9 @@
     const SettingsPage = {
       template: `
         <div class="page">
-          <div class="toolbar"><h1>Settings</h1></div>
+          <div class="toolbar">
+            <h2>Settings</h2>
+          </div>
 
           <div v-if="error" class="[role="alert"]">{{ error }}</div>
 
