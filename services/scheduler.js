@@ -125,6 +125,23 @@ async function purgeOldLogs() {
   scheduleLog(`[${now()}] Scheduler: purged logs older than ${settings.log_retention_days} days`);
 }
 
+/** Caps twitter_posts at twitter_posts_per_project (most recent N per project, oldest deleted). Daily at midnight. */
+async function purgeTwitterPosts() {
+  const settings = await db.config.getSettings();
+  if (!settings) return;
+  const max = parseInt(settings.twitter_posts_per_project, 10) || 50;
+  await db.exec(`
+    DELETE FROM twitter_posts
+    WHERE id IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at DESC, id DESC) AS rn
+        FROM twitter_posts
+      ) WHERE rn > ${max}
+    )
+  `);
+  scheduleLog(`[${now()}] Scheduler: purged twitter_posts beyond ${max} per project`);
+}
+
 /** Fires every minute (1-min cron grid). For each resource type:
     - Selects unconfirmed event_logs rows older than *_alert_minutes since their last alert (or never alerted),
       and younger than *_alert_stop_minutes (if set).
@@ -409,7 +426,10 @@ async function reschedule() {
   scheduleLog(`[${now()}] Scheduler: twitter job → "${twitterExpr}" (every ${intervals.twitter}min)`);
 
   const purgeExpr = '0 0 * * *';
-  const purgeJob = cron.schedule(purgeExpr, () => { purgeOldLogs().catch(err => console.error(err)); });
+  const purgeJob = cron.schedule(purgeExpr, async () => {
+    try { await purgeOldLogs(); } catch (err) { console.error(err); }
+    try { await purgeTwitterPosts(); } catch (err) { console.error(err); }
+  });
   jobs.push(purgeJob);
   scheduleLog(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
 
@@ -445,4 +465,4 @@ function init() {
   scheduleLog(`[${now()}] Scheduler initialized`);
 }
 
-module.exports = { init, purgeOldLogs };
+module.exports = { init, purgeOldLogs, purgeTwitterPosts };

@@ -2522,14 +2522,6 @@
               </div>
 
               <fieldset role="group">
-                <label data-tooltip="Automatically delete check logs and status changes older than the specified number of days">
-                  <input type="checkbox" v-model="form.log_retention_enabled" />
-                  Delete logs older than
-                  <input v-show="form.log_retention_enabled" v-model.number="form.log_retention_days" type="number" min="0" max="365" style="width:80px"/> days
-                </label>
-              </fieldset>
-
-              <fieldset role="group">
                 <label data-tooltip="Automatically reload the Activity page at the selected interval to show latest status">
                   <input type="checkbox" v-model="form.ui_refresh_enabled" />
                   Enable auto-refresh
@@ -2572,6 +2564,32 @@
               </fieldset>
 
               <button :disabled="saving" @click="saveAppSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </article>
+
+            <!-- Database CleanUp -->
+            <article>
+              <h3>Database CleanUp</h3>
+              <p class="muted">Daily maintenance tasks that keep the database small.</p>
+
+              <fieldset role="group">
+                <label data-tooltip="Automatically delete check logs and status changes older than the specified number of days">
+                  <input type="checkbox" v-model="form.log_retention_enabled" />
+                  Delete logs older than
+                  <input v-show="form.log_retention_enabled" v-model.number="form.log_retention_days" type="number" min="0" max="365" style="width:80px"/> days
+                </label>
+              </fieldset>
+
+              <fieldset role="group">
+                <label data-tooltip="Cap the number of twitter posts stored per project (oldest are deleted daily). Range: 50-100.">
+                  Twitter posts per project (max)
+                  <input v-model.number="form.twitter_posts_per_project" type="number" min="50" max="100" style="width:80px" />
+                </label>
+              </fieldset>
+
+              <button :disabled="saving" @click="saveCleanUpSettings">
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
               </button>
@@ -2657,6 +2675,7 @@
           twitter_interval_minutes:  1440,
           log_retention_days:        7,
           log_retention_enabled:     false,
+          twitter_posts_per_project: 50,
           ui_refresh_seconds:        60,
           ui_refresh_enabled:        false,
           showDangerZone:           false,
@@ -2718,6 +2737,7 @@
               twitter_interval_minutes: pickMinutes(settings.value, 'twitter'),
               log_retention_days:   settings.value.log_retention_days || 7,
               log_retention_enabled: !!settings.value.log_retention_days,
+              twitter_posts_per_project: settings.value.twitter_posts_per_project ?? 50,
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
               compact_activity:     !!settings.value.compact_activity,
@@ -2805,6 +2825,16 @@
             logs_per_page: form.value.logs_per_page_enabled
               ? Number(form.value.logs_per_page) || 20
               : 20,
+          });
+        }
+
+        /** Save Database CleanUp settings (log retention + twitter posts cap) */
+        async function saveCleanUpSettings() {
+          await saveSettings({
+            log_retention_days: form.value.log_retention_enabled
+              ? Number(form.value.log_retention_days) || 7
+              : 0,
+            twitter_posts_per_project: Math.max(50, Math.min(100, Number(form.value.twitter_posts_per_project) || 50)),
           });
         }
 

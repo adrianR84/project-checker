@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
   // Return flat shape for frontend compatibility
   res.json({
     log_retention_days:         settings.log_retention_days,
+    twitter_posts_per_project:  settings.twitter_posts_per_project ?? 50,
     ui_refresh_seconds:         settings.ui_refresh_seconds,
     compact_activity:           settings.compact_activity_display,
     github_token:               settings.github_token,
@@ -77,6 +78,14 @@ router.put('/', async (req, res) => {
       return res.status(400).json({ error: 'log_retention_days must be an integer between 0 and 365' });
     }
     updates.log_retention_days = v;
+  }
+
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'twitter_posts_per_project')) {
+    const v = parseInt(req.body.twitter_posts_per_project, 10);
+    if (!Number.isFinite(v) || v < 50 || v > 100) {
+      return res.status(400).json({ error: 'twitter_posts_per_project must be an integer between 50 and 100' });
+    }
+    updates.twitter_posts_per_project = v;
   }
 
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'ui_refresh_seconds')) {
@@ -183,7 +192,7 @@ router.put('/', async (req, res) => {
       await db.prepare('UPDATE config SET check_intervals = ? WHERE user_id = ?').run(JSON.stringify(ci), req.userId);
     }
   }
-  if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined) {
+  if (updates.log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined || updates.twitter_posts_per_project !== undefined) {
     const s = await db.config.getSettings(req.userId);
     if (s) {
       if (updates.log_retention_days !== undefined) s.log_retention_days = updates.log_retention_days;
@@ -192,6 +201,7 @@ router.put('/', async (req, res) => {
       if (updates.github_token !== undefined) s.github_token = updates.github_token || null;
       if (updates.logs_per_page !== undefined) s.logs_per_page = updates.logs_per_page;
       if (updates.checks_on_new_project !== undefined) s.checks_on_new_project = updates.checks_on_new_project;
+      if (updates.twitter_posts_per_project !== undefined) s.twitter_posts_per_project = updates.twitter_posts_per_project;
       await db.prepare('UPDATE config SET settings = ? WHERE user_id = ?').run(JSON.stringify(s), req.userId);
     }
   }
