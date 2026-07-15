@@ -523,8 +523,8 @@
                 <th class="type_cell" data-tooltip="Type of status change event">Event</th>
                 <th class="time_cell" data-tooltip="Time of the event">When</th>
                 <th class="details_cell" data-tooltip="Additional event details">Details</th>
-                <th style="width:80px">
-                  <button style="font-size:0.8em;padding:2px" data-tooltip="Confirm all unconfirmed events at once" @click="confirmAll">CA</button>
+                <th style="width:40px" data-tooltip="Confirm all unconfirmed events at once">
+                  <button style="font-size:0.8em;padding:2px" @click="confirmAll">CA</button>
                 </th>
               </tr>
             </thead>
@@ -1063,12 +1063,12 @@
                 <th data-tooltip="Current status">Status</th>
                 <th data-tooltip="Time of last check">Last Checked</th>
                 <th data-tooltip="Time of last status change">Last Change</th>
-                <th class="action_cell">
+                <th class="action_cell" data-tooltip="Refresh all projects at once">
                   <button
                     class="secondary"
                     :disabled="busy === 'all'"
                     style="padding:2px 6px;"
-                    data-tooltip="Refresh All" @click="refreshAll"
+                    @click="refreshAll"
                   >
                     <span v-if="busy === 'all'" class="spinner"></span>
                     <span v-else>↻</span>
