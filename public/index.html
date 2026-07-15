@@ -1358,7 +1358,12 @@
             <h1>Activity</h1>
           </div>
 
-          <div class="tabs" style="margin: 0 20px; align-items: center;">
+          <div class="page-nav-arrows">
+            <button class="page-nav-btn" @click="scrollToTop" title="Back to top">▲</button>
+            <button class="page-nav-btn" @click="scrollToLogs" title="Go to logs">▼</button>
+          </div>
+
+          <div class="tabs" id="activity-tabs" style="margin: 0 20px; align-items: center;">
             <button :class="['tab', activityTab === 'resources' ? 'active' : '']" @click="activityTab = 'resources'">Resources</button>
             <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
             <input
@@ -1490,7 +1495,7 @@
           </div>
 
           <!-- Recent logs table -->
-          <section class="logs-section">
+          <section class="logs-section" id="logs">
             <div class="tabs">
               <button :class="['tab', logTab === 'check-logs' ? 'active' : '']" @click="logTab = 'check-logs'">Check Logs</button>
               <button :class="['tab', logTab === 'status-changes' ? 'active' : '']" @click="logTab = 'status-changes'">Event Logs</button>
@@ -1830,6 +1835,21 @@
           applyPriceSort(priceSort.value.col, priceSort.value.desc);
         }
 
+        function scrollToTop() {
+          const el = document.getElementById('activity-tabs');
+          if (el) {
+            const top = el.getBoundingClientRect().top + window.scrollY - 60;
+            window.scrollTo({ top, behavior: 'smooth' });
+          }
+        }
+        function scrollToLogs() {
+          const el = document.getElementById('logs');
+          if (el) {
+            const top = el.getBoundingClientRect().top + window.scrollY - 60;
+            window.scrollTo({ top, behavior: 'smooth' });
+          }
+        }
+
         // Sync pagination limits from settings
         watch(() => sharedSettings.value?.logs_per_page, (val) => {
           if (val) {
@@ -1848,6 +1868,7 @@
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, fmtShortNum, fmtPct, copyContract, openIframe,
+          scrollToTop, scrollToLogs,
         };
       },
     };

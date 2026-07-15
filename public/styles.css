@@ -201,6 +201,31 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 /* ── Layout ───────────────────────────────────────────────────────────── */
 .page { max-width: 1200px; margin: 0 auto; padding: 28px 0px; }
 
+.page-nav-arrows {
+  position: fixed;
+  right: max(16px, calc((100vw - 1316px) / 2 + 16px));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 100;
+}
+.page-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  color: var(--text-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.page-nav-btn:hover { background: var(--primary-bg); }
+
 .toolbar {
   display: flex;
   gap: 10px;
