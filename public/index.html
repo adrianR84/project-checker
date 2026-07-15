@@ -680,8 +680,8 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Website URL</label>
-                <label data-tooltip="Perform HTTP checks on this website" data-placement="top"><input type="checkbox" v-model="f.website_enabled" /> Enabled</label>
-                <label data-tooltip="Verify page content matches expected value" data-placement="left"><input type="checkbox" v-model="f.website_content_check" :disabled="!f.website_enabled" /> Content Check</label>
+                <label data-tooltip="Verify page content matches expected value" data-placement="top"><input type="checkbox" v-model="f.website_content_check" :disabled="!f.website_enabled" /> Content Check</label>
+                <label data-tooltip="Perform HTTP checks on this website" data-placement="left"><input type="checkbox" v-model="f.website_enabled" /> Enabled</label>
               </div>
               <input v-model="f.website_url" type="url" placeholder="https://example.com" />
             </div>
