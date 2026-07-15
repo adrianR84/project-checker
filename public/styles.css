@@ -169,6 +169,7 @@ table.compact .time_cell     { min-width: 150px; width: 150px; }
 table.compact .status_cell   { min-width: 70px;  width: 90px;  }
 table.compact .action_cell   { min-width: 40px;  width: 40px;  }
 table.compact .details_cell   { min-width: 140px; }
+table.compact .cen { text-align: center; }
 table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */

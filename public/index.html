@@ -93,6 +93,7 @@
       getCheckLogs:       (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
       getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
       confirmStatusChange: (id, confirmed = 1) => req(`/check-logs/status-changes/${id}/confirm`, { method: 'PATCH', body: JSON.stringify({ confirmed: confirmed ? 1 : 0 }) }),
+      confirmAllStatusChanges: () => req('/check-logs/status-changes/confirm-all', { method: 'POST' }),
       getAlertLogs:       (q = {}) => req('/check-logs/alerts?' + new URLSearchParams(q).toString()),
       getTokenPrices:     ()       => req('/dashboard/token-prices'),
       getSettings:    ()       => req('/settings'),
@@ -522,7 +523,9 @@
                 <th class="type_cell" data-tooltip="Type of status change event">Event</th>
                 <th class="time_cell" data-tooltip="Time of the event">When</th>
                 <th class="details_cell" data-tooltip="Additional event details">Details</th>
-                <th style="width:32px"></th>
+                <th style="width:80px">
+                  <button style="font-size:0.8em;padding:2px" @click="confirmAll">Confirm All</button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -536,7 +539,7 @@
                 </td>
                 <td class="muted">{{ absoluteTime(log.created_at) }}</td>
                 <td v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
-                <td>
+                <td class="cen">
                   <input type="checkbox" :checked="!!log.confirmed" @change="toggleConfirm(log, $event)" />
                 </td>
               </tr>
@@ -579,6 +582,16 @@
             this.$emit('changePage', this.page);
           } catch (e) {
             event.target.checked = !!log.confirmed;
+            alert('Failed: ' + e.message);
+          }
+        },
+        async confirmAll() {
+          if (!confirm('Do you want to set all events as Confirmed ?')) return;
+          try {
+            await api.confirmAllStatusChanges();
+            showToast('All confirmed', 'ok');
+            this.$emit('refresh');
+          } catch (e) {
             alert('Failed: ' + e.message);
           }
         },

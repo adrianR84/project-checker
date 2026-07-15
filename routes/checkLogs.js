@@ -109,6 +109,12 @@ router.patch('/status-changes/:id/confirm', async (req, res) => {
   res.json({ ok: true, id, confirmed });
 });
 
+// POST /api/check-logs/status-changes/confirm-all — confirm all unconfirmed event logs for user
+router.post('/status-changes/confirm-all', async (req, res) => {
+  await db.prepare('UPDATE event_logs SET confirmed = 1 WHERE confirmed = 0 AND project_id IN (SELECT id FROM projects WHERE user_id = ?)').run(req.userId);
+  res.json({ ok: true });
+});
+
 // GET /api/check-logs/alerts — alert_logs entries
 router.get('/alerts', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
