@@ -219,10 +219,14 @@
         const url = new URL(u);
         const h = url.hostname.replace(/^www\./, '');
         if (h === 'github.com' || h === 'www.github.com') return url.pathname.replace(/^\//, '').split('/')[0] || null;
-        if (h === 'x.com' || h === 'www.x.com' || h === 'twitter.com' || h === 'www.twitter.com') return url.pathname.replace(/^\//, '') || null;
-        if (h === 't.me' || h === 'www.t.me') return url.pathname.replace(/^\//, '') || null;
-        return h; // websites: just the hostname
-      } catch { return u; }
+        if (h === 'twitter.com' || h === 'x.com' || h === 'www.twitter.com' || h === 'www.x.com') return url.pathname.replace(/^\//, '').split('/')[0] || null;
+        return h;
+      } catch { return u.slice(0, 20); }
+    }
+
+    function projectIconLink(p, type, url) {
+      if (!url) return '—';
+      return `<a href="${url}" target="_blank" rel="noopener"><span class="icon icon-${type}"></span></a>`;
     }
 
     /** Format a check_logs row for the detail column */
@@ -1962,22 +1966,30 @@
               <thead>
                 <tr>
                   <th style="width:2.5em"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
-                  <th data-tooltip="Project name">Name</th>
-                  <th data-tooltip="Website URL">Website</th>
-                  <th data-tooltip="GitHub organization URL">GitHub</th>
-                  <th data-tooltip="Twitter handle or URL">Twitter</th>
-                  <th data-tooltip="Token info">Token</th>
-                  <th class="text-right">Actions</th>
+                  <th class="project_cell" data-tooltip="Project name">Name</th>
+                  <th class="resource_cell" data-tooltip="Website URL">Website</th>
+                  <th class="action_cell" data-tooltip="Website enabled">WE</th>
+                  <th class="resource_cell" data-tooltip="GitHub organization URL">GitHub</th>
+                  <th class="action_cell" data-tooltip="GitHub enabled">GE</th>
+                  <th class="resource_cell" data-tooltip="Twitter handle or URL">Twitter</th>
+                  <th class="action_cell" data-tooltip="Twitter enabled">TE</th>
+                  <th class="type_cell" data-tooltip="Token info">Token</th>
+                  <th class="action_cell" data-tooltip="Token enabled">TE</th>
+                  <th class="col-actions" class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="p in filteredProjects" :key="p.id" :class="{ disabled: !p.enabled }">
                   <td><input type="checkbox" :checked="selected.includes(p.id)" @change="toggleSelect(p.id)" /></td>
                   <td>{{ p.name }}</td>
-                  <td><a v-if="p.website_url" :href="p.website_url" target="_blank" rel="noopener">{{ urlLabel(p.website_url) }}</a><span v-else>—</span></td>
-                  <td><a v-if="p.github_url" :href="p.github_url" target="_blank" rel="noopener">{{ urlLabel(p.github_url) }}</a><span v-else>—</span></td>
-                  <td><a v-if="p.twitter_url" :href="p.twitter_url" target="_blank" rel="noopener">{{ urlLabel(p.twitter_url) }}</a><span v-else>—</span></td>
+                  <td v-html="projectIconLink(p, 'website', p.website_url)"></td>
+                  <td :class="p.website_enabled ? 'muted' : 'alert'">{{ p.website_enabled ? '✓' : '✗' }}</td>
+                  <td v-html="projectIconLink(p, 'github', p.github_url)"></td>
+                  <td :class="p.github_enabled ? 'muted' : 'alert'">{{ p.github_enabled ? '✓' : '✗' }}</td>
+                  <td v-html="projectIconLink(p, 'twitter', p.twitter_url)"></td>
+                  <td :class="p.twitter_enabled ? 'muted' : 'alert'">{{ p.twitter_enabled ? '✓' : '✗' }}</td>
                   <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
+                  <td :class="p.token_enabled ? 'muted' : 'alert'">{{ p.token_enabled ? '✓' : '✗' }}</td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
                     <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>
@@ -2361,7 +2373,7 @@
           projFilter, selected,
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
-          urlLabel, tok,
+          urlLabel, tok, projectIconLink,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
           api: window.api,
         };
