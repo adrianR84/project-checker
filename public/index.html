@@ -697,7 +697,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Twitter URL</label>
-                <label data-tooltip="Fetch latest posts and alert on new ones" data-placement="top"><input type="checkbox" v-model="f.twitter_posts_check" /> Posts Check</label>
+                <label data-tooltip="Fetch latest posts and alert on new ones" data-placement="top"><input type="checkbox" v-model="f.twitter_posts_check" :disabled="!f.twitter_enabled" /> Posts Check</label>
                 <label data-tooltip="Check Twitter account existence and account suspension" data-placement="left"><input type="checkbox" v-model="f.twitter_enabled" /> Enabled</label>
               </div>
               <input v-model="f.twitter_url" type="url" placeholder="https://twitter.com/handle" />
@@ -794,6 +794,11 @@
         // ponytail: website_content_check depends on website_enabled — force off when disabled
         watch(() => f.value.website_enabled, (enabled) => {
           if (!enabled) f.value.website_content_check = false;
+        });
+
+        // ponytail: twitter_posts_check depends on twitter_enabled — force off when disabled
+        watch(() => f.value.twitter_enabled, (enabled) => {
+          if (!enabled) f.value.twitter_posts_check = false;
         });
 
         async function lookupToken() {
