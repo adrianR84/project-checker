@@ -6,8 +6,10 @@ const readline = require('node:readline');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'project-checker.db');
 
+const TABLES = ['alert_logs', 'check_logs', 'event_logs', 'token_prices_alerts', 'token_prices', 'twitter_posts'];
+if (!process.env.SKIP_DATA) TABLES.push('repos', 'projects');
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const answer = await new Promise(resolve => rl.question('Drop ALL data tables? Type "yes" to confirm: ', resolve));
+const answer = await new Promise(resolve => rl.question(`Drop tables: ${TABLES.join(', ')} ? Type "yes" to confirm: `, resolve));
 rl.close();
 if (answer.trim().toLowerCase() !== 'yes') { console.log('Aborted.'); process.exit(0); }
 
@@ -26,5 +28,5 @@ if (!process.env.SKIP_DATA) {
 }
 db.exec('PRAGMA foreign_keys = ON');
 
-console.log('All data tables dropped.');
+console.log(`Dropped: ${TABLES.join(', ')}`);
 db.close();
