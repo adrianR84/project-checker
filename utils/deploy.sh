@@ -3,8 +3,8 @@
 
 set -e
 
-SKIP_INSTALL="${SKIP_INSTALL:-1}"  # 1=skip install (faster), 0=run pnpm install
-SKIP_DATA="${SKIP_DATA:-1}"        # 1=skip data folder, 0=include data
+SKIP_INSTALL="${SKIP_INSTALL:-0}"  # 1=skip install (faster), 0=run pnpm install
+SKIP_DATA="${SKIP_DATA:-0}"        # 1=skip data folder, 0=include data
 SKIP_ENV="${SKIP_ENV:-1}"          # 1=skip .env file, 0=include .env
 
 HOST="adi-vps"
@@ -34,6 +34,11 @@ TAR_EXCLUDES=(
 # Stop pm2 process and kill anything on the app port
 echo "→ Stopping $APP_NAME"
 ssh "$HOST" "pm2 stop '$APP_NAME' 2>/dev/null; fuser -k $SERVER_PORT/tcp 2>/dev/null; sleep 1; true"
+
+# Backup current server files before overwrite
+BACKUP_NAME="${PROJECT_NAME}_$(date +%Y%m%d_%H%M%S)"
+echo "→ Backing up current server state to ~/backups/$BACKUP_NAME"
+ssh "$HOST" "mkdir -p ~/backups && cp -r $APP_PATH ~/backups/$BACKUP_NAME"
 
 # Upload via tar/pipes
 echo "→ Uploading to $HOST:$APP_PATH"
