@@ -194,12 +194,10 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 /* ── Settings grid helpers ──────────────────────────────────────────── */
 /* Force a settings article to span 2 columns in Pico's auto-fit grid */
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
-}
-.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr);  gap: 10px; }
+.grid.col2 { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));gap: 18px; }
 .force-wide {
   grid-column: span 2;
   min-width: 0;
@@ -482,7 +480,7 @@ nav.navbar a[aria-current="page"] {
   color: var(--app-muted);
 }
 
-/* ── Price Alerts Table ─────────────────────────────────────────────────── */
+/* ── Price Alerts Table Settings ─────────────────────────────────────────────────── */
 .price-alerts-table {
   display: flex;
   flex-direction: column;
@@ -595,6 +593,12 @@ nav.navbar a[aria-current="page"] {
   .page-nav-arrows { display: none; }
   .price-table .hide-sm { display: none; }
   .project-grid {  grid-template-columns: 1fr; }  
+
+
+  .grid { grid-template-columns: repeat(2, 1fr); }
+  .grid .force-wide { grid-column: span 2; min-width: 0; }
+  
+
 }
 
 @media (max-width: 1240px) {
@@ -608,7 +612,11 @@ nav.navbar a[aria-current="page"] {
     --pico-font-size: 80%;
   }
 
-
+  .grid { grid-template-columns: repeat(1, 1fr); }
+  .grid .force-wide {
+    grid-column: span 1;
+    min-width: 0;
+  }
 
   /* Page: add side breathing room */
   .page {
