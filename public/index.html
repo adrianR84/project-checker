@@ -526,7 +526,7 @@
                 <th class="resource_cell" data-tooltip="Resource type: website, GitHub, or Twitter">Type</th>
                 <th class="type_cell" data-tooltip="Type of status change event">Event</th>
                 <th class="time_cell" data-tooltip="Time of the event">When</th>
-                <th class="details_cell" data-tooltip="Additional event details">Details</th>
+                <th class="details_cell hide-sm" data-tooltip="Additional event details">Details</th>
                 <th style="width:40px" data-tooltip="Confirm all unconfirmed events at once">
                   <button style="font-size:0.8em;padding:2px" @click="confirmAll">CA</button>
                 </th>
@@ -542,7 +542,7 @@
                   </span>
                 </td>
                 <td class="muted">{{ absoluteTime(log.created_at) }}</td>
-                <td v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
+                <td class="hide-sm" v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
                 <td class="text-center">
                   <input type="checkbox" :checked="!!log.confirmed" @change="toggleConfirm(log, $event)" />
                 </td>
