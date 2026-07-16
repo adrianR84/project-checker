@@ -75,49 +75,6 @@ button, .btn {
 .fade-enter-active, .fade-leave-active { transition: opacity 180ms; }
 .fade-enter-from, .fade-leave-to        { opacity: 0; }
 
-/* ── Navbar (Pico's .navbar with app overrides) ───────────────────────── */
-nav.navbar {
-  background: var(--app-surface);
-  border-bottom: 1px solid var(--app-border);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  padding: 0px;
-  max-width: 1200px;
-  margin:0pc auto;
-}
-nav.navbar .brand {
-  display: flex; align-items: center; gap: 8px;
-  font-weight: 600; font-size: 1.2rem;
-  color: var(--app-text);
-  text-decoration: none;
-  box-shadow: none;
-  background: none;
-}
-nav.navbar a {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--app-muted);
-  text-decoration: none;
-  background: none;
-  box-shadow: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  transition: color 180ms, background 180ms;
-}
-nav.navbar a:hover {
-  color: var(--app-text);
-  background: color-mix(in srgb, var(--app-bg) 80%, transparent);
-}
-nav.navbar a[aria-current="page"] {
-  color: var(--app-text);
-  background: color-mix(in srgb, var(--app-primary) 12%, transparent);
-}
-.logo-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--app-primary), var(--app-ok));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--app-primary) 60%, transparent);
-}
 
 
 /* ── Settings grid helpers ──────────────────────────────────────────── */
@@ -200,7 +157,12 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 0px; }
+/* Override Pico's default max-width 1200px — let everything fill the viewport */
+html, body, main { max-width: 100%; margin: 0; padding: 0; }
+
+.page { max-width: 1200px; padding: 28px 0px; overflow-x: hidden; margin:0 auto; }
+
+.logs-section { margin-top: 1rem; overflow-x: auto; }
 
 .page-nav-arrows {
   position: fixed;
@@ -243,6 +205,53 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
   gap: 18px;
 }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+
+/* ── Navbar (Pico's .navbar with app overrides) ───────────────────────── */
+nav.navbar {
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+nav.navbar .brand {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; font-size: 1.2rem;
+  color: var(--app-text);
+  text-decoration: none;
+  box-shadow: none;
+  background: none;
+}
+nav.navbar a {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--app-muted);
+  text-decoration: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: color 180ms, background 180ms;
+}
+nav.navbar a:hover {
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-bg) 80%, transparent);
+}
+nav.navbar a[aria-current="page"] {
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-primary) 12%, transparent);
+}
+.logo-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--app-primary), var(--app-ok));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--app-primary) 60%, transparent);
+}
+
 
 /* ── Modal ───────────────────────────────────────── */
 .modal {
@@ -583,6 +592,7 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
+  .page { padding: 28px 5px; }
   .page-nav-arrows { display: none; }
   .price-table .hide-sm { display: none; }
   .project-grid {  grid-template-columns: 1fr; }
@@ -590,4 +600,86 @@ table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow
 
 @media (max-width: 1240px) {
   .page-nav-arrows { display: none; }
+}
+
+/* ── Mobile: always-on tweaks ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Smaller base font */
+  :root {
+    --pico-font-size: 80%;
+  }
+
+  /* Page: add side breathing room */
+  .page {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Navbar: full width, no max-width constraint */
+  nav.navbar {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+
+  /* Tables inside articles need a horizontal scroll anchor */
+  article table.compact {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Tabs: reduce padding, allow wrapping */
+  .tabs {
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  /* Toast: center bottom on small screens */
+  #toast {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    align-items: center;
+  }
+
+  /* Project card: tighter padding */
+  .project-card {
+    padding: 12px;
+  }
+
+  /* Toolbar: tighter on small screens */
+  .toolbar {
+    padding: 0;
+  }
+
+  /* Modal: nearly full screen on mobile */
+  .modal {
+    max-width: 98vw;
+    max-height: 98vh;
+  }
+
+  /* Auth card */
+  .auth-card {
+    padding: 1.25rem;
+  }
+
+  /* Price alerts grid: single column */
+  .price-alerts-header,
+  .price-alert-row {
+    grid-template-columns: 32px 60px 1fr 60px 50px;
+    font-size: 0.8rem;
+  }
+
+  /* Project card status table: scrollable */
+  .project-card table.compact {
+    font-size: 0.78rem;
+  }
 }
