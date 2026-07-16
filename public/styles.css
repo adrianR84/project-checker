@@ -107,6 +107,16 @@ table.compact td:has([data-tooltip]) { overflow: visible; }
 table.compact .text-center{text-align: center;}
 table.compact .text-right{text-align: right;}
 
+table.compact .project_cell{ min-width: 100px; max-width: 350px; }
+table.compact .project_cell.alert  { width: 250px; }
+table.compact .resource_cell { min-width: 70px;  width: 80px;  }
+table.compact .type_cell     { min-width: 70px;  width: 100px;  }
+table.compact .time_cell     { min-width: 150px; width: 150px; }
+table.compact .status_cell   { min-width: 70px;  width: 90px;  }
+table.compact .action_cell   { min-width: 40px;  width: 40px;  }
+table.compact .details_cell   { min-width: 140px; }
+table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
+
 .res-label { font-weight: 600; margin-right: 4px; }
 .icon-btn {
   background: none;
@@ -117,16 +127,6 @@ table.compact .text-right{text-align: right;}
   vertical-align: middle;
 }
 .icon-btn:hover { opacity: 0.75; }
-
-table.compact .project_cell{ min-width: 100px; max-width: 350px; }
-table.compact .project_cell.alert  { width: 250px; }
-table.compact .resource_cell { min-width: 70px;  width: 80px;  }
-table.compact .type_cell     { min-width: 70px;  width: 100px;  }
-table.compact .time_cell     { min-width: 150px; width: 150px; }
-table.compact .status_cell   { min-width: 70px;  width: 90px;  }
-table.compact .action_cell   { min-width: 40px;  width: 40px;  }
-table.compact .details_cell   { min-width: 140px; }
-table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */
 #toast {
@@ -369,26 +369,17 @@ nav.navbar a[aria-current="page"] {
 
 .project-grid { display: grid; grid-template-columns: repeat(3, 1fr);  gap: 10px; padding-top:10px;}
 
-.project-card { display: flex; flex-direction: column; gap: 14px; overflow: visible; margin-bottom: 0px; padding:5px; border: 1px solid var(--app-border)}
+.project-card { display: flex; flex-direction: column; gap: 6px; overflow: visible; margin-bottom: 0px; padding:5px; border: 1px solid var(--app-border)}
 
 .project-card .token-details {display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 2px;}
 .project-card .text-small {font-size: 0.85rem}
 
-.head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 0px; }
-.repos-head { margin-bottom: 8px; overflow: visible; }
+.project-card .head, .repos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 0px; background-color: var(--app-border); padding: 2px 5px;}
 
-.name { font-size: 1rem; font-weight: 600; margin: 0; cursor: pointer;}
+.project-card .name { font-size: 1rem; font-weight: 600; margin: 0; cursor: pointer;}
 
 .repos-section { border-top: 1px solid var(--app-border); padding-top: 12px; }
 .repos-scroll  { max-height: 200px; overflow-y: auto; }
-
-.actions-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  border-top: 1px solid var(--app-border);
-  padding-top: 12px;
-}
 
 /* ── Repo list ───────────────────────────────────────────────────────── */
 .repo-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -590,7 +581,9 @@ nav.navbar a[aria-current="page"] {
 }
 
 
-
+@media (max-width: 1100px) {
+  .project-grid { grid-template-columns: repeat(2, 1fr);}
+}
 
 /* ── Tablets ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
@@ -601,7 +594,7 @@ nav.navbar a[aria-current="page"] {
   .page { padding: 28px 5px; }
   .page-nav-arrows { display: none; }
   .price-table .hide-sm { display: none; }
-  .project-grid { grid-template-columns: repeat(2, 1fr);}
+  .project-grid {  grid-template-columns: 1fr; }  
 }
 
 @media (max-width: 1240px) {
@@ -615,7 +608,7 @@ nav.navbar a[aria-current="page"] {
     --pico-font-size: 90%;
   }
 
-  .project-grid {  grid-template-columns: 1fr; }  
+
 
   /* Page: add side breathing room */
   .page {

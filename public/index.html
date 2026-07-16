@@ -121,12 +121,12 @@
     window.fearIndex = fearIndex;
 
     /** Show a toast notification in the bottom-right corner */
-    function showToast(msg, type = 'ok') {
+    function showToast(msg, type = 'ok', duration = 2200) {
       const el = document.createElement('div');
       el.className = `toast-msg ${type}`;
       el.textContent = msg;
       document.getElementById('toast').appendChild(el);
-      setTimeout(() => el.remove(), 2200);
+      setTimeout(() => el.remove(), duration);
     }
     window.showToast = showToast;
 
@@ -1052,11 +1052,11 @@
         <div class="project-card">
 
           <!-- Card header: project name only -->
-          <header class="head">
+          <div class="head">
             <h2 class="name" @click="openProjectEdit">
               {{ project.name }}
             </h2>
-          </header>
+          </div>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
           <table class="compact">
@@ -1071,7 +1071,7 @@
                   <button
                     class="secondary"
                     :disabled="busy === 'all'"
-                    style="padding:2px 6px;"
+                    style="padding:0px 4px;"
                     @click="refreshAll"
                   >
                     <span v-if="busy === 'all'" class="spinner"></span>
@@ -1083,10 +1083,9 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" class="res-label">Twitter</a>
-                  <button class="icon-btn" @click="openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter')">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
                     <span class="icon icon-twitter"></span>
-                  </button>
+                  </a>
                 </td>
                 <td><span :class="['badge', project.twitter_enabled ? 'success' : 'secondary']">{{ project.twitter_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(twitter.status)]">{{ twitter.status || 'pending' }}</span></td>
@@ -1106,16 +1105,15 @@
                 </td>
               </tr>
               <tr v-else>
-                <td>Twitter</td>
+                <td><span class="icon icon-twitter" style="opacity:0.3" title="Not Set"></span></td>
                 <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
 
               <tr v-if="project.website_url">
                 <td>
-                  <a :href="project.website_url" target="_blank" rel="noopener" class="res-label">Website</a>
-                  <button class="icon-btn" @click="openIframe(project.website_url, 'Website', '1200px')">
+                  <a :href="project.website_url" target="_blank" rel="noopener" title="Open Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(project.website_url, 'Website', '1200px'))">
                     <span class="icon icon-website"></span>
-                  </button>
+                  </a>
                 </td>
                 <td><span :class="['badge', project.website_enabled ? 'success' : 'secondary']">{{ project.website_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(website.status)]">{{ website.status || 'pending' }}</span></td>
@@ -1135,13 +1133,15 @@
                 </td>
               </tr>
               <tr v-else>
-                <td>Website</td>
+                <td><span class="icon icon-website" style="opacity:0.3" title="Not Set"></span></td>
                 <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
 
               <tr v-if="project.github_url">
                 <td>
-                  <a :href="project.github_url" target="_blank" rel="noopener" class="res-label">GitHub</a>
+                  <a :href="project.github_url" target="_blank" rel="noopener" title="Open GitHub">
+                    <span class="icon icon-github"></span>
+                  </a>
                 </td>
                 <td><span :class="['badge', project.github_enabled ? 'success' : 'secondary']">{{ project.github_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(github.status)]">{{ github.status || 'pending' }}</span></td>
@@ -1160,7 +1160,7 @@
                 </td>
               </tr>
               <tr v-else>
-                <td>GitHub</td>
+                <td><span class="icon icon-github" style="opacity:0.3" title="Not Set"></span></td>
                 <td colspan="5" style="text-align: center;"><span class="muted">Not Set</span></td>
               </tr>
             </tbody>
@@ -1168,9 +1168,7 @@
 
           <!-- Token price summary (if project has a token) -->
           <div v-if="token" class="token-details text-small">
-            <a :href="'https://x.com/search?q=%24' + (token.symbol.startsWith('$') ? token.symbol.slice(1) : token.symbol) + '&src=typed_query'" target="_blank" rel="noopener" style="font-weight:600;">{{ token.symbol }}</a>
             <a :href="'https://dexscreener.com/' + token.chain + '/' + token.contract" target="_blank" rel="noopener">{{ token.price_usd != null ? '$' + parseFloat(token.price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—' }}</a>
-            <span v-if="token.price_change_h1 != null" :class="['badge', token.price_change_h1 < 0 ? 'error' : 'ok']">1h  {{ fmtPct(token.price_change_h1) }}</span>
             <span v-if="token.price_change_h6 != null" :class="['badge', token.price_change_h6 < 0 ? 'error' : 'ok']">6h {{ fmtPct(token.price_change_h6) }}</span>
             <span v-if="token.price_change_h24 != null" :class="['badge', token.price_change_h24 < 0 ? 'error' : 'ok']">24h {{ fmtPct(token.price_change_h24) }}</span>
             <span v-if="token.market_cap != null">MCap {{ fmtShortNum(token.market_cap) }}</span>
@@ -2394,8 +2392,6 @@
             <h2>Settings</h2>
           </div>
 
-          <div v-if="error" class="[role="alert"]">{{ error }}</div>
-
           <div v-if="loading" class="center-loader">
             <span class="spinner lg"></span>
           </div>
@@ -2745,7 +2741,6 @@
         const clearing  = ref(false);
         const clearingLogs  = ref(false);
         const clearingAlerts = ref(false);
-        const error      = ref('');
 
         /**
          * Extract the interval (in minutes) for a given check type from the settings object.
@@ -2767,7 +2762,6 @@
         /** Load settings from GET /api/settings */
         async function load() {
           loading.value = true;
-          error.value   = '';
           try {
             settings.value = await api.getSettings();
             form.value = {
@@ -2810,7 +2804,7 @@
             };
             sharedSettings.value = settings.value;
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             loading.value = false;
           }
@@ -2819,7 +2813,6 @@
         /** Save updated intervals via PUT /api/settings */
         async function onSave() {
           saving.value = true;
-          error.value = '';
           try {
             settings.value = await api.updateSettings({
               github_check_minutes:  Number(form.value.github_interval_minutes),
@@ -2829,7 +2822,7 @@
             });
             showToast('Saved.');
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             saving.value = false;
           }
@@ -2838,25 +2831,21 @@
         // ponytail: shared save wrapper — all four save functions follow the same try/catch/finally shape
         async function saveSettings(payload) {
           saving.value = true;
-          error.value = '';
           try {
             settings.value = await api.updateSettings(payload);
             sharedSettings.value = settings.value;
             showToast('Saved.');
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             saving.value = false;
           }
         }
 
-        /** Save App Settings (log retention only) */
+        /** Save App Settings (excludes log retention — handled by saveCleanUpSettings) */
         async function saveAppSettings() {
           await saveSettings({
             github_token: form.value.github_token,
-            log_retention_days: form.value.log_retention_enabled
-              ? Number(form.value.log_retention_days) || 7
-              : 0,
             ui_refresh_seconds: form.value.ui_refresh_enabled
               ? Number(form.value.ui_refresh_seconds) || 60
               : 0,
@@ -2927,7 +2916,7 @@
           try {
             await fn();
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             triggering.value = null;
           }
@@ -2940,7 +2929,7 @@
           try {
             await api.clearLogs();
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             clearingLogs.value = false;
           }
@@ -2953,7 +2942,7 @@
           try {
             await api.clearAlertLogs();
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
           } finally {
             clearingAlerts.value = false;
           }
@@ -2968,7 +2957,7 @@
             await api.clearData();
             window.location.reload();
           } catch (e) {
-            error.value = e.message;
+            showToast(e.message, 'error', 5000);
             clearing.value = false;
           }
         }
@@ -2977,7 +2966,6 @@
 
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
-          error,
           onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, savePriceAlertsSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
           relativeTime,
           api: window.api,
