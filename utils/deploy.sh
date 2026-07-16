@@ -25,6 +25,7 @@ TAR_EXCLUDES=(
   --exclude='logs'
   --exclude='.DS_Store'
   --exclude='*.log'
+  --exclude='utils/drop-tables.js'
 )
 [[ "$SKIP_DATA" == "1" ]] && TAR_EXCLUDES+=( --exclude='data' --exclude='.env' )
 
