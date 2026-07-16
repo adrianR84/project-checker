@@ -1,4 +1,5 @@
 // Drop all data tables (removes tables entirely — schema gone)
+// SKIP_DATA=1 skip projects and repos tables
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const readline = require('node:readline');
@@ -19,8 +20,10 @@ db.exec('DROP TABLE IF EXISTS event_logs');
 db.exec('DROP TABLE IF EXISTS token_prices_alerts');
 db.exec('DROP TABLE IF EXISTS token_prices');
 db.exec('DROP TABLE IF EXISTS twitter_posts');
-db.exec('DROP TABLE IF EXISTS repos');
-db.exec('DROP TABLE IF EXISTS projects');
+if (!process.env.SKIP_DATA) {
+  db.exec('DROP TABLE IF EXISTS repos');
+  db.exec('DROP TABLE IF EXISTS projects');
+}
 db.exec('PRAGMA foreign_keys = ON');
 
 console.log('All data tables dropped.');
