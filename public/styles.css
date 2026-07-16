@@ -605,10 +605,7 @@ nav.navbar a[aria-current="page"] {
 @media (max-width: 600px) {
 
   .grid { grid-template-columns: repeat(1, 1fr); }
-  .grid .force-wide {
-    grid-column: span 1;
-    min-width: 0;
-  }
+  .grid .force-wide { grid-column: span 1; min-width: 0; }
 
   /* Page: add side breathing room */
   .page {
