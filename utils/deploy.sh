@@ -33,7 +33,7 @@ TAR_EXCLUDES=(
 
 # Stop pm2 process and kill anything on the app port
 echo "→ Stopping $APP_NAME"
-ssh "$HOST" "pm2 stop '$APP_NAME' 2>/dev/null; fuser -k $SERVER_PORT/tcp 2>/dev/null; sleep 1; true"
+ssh "$HOST" "pm2 stop '$APP_NAME' > /dev/null 2>&1 || true; fuser -k $SERVER_PORT/tcp 2>/dev/null || true; sleep 1"
 
 # Backup current server files before overwrite
 BACKUP_NAME="${PROJECT_NAME}_$(date +%Y%m%d_%H%M%S)"
@@ -52,13 +52,13 @@ if [[ "$SKIP_INSTALL" != "1" ]]; then
 fi
 
 echo "→ Starting $APP_NAME"
-ssh "$HOST" "$PM2_CMD"
+ssh "$HOST" "$PM2_CMD" > /dev/null 2>&1
 
 # Wait for pm2 to settle
 sleep 2
 
 # Check status (grep-based, no jq needed)
-STATUS=$(ssh "$HOST" "pm2 info '$APP_NAME'" 2>/dev/null | grep 'status' | head -1 | awk '{print $NF}')
+STATUS=$(ssh "$HOST" "pm2 info '$APP_NAME'" 2>/dev/null | grep 'status' | head -1 | awk '{print $4}')
 if [[ "$STATUS" == "online" ]]; then
   echo "✓ $APP_NAME is online"
 else
