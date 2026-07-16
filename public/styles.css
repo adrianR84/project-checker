@@ -411,7 +411,7 @@ nav.navbar a[aria-current="page"] {
 /* ── Price table ────────────────────────────────────────────────────────── */
 .table-wrapper { overflow-x: auto; margin: 0 20px; }
 .price-table { table-layout: auto; font-size: 0.85rem; width: 100%; border-collapse: collapse; }
-.price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; }
+.price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
 .price-table td.num, .price-table th.num { text-align: right; }
 .price-table td.cen, .price-table th.cen { text-align: center; }
