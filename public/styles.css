@@ -77,13 +77,6 @@ button, .btn {
 
 
 
-/* ── Settings grid helpers ──────────────────────────────────────────── */
-/* Force a settings article to span 2 columns in Pico's auto-fit grid */
-article.force-wide {
-  grid-column: span 2;
-  min-width: 0;
-}
-
 /* ── Form row: label left + Enable right, input below ─────────────── */
 .form-row { display: flex; flex-direction: column; gap: 4px; }
 .form-row-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -198,12 +191,19 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 }
 .toolbar h2 { margin: 0; flex: 1; }
 
+/* ── Settings grid helpers ──────────────────────────────────────────── */
+/* Force a settings article to span 2 columns in Pico's auto-fit grid */
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;
 }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.force-wide {
+  grid-column: span 2;
+  min-width: 0;
+}
 
 
 /* ── Navbar (Pico's .navbar with app overrides) ───────────────────────── */
