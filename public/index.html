@@ -1465,7 +1465,7 @@
           </div>
 
           <!-- Prices tab: token price table -->
-          <div v-else-if="activityTab === 'prices'">
+          <div style="overflow-x: auto;" v-else-if="activityTab === 'prices'">
 
             <div v-if="pricesLoading" class="center-loader">
               <span class="spinner lg"></span>
