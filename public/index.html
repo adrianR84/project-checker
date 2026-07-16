@@ -205,6 +205,12 @@
       return (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2) + '%';
     }
 
+    /** Trim project name to max N chars, adding ellipsis if longer */
+    function trimName(name, max = 25) {
+      if (!name) return '';
+      return name.length > max ? name.slice(0, max) + '…' : name;
+    }
+
     /** Extract the hostname from a URL, stripping leading "www." */
     /**
      * Extract a human-readable label from a URL, tailored to each platform.
@@ -411,7 +417,7 @@
       `,
 
       // Expose helpers to the template
-      methods: { relativeTime },
+      methods: { relativeTime, trimName },
     };
 
     /* ── CheckLogList component ───────────────────────────────────────────────
@@ -439,7 +445,7 @@
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
-                <td>{{ log.project_name || log.project_id }}</td>
+                <td>{{ trimName(log.project_name) || log.project_id }}</td>
                 <td v-html="resourceIcon(log.resource_type)"></td>
                 <td>
                   <span :class="['badge', statusClass(log.status)]">{{ log.status }}</span>
@@ -462,7 +468,7 @@
         totalPages() { return Math.ceil(this.total / this.limit) || 1; }
       },
 
-      methods: { relativeTime, absoluteTime, statusClass, logDetail, resourceIcon: (t) => `<span class="icon icon-${t}"></span>` },
+      methods: { relativeTime, absoluteTime, statusClass, logDetail, trimName, resourceIcon: (t) => `<span class="icon icon-${t}"></span>` },
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
@@ -534,7 +540,7 @@
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
-                <td>{{ log.project_name || log.project_id }}</td>
+                <td>{{ trimName(log.project_name) || log.project_id }}</td>
                 <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
@@ -563,7 +569,7 @@
       },
 
       methods: {
-        relativeTime, absoluteTime,
+        relativeTime, absoluteTime, trimName,
         badgeClass: statusChangeHelpers.badgeClass,
         resourceIcon: statusChangeHelpers.resourceIcon,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
@@ -627,7 +633,7 @@
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
-                <td>{{ log.project_name || log.status_change_id }}</td>
+                <td>{{ trimName(log.project_name) || log.status_change_id }}</td>
                 <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
@@ -653,7 +659,7 @@
       },
 
       methods: {
-        absoluteTime,
+        absoluteTime, trimName,
         badgeClass: statusChangeHelpers.badgeClass,
         resourceIcon: statusChangeHelpers.resourceIcon,
         formatChangeValue: statusChangeHelpers.formatChangeValue,
@@ -1959,7 +1965,7 @@
             No projects yet. Click <strong>+ Add Project</strong> to start.
           </div>
 
-          <div v-else>
+          <div style="overflow-x: scroll;" v-else>
             <table class="compact">
               <thead>
                 <tr>
@@ -1979,7 +1985,7 @@
               <tbody>
                 <tr v-for="p in filteredProjects" :key="p.id" :class="{ disabled: !p.enabled }">
                   <td><input type="checkbox" :checked="selected.includes(p.id)" @change="toggleSelect(p.id)" /></td>
-                  <td>{{ p.name }}</td>
+                  <td>{{ trimName(p.name) }}</td>
                   <td v-html="projectIconLink(p, 'website', p.website_url)"></td>
                   <td :class="p.website_enabled ? 'muted' : 'alert'">{{ p.website_enabled ? '✓' : '✗' }}</td>
                   <td v-html="projectIconLink(p, 'github', p.github_url)"></td>
@@ -2371,7 +2377,7 @@
           projFilter, selected,
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
-          urlLabel, tok, projectIconLink,
+          urlLabel, tok, projectIconLink, trimName,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
           api: window.api,
         };

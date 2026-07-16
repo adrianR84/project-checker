@@ -671,6 +671,16 @@ nav.navbar a[aria-current="page"] {
     padding: 0;
   }
 
+  /* Project table: force project_cell to shrink and truncate on mobile */
+  table.compact .project_cell {
+    min-width: 0 !important;
+    max-width: 120px !important;
+    width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Modal: nearly full screen on mobile */
   .modal {
     max-width: 98vw;
