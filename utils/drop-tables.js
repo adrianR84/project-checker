@@ -12,6 +12,7 @@ db.exec('DROP TABLE IF EXISTS check_logs');
 db.exec('DROP TABLE IF EXISTS event_logs');
 db.exec('DROP TABLE IF EXISTS token_prices_alerts');
 db.exec('DROP TABLE IF EXISTS token_prices');
+db.exec('DROP TABLE IF EXISTS twitter_posts');
 db.exec('DROP TABLE IF EXISTS repos');
 db.exec('DROP TABLE IF EXISTS projects');
 db.exec('PRAGMA foreign_keys = ON');
