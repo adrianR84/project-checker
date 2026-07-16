@@ -409,9 +409,10 @@ nav.navbar a[aria-current="page"] {
 .logs-section { margin-top: 1rem; }
 
 /* ── Price table ────────────────────────────────────────────────────────── */
-.table-wrapper { overflow-x: auto; margin: 0 20px; }
+.price-table-wrapper {overflow-x: auto; overflow-y: auto; max-height: 80vh; font-size: 1.5rem;}
 .price-table { table-layout: auto; font-size: 0.85rem; width: 100%; border-collapse: collapse; }
 .price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
 .price-table td.num, .price-table th.num { text-align: right; }
 .price-table td.cen, .price-table th.cen { text-align: center; }
@@ -680,6 +681,16 @@ nav.navbar a[aria-current="page"] {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* Price table: sticky second column (Symbol) on mobile — first col (Project) is hidden */
+  .price-table th:nth-child(2),
+  .price-table td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--pico-card-background-color, #1a1a2e);
+  }
+  .price-table th:nth-child(2) { z-index: 3; }
 
   /* Modal: nearly full screen on mobile */
   .modal {
