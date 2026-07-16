@@ -31,20 +31,23 @@ TAR_EXCLUDES=(
 [[ "$SKIP_DATA" == "1" ]] && TAR_EXCLUDES+=( --exclude='data' )
 [[ "$SKIP_ENV" == "1" ]] && TAR_EXCLUDES+=( --exclude='.env' )
 
+# Stop pm2 process and kill anything on the app port
+echo "→ Stopping $APP_NAME"
+ssh "$HOST" "pm2 stop '$APP_NAME' 2>/dev/null; fuser -k $SERVER_PORT/tcp 2>/dev/null; sleep 1; true"
+
 # Upload via tar/pipes
 echo "→ Uploading to $HOST:$APP_PATH"
 tar -C "$PWD" -cf - "${TAR_EXCLUDES[@]}" . | ssh "$HOST" "cd $APP_PATH && tar -xf -"
 
-# Install deps and (re)start pm2
+# Install deps and start pm2
 PM2_CMD="cd $APP_PATH && PORT=$SERVER_PORT pm2 start index.js --name '$APP_NAME' --update-env"
 if [[ "$SKIP_INSTALL" != "1" ]]; then
   INSTALL_CMD=$(ssh "$HOST" "which pnpm > /dev/null 2>&1 && echo pnpm || echo npm")
   PM2_CMD="cd $APP_PATH && $INSTALL_CMD install && $PM2_CMD"
 fi
 
-# Stop pm2 process and kill anything on the app port
-echo "→ (Re)starting pm2"
-ssh "$HOST" "pm2 stop '$APP_NAME' 2>/dev/null; fuser -k $SERVER_PORT/tcp 2>/dev/null; sleep 1; $PM2_CMD"
+echo "→ Starting $APP_NAME"
+ssh "$HOST" "$PM2_CMD"
 
 # Wait for pm2 to settle
 sleep 2
