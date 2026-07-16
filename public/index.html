@@ -302,7 +302,7 @@
               </a>
             </li>
             <li v-if="fearIndex?.value !== undefined">
-              <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" style="font-size:0.8rem" :class="['badge', fearIndex.value_classification === 'Extreme Fear' ? 'error' : fearIndex.value_classification === 'Fear' ? 'pending' : fearIndex.value_classification.includes('Greed') ? 'ok' : 'pending']" :title="'Fear & Greed Index: ' + fearIndex.value_classification">
+              <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" class="index" :class="['badge', fearIndex.value_classification === 'Extreme Fear' ? 'error' : fearIndex.value_classification === 'Fear' ? 'pending' : fearIndex.value_classification.includes('Greed') ? 'ok' : 'pending']" :title="'Fear & Greed Index: ' + fearIndex.value_classification">
                 {{ fearIndex.value }} {{ fearIndex.value_classification }}
               </a>
             </li>

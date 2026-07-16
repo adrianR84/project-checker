@@ -235,6 +235,7 @@ nav.navbar a {
   padding: 8px 12px;
   transition: color 180ms, background 180ms;
 }
+nav.navbar a.index{font-size:0.8rem}
 nav.navbar a:hover {
   color: var(--app-text);
   background: color-mix(in srgb, var(--app-bg) 80%, transparent);
@@ -409,8 +410,8 @@ nav.navbar a[aria-current="page"] {
 .logs-section { margin-top: 1rem; }
 
 /* ── Price table ────────────────────────────────────────────────────────── */
-.price-table-wrapper {overflow-x: auto; overflow-y: auto; max-height: 80vh; font-size: 1.5rem;}
-.price-table { table-layout: auto; font-size: 0.85rem; width: 100%; border-collapse: collapse; }
+.price-table-wrapper {overflow-x: auto; overflow-y: auto; max-height: 80vh; }
+.price-table { table-layout: auto; font-size: 0.85rem; width: 100%; border-collapse: collapse; font-size: 0.95rem;}
 .price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
 
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
@@ -586,20 +587,14 @@ nav.navbar a[aria-current="page"] {
 
 /* ── Tablets ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  /* Smaller base font */
-  :root {
-    --pico-font-size: 90%;
-  }  
+
   .page { padding: 28px 5px; }
   .page-nav-arrows { display: none; }
   .price-table .hide-sm { display: none; }
   .project-grid {  grid-template-columns: 1fr; }  
 
-
   .grid { grid-template-columns: repeat(2, 1fr); }
   .grid .force-wide { grid-column: span 2; min-width: 0; }
-  
-
 }
 
 @media (max-width: 1240px) {
@@ -608,10 +603,6 @@ nav.navbar a[aria-current="page"] {
 
 /* ── Mobile: always-on tweaks ─────────────────────────────────────────── */
 @media (max-width: 600px) {
-  /* Smaller base font */
-  :root {
-    --pico-font-size: 90%;
-  }
 
   .grid { grid-template-columns: repeat(1, 1fr); }
   .grid .force-wide {
@@ -630,7 +621,13 @@ nav.navbar a[aria-current="page"] {
     max-width: 100%;
     margin: 0 auto;
     padding: 0 12px;
+    overflow: auto;
   }
+
+  nav.navbar a {
+  font-size: 0.9rem;
+ }
+ nav.navbar a.index{font-size:0.6rem}
 
   /* Tables inside articles need a horizontal scroll anchor */
   article table.compact {
