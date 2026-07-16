@@ -543,7 +543,7 @@
                 </td>
                 <td class="muted">{{ absoluteTime(log.created_at) }}</td>
                 <td v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
-                <td class="cen">
+                <td class="text-center">
                   <input type="checkbox" :checked="!!log.confirmed" @change="toggleConfirm(log, $event)" />
                 </td>
               </tr>
@@ -1049,7 +1049,7 @@
       components: { RepoList },
 
       template: `
-        <article class="project-card">
+        <div class="project-card">
 
           <!-- Card header: project name only -->
           <header class="head">
@@ -1062,11 +1062,11 @@
           <table class="compact">
             <thead>
               <tr>
-                <th data-tooltip="Resource type">Resource</th>
+                <th data-tooltip="Resource type">Res</th>
                 <th class="action_cell" data-tooltip="Whether monitoring is enabled">Mon.</th>
                 <th data-tooltip="Current status">Status</th>
-                <th data-tooltip="Time of last check">Last Checked</th>
-                <th data-tooltip="Time of last status change">Last Change</th>
+                <th data-tooltip="Time of last check">Checked</th>
+                <th data-tooltip="Time of last status change">Change</th>
                 <th class="action_cell" data-tooltip="Refresh all projects at once">
                   <button
                     class="secondary"
@@ -1205,7 +1205,7 @@
             </div>
           </section>
 
-        </article>
+        </div>
       `,
 
       setup(props, { emit }) {
