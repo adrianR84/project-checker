@@ -144,7 +144,7 @@ tr.disabled td:last-child {
 table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
 table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bottom:0px; }
-table.compact th, table.compact td { padding: 4px 8px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
 table.compact .text-center{text-align: center;}
@@ -161,7 +161,7 @@ table.compact .text-right{text-align: right;}
 }
 .icon-btn:hover { opacity: 0.75; }
 
-table.compact .project_cell{ min-width: 150px; max-width: 300px; }
+table.compact .project_cell{ min-width: 100px; max-width: 350px;  }
 table.compact .project_cell.alert  { width: 250px; }
 table.compact .resource_cell { min-width: 70px;  width: 80px;  }
 table.compact .type_cell     { min-width: 70px;  width: 100px;  }
