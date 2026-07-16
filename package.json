@@ -12,7 +12,7 @@
     "vacuum": "node --disable-warning=ExperimentalWarning utils/vacuum-db.js",
     "drop-tables": "node --disable-warning=ExperimentalWarning utils/drop-tables.js",
     "drop-tables:keep-data": "node --disable-warning=ExperimentalWarning utils/drop-tables.js --keep-data",
-    "release": "bash ./utils/deploy.sh"
+    "deploy-app": "bash ./utils/deploy.sh"
   },
   "dependencies": {
     "better-auth": "^1.6.22",

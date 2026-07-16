@@ -143,7 +143,7 @@ tr.disabled td:last-child {
 }
 table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
-table.compact { table-layout: fixed; font-size: 0.85rem; margin-bottom:0px; width: 100%;}
+table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bottom:0px; }
 table.compact th, table.compact td { padding: 4px 8px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
