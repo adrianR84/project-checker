@@ -5,13 +5,13 @@
   "main": "index.js",
   "pnpm": {},
   "scripts": {
-    "start": "node index.js",
-    "dev": "node utils/kill-ports.js && concurrently \"node --watch index.js\" \"live-server --port=3005 --no-browser --proxy=/api:http://localhost:3004/api public\"",
-    "dev:log": "node utils/kill-ports.js && node utils/dev-log.js",
+    "start": "node --disable-warning=ExperimentalWarning index.js",
+    "dev": "node utils/kill-ports.js && concurrently \"node --watch --disable-warning=ExperimentalWarning index.js\" \"live-server --port=3005 --no-browser --proxy=/api:http://localhost:3004/api public\"",
+    "dev:log": "node utils/kill-ports.js && node utils/dev-log.js --disable-warning=ExperimentalWarning",
     "log:pipe": "node utils/log-pipe.js",
-    "vacuum": "node utils/vacuum-db.js",
-    "drop-tables": "node utils/drop-tables.js",
-    "drop-tables:keep-data": "SKIP_DATA=1 node utils/drop-tables.js",
+    "vacuum": "node --disable-warning=ExperimentalWarning utils/vacuum-db.js",
+    "drop-tables": "node --disable-warning=ExperimentalWarning utils/drop-tables.js",
+    "drop-tables:keep-data": "node --disable-warning=ExperimentalWarning utils/drop-tables.js --keep-data",
     "release": "bash ./utils/deploy.sh"
   },
   "dependencies": {

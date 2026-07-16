@@ -1,32 +1,36 @@
 // Drop all data tables (removes tables entirely — schema gone)
-// SKIP_DATA=1 skip projects and repos tables
+// --keep-data skips projects and repos tables
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
-const readline = require('node:readline');
+const readline = require('readline');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'project-checker.db');
+const keepData = process.argv.includes('--keep-data');
 
 const TABLES = ['alert_logs', 'check_logs', 'event_logs', 'token_prices_alerts', 'token_prices', 'twitter_posts'];
-if (!process.env.SKIP_DATA) TABLES.push('repos', 'projects');
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const answer = await new Promise(resolve => rl.question(`Drop tables: ${TABLES.join(', ')} ? Type "yes" to confirm: `, resolve));
-rl.close();
-if (answer.trim().toLowerCase() !== 'yes') { console.log('Aborted.'); process.exit(0); }
+if (!keepData) TABLES.push('repos', 'projects');
 
-const db = new DatabaseSync(DB_PATH);
+async function main() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise(resolve => {
+    rl.question(`Drop tables:\n${TABLES.join('\n')}\n\nType "yes" to confirm: `, resolve);
+  });
+  rl.close();
 
-db.exec('PRAGMA foreign_keys = OFF');
-db.exec('DROP TABLE IF EXISTS alert_logs');
-db.exec('DROP TABLE IF EXISTS check_logs');
-db.exec('DROP TABLE IF EXISTS event_logs');
-db.exec('DROP TABLE IF EXISTS token_prices_alerts');
-db.exec('DROP TABLE IF EXISTS token_prices');
-db.exec('DROP TABLE IF EXISTS twitter_posts');
-if (!process.env.SKIP_DATA) {
-  db.exec('DROP TABLE IF EXISTS repos');
-  db.exec('DROP TABLE IF EXISTS projects');
+  if (answer.trim().toLowerCase() !== 'yes') {
+    console.log('\nAborted.');
+    process.exit(0);
+  }
+
+  const db = new DatabaseSync(DB_PATH);
+  try {
+    db.exec('PRAGMA foreign_keys = OFF');
+    for (const t of TABLES) db.exec(`DROP TABLE IF EXISTS ${t}`);
+    db.exec('PRAGMA foreign_keys = ON');
+  } finally {
+    db.close();
+  }
+  console.log(`\nDropped: ${TABLES.join(', ')}`);
 }
-db.exec('PRAGMA foreign_keys = ON');
 
-console.log(`Dropped: ${TABLES.join(', ')}`);
-db.close();
+main().catch(err => { console.error(err); process.exit(1); });
