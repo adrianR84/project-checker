@@ -2640,24 +2640,28 @@
               <h3>Notification Channels</h3>
               <p class="muted">Send alerts to Telegram and/or Pushbullet when an alert is recorded.</p>
 
-              <div class="grid">
+              <div class="grid col2">
                 <div class="form-group">
                   <label>
                     <input type="checkbox" v-model="form.telegram_enabled" />
                     Enable Telegram
                   </label>
-                  <input
-                    v-model="form.telegram_bot_token"
-                    type="password"
-                    placeholder="Bot Token"
-                    autocomplete="off"
-                    :disabled="!form.telegram_enabled"
-                  />
-                  <input
-                    v-model="form.telegram_chat_id"
-                    placeholder="Chat ID"
-                    :disabled="!form.telegram_enabled"
-                  />
+                  <span data-tooltip="Get a token from @BotFather on Telegram">
+                    <input
+                      v-model="form.telegram_bot_token"
+                      type="password"
+                      placeholder="Bot Token"
+                      autocomplete="off"
+                      :disabled="!form.telegram_enabled"
+                    />
+                  </span>
+                  <span data-tooltip="Your chat ID — message @userinfobot on Telegram to find it" data-placement="left">
+                    <input
+                      v-model="form.telegram_chat_id"
+                      placeholder="Chat ID"
+                      :disabled="!form.telegram_enabled"
+                    />
+                  </span>
                 </div>
 
                 <div class="form-group">
@@ -2665,13 +2669,15 @@
                     <input type="checkbox" v-model="form.pushbullet_enabled" />
                     Enable Pushbullet
                   </label>
-                  <input
-                    v-model="form.pushbullet_access_token"
-                    type="password"
-                    placeholder="Access Token"
-                    autocomplete="off"
-                    :disabled="!form.pushbullet_enabled"
-                  />
+                  <span data-tooltip="Your Pushbullet access token from pushbullet.com/account">
+                    <input
+                      v-model="form.pushbullet_access_token"
+                      type="password"
+                      placeholder="Access Token"
+                      autocomplete="off"
+                      :disabled="!form.pushbullet_enabled"
+                    />
+                  </span>
                 </div>
               </div>
 
