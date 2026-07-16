@@ -533,15 +533,15 @@
                 <th class="type_cell" data-tooltip="Type of status change event">Event</th>
                 <th class="time_cell" data-tooltip="Time of the event">When</th>
                 <th class="details_cell hide-sm" data-tooltip="Additional event details">Details</th>
-                <th style="width:40px" data-tooltip="Confirm all unconfirmed events at once">
-                  <button style="font-size:0.8em;padding:2px" @click="confirmAll">CA</button>
+                <th style="width:40px;overflow:visible" data-tooltip="Confirm all unconfirmed events at once" data-placement="left">
+                  <button style="font-size:0.8em;padding:2px;" @click="confirmAll">CA</button>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ trimName(log.project_name) || log.project_id }}</td>
-                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
+                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -634,7 +634,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ trimName(log.project_name) || log.status_change_id }}</td>
-                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Ctrl+click for iframe modal' : ''" @click="e => log.resource_type === 'twitter' && e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
+                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -1089,7 +1089,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1117,7 +1117,7 @@
 
               <tr v-if="project.website_url">
                 <td>
-                  <a :href="project.website_url" target="_blank" rel="noopener" title="Open Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(project.website_url, 'Website', '1200px'))">
+                  <a :href="project.website_url" target="_blank" rel="noopener" title="Open Website — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe(project.website_url, 'Website', '1200px'))">
                     <span class="icon icon-website"></span>
                   </a>
                 </td>
@@ -1521,13 +1521,13 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Ctrl+click for iframe modal" @click="e => e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
+                    <a v-if="row.website_url" :href="row.website_url" target="_blank" rel="noopener" title="Website — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe(row.website_url, 'Website', '1200px'))">
                       <span class="icon icon-website"></span>
                     </a>
                     <span v-else>—</span>
