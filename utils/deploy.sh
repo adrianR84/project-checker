@@ -5,6 +5,7 @@ set -e
 
 SKIP_INSTALL="${SKIP_INSTALL:-1}"  # 1=skip install (faster), 0=run pnpm install
 SKIP_DATA="${SKIP_DATA:-1}"        # 1=skip data folder, 0=include data
+SKIP_ENV="${SKIP_ENV:-1}"          # 1=skip .env file, 0=include .env
 
 HOST="adi-vps"
 PROJECT_NAME=$(basename "$PWD")
@@ -27,7 +28,8 @@ TAR_EXCLUDES=(
   --exclude='*.log'
   --exclude='utils/drop-tables.js'
 )
-[[ "$SKIP_DATA" == "1" ]] && TAR_EXCLUDES+=( --exclude='data' --exclude='.env' )
+[[ "$SKIP_DATA" == "1" ]] && TAR_EXCLUDES+=( --exclude='data' )
+[[ "$SKIP_ENV" == "1" ]] && TAR_EXCLUDES+=( --exclude='.env' )
 
 # Upload via tar/pipes
 echo "→ Uploading to $HOST:$APP_PATH"
