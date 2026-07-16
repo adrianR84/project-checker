@@ -11,7 +11,8 @@
     "log:pipe": "node utils/log-pipe.js",
     "vacuum": "node utils/vacuum-db.js",
     "drop-tables": "node utils/drop-tables.js",
-    "release": "bash ./utils/deploy.sh"
+    "release": "bash ./utils/deploy.sh",
+    "deploy": "node utils/deploy.js"
   },
   "dependencies": {
     "better-auth": "^1.6.22",
