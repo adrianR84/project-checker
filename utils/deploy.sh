@@ -3,8 +3,8 @@
 
 set -e
 
-SKIP_INSTALL="${SKIP_INSTALL:-0}"  # 1=skip install (faster), 0=run pnpm install
-SKIP_DATA="${SKIP_DATA:-0}"        # 1=skip data folder, 0=include data
+SKIP_INSTALL="${SKIP_INSTALL:-1}"  # 1=skip install (faster), 0=run pnpm install
+SKIP_DATA="${SKIP_DATA:-1}"        # 1=skip data folder, 0=include data
 SKIP_ENV="${SKIP_ENV:-1}"          # 1=skip .env file, 0=include .env
 
 HOST="adi-vps"
