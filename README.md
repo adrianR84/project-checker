@@ -28,14 +28,16 @@ pnpm drop-tables  # DROP all data tables (schema gone — use to reset DB)
 
 ## What it does
 
+Monitors websites, GitHub orgs/repos, Twitter/X accounts, and crypto token prices for changes. Sends alerts via Telegram and/or Pushbullet on configurable intervals, with auto-stop after a grace period.
+
 | Resource | What it checks |
 |----------|----------------|
 | Website | HTTP status, response time, content fingerprint (title, Open Graph, Twitter tags, canonical, first paragraph) — detects page changes |
-| GitHub | New commits, new tags, deleted repos — per-org via GitHub API |
-| Twitter / X | HTTP status, suspended-account detection via `defuddle` CLI |
+| GitHub | New commits, new tags, deleted repos — per-org via GitHub API; supports adding individual repos to a project |
+| Twitter / X | HTTP status, suspended-account detection via `defuddle` CLI; caches recent posts and detects new ones |
 | Token price | USD price, 1h/6h/24h change, liquidity, volume, market cap from DexScreener |
 
-Changes are recorded as events in `event_logs` and alerted on configurable intervals via Telegram and/or Pushbullet.
+Multi-user via `better-auth` (email/password + Google/GitHub/Twitter/Facebook OAuth). Projects can be bulk-imported via the public API v1 using a bearer token.
 
 ## Project structure
 
