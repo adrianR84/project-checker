@@ -134,17 +134,19 @@ router.post('/', async (req, res) => {
   const twitterJson  = twitter_url  ? JSON.stringify({ url: twitter_url, pc: twitterPc }) : null;
   const telegramJson = telegram_url  ? JSON.stringify({ url: telegram_url }) : null;
 
-  // Prevent duplicate: same name + website_url for this user
-  if (website_url) {
-    const existing = await db.prepare(
-      'SELECT id FROM projects WHERE name = ? AND website IS NOT NULL AND user_id = ?'
-    ).get(name, req.userId);
-    if (existing) {
-      // Re-parse to get the URL for comparison
-      const parsed = parseProjectRow(existing);
-      if (parsed.website_url === website_url) return res.status(409).json({ error: 'Project with this name and website already exists' });
-    }
-  }
+  // Prevent duplicate: all provided fields must match (same user)
+  const dupConditions = ['user_id = ?'];
+  const dupParams = [req.userId];
+  if (name)          { dupConditions.push('name = ?');         dupParams.push(name); }
+  if (websiteJson)   { dupConditions.push('website = ?');       dupParams.push(websiteJson); }
+  if (githubJson)    { dupConditions.push('github = ?');        dupParams.push(githubJson); }
+  if (twitterJson)   { dupConditions.push('twitter = ?');       dupParams.push(twitterJson); }
+  if (telegramJson)  { dupConditions.push('telegram = ?');      dupParams.push(telegramJson); }
+  if (tokenJson)     { dupConditions.push('token = ?');         dupParams.push(tokenJson); }
+  const existing = await db.prepare(
+    `SELECT id FROM projects WHERE ${dupConditions.join(' AND ')}`
+  ).get(...dupParams);
+  if (existing) return res.status(409).json({ error: 'Project with this combination of fields already exists' });
 
   const ts = now();
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;

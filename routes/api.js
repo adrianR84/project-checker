@@ -53,10 +53,19 @@ router.post('/projects/import', requireApiToken, async (req, res) => {
     const telegramJson = !empty(telegram) ? JSON.stringify({ url: tr(telegram) }) : null;
     const tokenJson = JSON.stringify({ symbol: tr(symbol), contract: tr(contractAddress), chain: tr(chainId) });
 
+    // Build a single "all provided fields match" check
+    const conditions = ['user_id = ?'];
+    const params = [req.userId];
+    if (!empty(name))     { conditions.push('name = ?');           params.push(tr(name)); }
+    if (!empty(website))  { conditions.push('website = ?');        params.push(websiteJson); }
+    if (!empty(github))   { conditions.push('github = ?');         params.push(githubJson); }
+    if (!empty(twitter))  { conditions.push('twitter = ?');        params.push(twitterJson); }
+    if (!empty(telegram)) { conditions.push('telegram = ?');        params.push(telegramJson); }
+    if (!empty(symbol))   { conditions.push('token = ?');           params.push(tokenJson); }
     const existing = await db.prepare(
-      'SELECT id FROM projects WHERE name = ? AND user_id = ?'
-    ).get(name, req.userId);
-    if (existing) { errors.push({ index: i, error: 'Project with this name already exists' }); continue; }
+      `SELECT id FROM projects WHERE ${conditions.join(' AND ')}`
+    ).get(...params);
+    if (existing) { errors.push({ index: i, error: 'Project with this combination of fields already exists' }); continue; }
 
     try {
       const result = await db.prepare(`
