@@ -48,7 +48,9 @@ const projectsRouter = require('./routes/projects');
 const checkLogsRouter = require('./routes/checkLogs');
 const settingsRouter = require('./routes/settings');
 const dashboardRouter = require('./routes/dashboard');
+const apiRouter = require('./routes/api');
 
+app.use('/api/v1', apiRouter);   // public bearer-token API (before session middleware)
 app.use('/api/projects', projectsRouter);
 app.use('/api/check-logs', checkLogsRouter);
 app.use('/api/settings', settingsRouter);
