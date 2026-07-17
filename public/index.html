@@ -105,6 +105,7 @@
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
       clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
       clearAlertLogs: ()       => req('/settings/clear-alert-logs', { method: 'POST' }),
+      generateApiToken: ()      => req('/settings/generate-api-token', { method: 'POST' }),
 
       // Auth
       signIn:      (creds)  => req('/auth/sign-in/email',    { method: 'POST', body: JSON.stringify(creds) }),
@@ -2624,6 +2625,15 @@
                 <input v-model="form.github_token" type="password" autocomplete="off" placeholder="ghp_…" />
               </div>
 
+              <div class="form-group">
+                <label data-tooltip="API token for programmatic access">API Token</label>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <input v-model="form.api_token" type="password" autocomplete="off" placeholder="PC_…" style="flex:1" />
+                  <button type="button" class="btn btn-secondary" @click="generateApiToken" :disabled="generatingToken">Generate</button>
+                </div>
+                <p v-if="generatedApiToken" class="muted" style="margin:0px 5px 10px 5px;font-size:0.8rem;word-break:break-all">Token: {{ generatedApiToken }}</p>
+              </div>
+
               <fieldset role="group">
                 <label data-tooltip="Automatically reload the Activity page at the selected interval to show latest status">
                   <input type="checkbox" v-model="form.ui_refresh_enabled" />
@@ -2812,6 +2822,7 @@
           twitter_alert_minutes:       60,
           twitter_alert_stop_minutes:  1440,
           github_token:               '',
+          api_token:                 '',
           telegram_enabled:         false,
           telegram_bot_token:       '',
           telegram_chat_id:         '',
@@ -2829,6 +2840,8 @@
         const clearing  = ref(false);
         const clearingLogs  = ref(false);
         const clearingAlerts = ref(false);
+        const generatedApiToken = ref('');
+        const generatingToken = ref(false);
 
         /**
          * Extract the interval (in minutes) for a given check type from the settings object.
@@ -2873,6 +2886,7 @@
               twitter_alert_minutes:      settings.value.twitter_alert_minutes ?? 60,
               twitter_alert_stop_minutes:  settings.value.twitter_alert_stop_minutes ?? 1440,
               github_token:              settings.value.github_token || '',
+              api_token:                settings.value.api_token || '',
               telegram_enabled:         !!settings.value.telegram?.enabled,
               telegram_bot_token:        settings.value.telegram?.bot_token || '',
               telegram_chat_id:          settings.value.telegram?.chat_id || '',
@@ -2934,6 +2948,7 @@
         async function saveAppSettings() {
           await saveSettings({
             github_token: form.value.github_token,
+            api_token: form.value.api_token,
             ui_refresh_seconds: form.value.ui_refresh_enabled
               ? Number(form.value.ui_refresh_seconds) || 60
               : 0,
@@ -2998,6 +3013,25 @@
           });
         }
 
+        /** Generate and display a new API token */
+        async function generateApiToken() {
+          if (!confirm('This will replace your existing API token. Continue?')) return;
+          generatingToken.value = true;
+          try {
+            const result = await api.generateApiToken();
+            generatedApiToken.value = result.api_token;
+            form.value.api_token = result.api_token;
+            if (navigator.clipboard) {
+              await navigator.clipboard.writeText(result.api_token);
+              showToast('Token copied to clipboard', 'ok', 3000);
+            }
+          } catch (e) {
+            showToast(e.message, 'error', 5000);
+          } finally {
+            generatingToken.value = false;
+          }
+        }
+
         /** Run trigger-all for a specific kind (web / gh / tw) */
         async function onTrigger(kind, fn) {
           triggering.value = kind;
@@ -3054,7 +3088,8 @@
 
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, savePriceAlertsSettings, onTrigger, onClear, onClearLogs, onClearAlerts,
+          generatedApiToken, generatingToken,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts,
           relativeTime,
           api: window.api,
         };

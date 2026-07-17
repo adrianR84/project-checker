@@ -28,6 +28,7 @@ router.get('/', async (req, res) => {
     ui_refresh_seconds:         settings.ui_refresh_seconds,
     compact_activity:           settings.compact_activity_display,
     github_token:               settings.github_token,
+    api_token:                 settings.api_token,
     logs_per_page:             settings.logs_per_page,
     checks_on_new_project:      settings.checks_on_new_project ?? 1,
     github_check_minutes:       check_intervals.github,
@@ -128,6 +129,9 @@ router.put('/', async (req, res) => {
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'github_token')) {
     updates.github_token = String(req.body.github_token || '');
   }
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'api_token')) {
+    updates.api_token = String(req.body.api_token || '');
+  }
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'logs_per_page')) {
     updates.logs_per_page = Math.max(5, Math.min(100, parseInt(req.body.logs_per_page, 10) || 20));
   }
@@ -219,6 +223,7 @@ router.put('/', async (req, res) => {
       if (updates.ui_refresh_seconds !== undefined) s.ui_refresh_seconds = updates.ui_refresh_seconds;
       if (updates.compact_activity !== undefined) s.compact_activity_display = updates.compact_activity;
       if (updates.github_token !== undefined) s.github_token = updates.github_token || null;
+      if (updates.api_token !== undefined) s.api_token = updates.api_token || null;
       if (updates.logs_per_page !== undefined) s.logs_per_page = updates.logs_per_page;
       if (updates.checks_on_new_project !== undefined) s.checks_on_new_project = updates.checks_on_new_project;
       if (updates.twitter_posts_per_project !== undefined) s.twitter_posts_per_project = updates.twitter_posts_per_project;
@@ -397,6 +402,18 @@ router.post('/clear-alert-logs', async (req, res) => {
     await db.prepare(`DELETE FROM alert_logs WHERE status_change_id IN (SELECT id FROM event_logs WHERE project_id IN (${placeholders}))`).run(...ids);
   }
   res.json({ ok: true });
+});
+
+// POST /api/settings/generate-api-token — generate and save a new PC_ token
+router.post('/generate-api-token', async (req, res) => {
+  const { randomBytes } = require('crypto');
+  const token = 'PC_' + randomBytes(32).toString('hex');
+  const s = await db.config.getSettings(req.userId);
+  if (s) {
+    s.api_token = token;
+    await db.prepare('UPDATE config SET settings = ? WHERE user_id = ?').run(JSON.stringify(s), req.userId);
+  }
+  res.json({ api_token: token });
 });
 
 module.exports = router;
