@@ -1494,8 +1494,8 @@
                   <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_change_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h24')">24h</th>
-                  <th class="hide-sm" :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                   <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
+                  <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                   <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
                   <th class="cen" title="Track price changes">
                     <span class="sr-only">Track</span>
@@ -1544,8 +1544,8 @@
                   <td class="cen hide-sm" :class="priceCellTint[row.project_id + '-price_change_h1'] || []">{{ fmtPct(row.price_change_h1) }}</td>
                   <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h6'] || []">{{ fmtPct(row.price_change_h6) }}</td>
                   <td class="cen" :class="priceCellTint[row.project_id + '-price_change_h24'] || []">{{ fmtPct(row.price_change_h24) }}</td>
-                  <td class="num hide-sm">{{ fmtShortNum(row.liquidity_usd) }}</td>
                   <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
+                  <td class="num"><b>{{ fmtShortNum(row.liquidity_usd) }}</b></td>
                   <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
                   <td class="cen">
                     <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
