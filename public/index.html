@@ -1465,8 +1465,7 @@
           </div>
 
           <!-- Prices tab: token price table -->
-          <div class="price-table-wrapper" v-else-if="activityTab === 'prices'">
-
+          <div class="price-table-wrapper" v-else-if="activityTab === 'prices'" :class="pricesMaximized ? 'maximized' : ''">
             <div v-if="pricesLoading" class="center-loader">
               <span class="spinner lg"></span>
             </div>
@@ -1499,7 +1498,9 @@
                   <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
                   <th class="cen" title="Track price changes">
                     <span class="sr-only">Track</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <button class="icon-btn" @click="pricesMaximized = !pricesMaximized">
+                      <span :class="pricesMaximized ? 'icon icon-shrink' : 'icon icon-expand'"></span>
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -1586,6 +1587,7 @@
         const projects      = ref([]);
         const prices        = ref([]);
         const pricesLoading = ref(false);
+        const pricesMaximized = ref(false);
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
@@ -1922,7 +1924,7 @@
         });
 
         return {
-          activityTab, projects, prices, pricesLoading,
+          activityTab, projects, prices, pricesLoading, pricesMaximized,
           logs, statusChanges, alertLogs, loading, error, logTab,
           logPage, logTotal, logLimit, scPage, scTotal, scLimit, alertPage, alertTotal, alertLimit,
           logSearch,

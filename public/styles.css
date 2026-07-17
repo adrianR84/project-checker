@@ -110,16 +110,6 @@ table.compact .action_cell   { min-width: 40px;  width: 40px;  }
 table.compact .details_cell   { min-width: 70px; }
 table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
-.res-label { font-weight: 600; margin-right: 4px; }
-.icon-btn {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  cursor: pointer;
-  display: inline-flex;
-  vertical-align: middle;
-}
-.icon-btn:hover { opacity: 0.75; }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */
 #toast {
@@ -417,10 +407,11 @@ nav.navbar a[aria-current="page"] {
 .danger-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* ── Price table ────────────────────────────────────────────────────────── */
-.price-table-wrapper {overflow-x: auto; overflow-y: auto; max-height: 80vh; }
+.price-table-wrapper {overflow-x: auto; overflow-y: auto; max-height: 80vh; position: relative;}
+.price-table-wrapper.maximized { position: fixed; inset: 0; z-index: 200; background: var(--app-bg); padding: 2px; overflow: auto; max-height: 100vh;}
+
 .price-table { table-layout: auto; font-size: 0.85rem; width: 100%; border-collapse: collapse; font-size: 0.95rem;}
 .price-table th { text-align: left; padding: 6px 10px; font-weight: bold; border-bottom: 2px solid var(--app-border); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
-
 .price-table td { padding: 6px 10px; border-bottom: 1px solid var(--app-border); }
 .price-table td.num, .price-table th.num { text-align: right; }
 .price-table td.cen, .price-table th.cen { text-align: center; }
@@ -566,6 +557,20 @@ nav.navbar a[aria-current="page"] {
 }
 
 /* ── Social icon classes (SVG inline data URIs) ──────────────────────── */
+
+
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn:hover { opacity: 0.75; }
+.icon-btn .icon { width: 16px; height: 16px; }
+
 .icon {
   display: inline-block;
   width: 18px;
@@ -587,6 +592,12 @@ nav.navbar a[aria-current="page"] {
 }
 .icon-website {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' stroke='%23e6e8ec' fill='none' stroke-width='3'%3E%3Cpath d='M39.93 55.72A24.86 24.86 0 1 1 56.86 32.15a37.24 37.24 0 0 1-.73 6'/%3E%3Cpath d='M37.86 51.1A47 47 0 0 1 32 56.7'/%3E%3Cpath d='M32 7A34.14 34.14 0 0 1 43.57 30a34.07 34.07 0 0 1 .09 4.85'/%3E%3Cpath d='M32 7A34.09 34.09 0 0 0 20.31 32.46c0 16.2 7.28 21 11.66 24.24'/%3E%3Cline x1='10.37' y1='19.9' x2='53.75' y2='19.9'/%3E%3Cline x1='32' y1='6.99' x2='32' y2='56.7'/%3E%3Cline x1='11.05' y1='45.48' x2='37.04' y2='45.48'/%3E%3Cline x1='7.14' y1='32.46' x2='56.86' y2='31.85'/%3E%3Cpath d='M53.57 57 58 52.56l-8-8 4.55-2.91a.38.38 0 0 0-.12-.7L39.14 37.37a.39.39 0 0 0-.46.46L42 53.41a.39.39 0 0 0 .71.13L45.57 49Z'/%3E%3C/svg%3E");
+}
+.icon-expand {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e6e8ec' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cpolyline points='9 21 3 21 3 15'/%3E%3Cline x1='21' y1='3' x2='14' y2='10'/%3E%3Cline x1='3' y1='21' x2='10' y2='14'/%3E%3C/svg%3E");
+}
+.icon-shrink {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e6e8ec' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 14 10 14 10 20'/%3E%3Cpolyline points='20 10 14 10 14 4'/%3E%3Cline x1='10' y1='14' x2='3' y2='21'/%3E%3Cline x1='21' y1='3' x2='14' y2='10'/%3E%3C/svg%3E");
 }
 
 
