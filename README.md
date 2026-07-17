@@ -141,7 +141,7 @@ All settings are stored in the `config` table as JSON group columns:
 | `SCHEDULER_DEBUG` | `0` | Set to `1` for verbose scheduler tick logging |
 | `SKIP_AUTH` | — | Set to `1` to bypass authentication (dev mode only) |
 | `DEFAULT_USER_ID` | — | Fallback user ID when `SKIP_AUTH=1` or scheduler has no session |
-| `BETTER_AUTH_URL` | `http://localhost:3000` | OAuth callback origin — must match registered redirect URI |
+| `BETTER_AUTH_URL` | `http://localhost:3004` | OAuth callback origin — must match registered redirect URI |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Google OAuth credentials |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | GitHub OAuth credentials |
 | `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` | — | Twitter/X OAuth credentials |
