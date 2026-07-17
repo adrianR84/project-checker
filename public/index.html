@@ -2744,7 +2744,9 @@
                   <span data-tooltip="Your chat ID — message @userinfobot on Telegram to find it" data-placement="left">
                     <input
                       v-model="form.telegram_chat_id"
+                      type="password"
                       placeholder="Chat ID"
+                      autocomplete="off"
                       :disabled="!form.telegram_enabled"
                     />
                   </span>

@@ -6,6 +6,12 @@ const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../se
 const router = express.Router();
 const now = () => new Date().toISOString();
 
+const DUMMY_GITHUB_TOKEN     = 'DUMMY_TOKEN_github';
+const DUMMY_API_TOKEN        = 'DUMMY_TOKEN_api';
+const DUMMY_TELEGRAM_TOKEN   = 'DUMMY_TOKEN_telegram';
+const DUMMY_TELEGRAM_CHAT_ID = 'DUMMY_TOKEN_telegram_chat_id';
+const DUMMY_PUSHBULLET_TOKEN = 'DUMMY_TOKEN_pushbullet';
+
 // GET /api/settings
 router.get('/', async (req, res) => {
   await db.ensureConfig(req.userId);
@@ -27,8 +33,8 @@ router.get('/', async (req, res) => {
     twitter_posts_per_project:  settings.twitter_posts_per_project ?? 50,
     ui_refresh_seconds:         settings.ui_refresh_seconds,
     compact_activity:           settings.compact_activity_display,
-    github_token:               settings.github_token,
-    api_token:                 settings.api_token,
+    github_token:               settings.github_token ? DUMMY_GITHUB_TOKEN : '',
+    api_token:                 settings.api_token    ? DUMMY_API_TOKEN    : '',
     logs_per_page:             settings.logs_per_page,
     checks_on_new_project:      settings.checks_on_new_project ?? 1,
     github_check_minutes:       check_intervals.github,
@@ -44,8 +50,8 @@ router.get('/', async (req, res) => {
     check_intervals,
     alert_intervals,
     alert_stops,
-    telegram,
-    pushbullet,
+    telegram: telegram ? { ...telegram, bot_token: telegram.bot_token ? DUMMY_TELEGRAM_TOKEN : '', chat_id: telegram.chat_id ? DUMMY_TELEGRAM_CHAT_ID : '' } : null,
+    pushbullet: pushbullet ? { ...pushbullet, access_token: pushbullet.access_token ? DUMMY_PUSHBULLET_TOKEN : '' } : null,
     price_alerts,
   });
 });
@@ -127,10 +133,12 @@ router.put('/', async (req, res) => {
 
   // Alert config keys
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'github_token')) {
-    updates.github_token = String(req.body.github_token || '');
+    const t = String(req.body.github_token || '');
+    if (t && t !== DUMMY_GITHUB_TOKEN) updates.github_token = t;
   }
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'api_token')) {
-    updates.api_token = String(req.body.api_token || '');
+    const t = String(req.body.api_token || '');
+    if (t && t !== DUMMY_API_TOKEN) updates.api_token = t;
   }
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'logs_per_page')) {
     updates.logs_per_page = Math.max(5, Math.min(100, parseInt(req.body.logs_per_page, 10) || 20));
@@ -183,8 +191,8 @@ router.put('/', async (req, res) => {
     if (cur) {
       const incoming = req.body.telegram;
       const merged = {
-        bot_token: typeof incoming.bot_token === 'string' ? incoming.bot_token : cur.bot_token,
-        chat_id:   typeof incoming.chat_id   === 'string' ? incoming.chat_id   : cur.chat_id,
+        bot_token: (incoming.bot_token && incoming.bot_token !== DUMMY_TELEGRAM_TOKEN) ? incoming.bot_token : cur.bot_token,
+        chat_id:   (incoming.chat_id && incoming.chat_id !== DUMMY_TELEGRAM_CHAT_ID) ? incoming.chat_id : cur.chat_id,
         enabled:   incoming.enabled === true || incoming.enabled === 1 || incoming.enabled === 'true'
       };
       await db.prepare('UPDATE config SET telegram = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
@@ -197,7 +205,7 @@ router.put('/', async (req, res) => {
     if (cur) {
       const incoming = req.body.pushbullet;
       const merged = {
-        access_token: typeof incoming.access_token === 'string' ? incoming.access_token : cur.access_token,
+        access_token: (incoming.access_token && incoming.access_token !== DUMMY_PUSHBULLET_TOKEN) ? incoming.access_token : cur.access_token,
         enabled:      incoming.enabled === true || incoming.enabled === 1 || incoming.enabled === 'true'
       };
       await db.prepare('UPDATE config SET pushbullet = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
