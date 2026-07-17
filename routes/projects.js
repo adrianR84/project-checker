@@ -226,18 +226,12 @@ router.put('/:id', async (req, res) => {
       : null;
     delete updates.twitter_url;
     delete updates.twitter_posts_check;
-    // twitter_enabled (master flag) lives on the flat column, not in the JSON — strip if present
-    delete updates.twitter_enabled;
   } else if ('twitter_posts_check' in updates) {
     // only pc changing — patch in place to preserve url
     const tw = existing?.twitter ? JSON.parse(existing.twitter) : {};
     tw.pc = updates.twitter_posts_check ? 1 : 0;
     updates.twitter = JSON.stringify(tw);
     delete updates.twitter_posts_check;
-    delete updates.twitter_enabled;
-  } else if ('twitter_enabled' in updates) {
-    // twitter_url not being updated — strip the stale flat flag, it lives in twitter.pc now
-    delete updates.twitter_enabled;
   }
   if ('telegram_url' in updates) {
     updates.telegram = updates.telegram_url ? JSON.stringify({ url: updates.telegram_url }) : null;

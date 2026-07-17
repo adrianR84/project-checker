@@ -1947,12 +1947,28 @@
           <div class="toolbar">
             <h2>Projects</h2>
             <input v-model="projFilter" type="search" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 160px; padding: 2px 12px 2px 40px; height: 40px" />
-            <button v-if="selected.length" class="secondary" @click="onBulkEnable">Enable ({{ selected.length }})</button>
-            <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
-            <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
-            <button @click="exportProjects">Export</button>
-            <button @click="openModal('import')">Import</button>
-            <button class="primary" @click="openCreate">Add</button>
+            <template v-if="selected.length">
+              <span class="mr10">{{ selected.length }} sel:</span>
+
+              <span class="icon icon-twitter mr5"></span>
+              <button class="secondary" data-tooltip="Enable Twitter for all selected" @click="onBulkTwitterEnable">✓</button>
+              <button class="secondary" data-tooltip="Disable Twitter for all selected" @click="onBulkTwitterDisable">✗</button>
+              <span class="mr10"></span>
+
+              <span class="icon icon-website mr5"></span>
+              <button class="secondary" data-tooltip="Enable Website for all selected" @click="onBulkWebsiteEnable">✓</button>
+              <button class="secondary" data-tooltip="Disable Website for all selected" @click="onBulkWebsiteDisable">✗</button>
+              <span class="mr10"></span>
+
+
+              <button class="secondary" data-tooltip="Enable all selected" @click="onBulkEnable">✓</button>
+              <button class="secondary" data-tooltip="Disable all selected" @click="onBulkDisable">✗</button>
+
+              <button class="secondary mr10 ml10" data-tooltip="Delete all selected" @click="onBulkDelete">🗑</button>
+            </template>
+            <button data-tooltip="Export all projects as JSON" @click="exportProjects">Export</button>
+            <button data-tooltip="Import projects from JSON" @click="openModal('import')">Import</button>
+            <button class="primary ml5" data-tooltip="Add a new project" @click="openCreate">Add</button>
           </div>
 
           <div v-if="error" class="[role="alert"]">{{ error }}</div>
@@ -2221,6 +2237,42 @@
           await load();
         }
 
+        /** Enable Twitter for all selected projects */
+        async function onBulkTwitterEnable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { twitter_enabled: 1 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Disable Twitter for all selected projects */
+        async function onBulkTwitterDisable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { twitter_enabled: 0 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Enable Website for all selected projects */
+        async function onBulkWebsiteEnable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { website_enabled: 1 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Disable Website for all selected projects */
+        async function onBulkWebsiteDisable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { website_enabled: 0 })));
+          selected.value = [];
+          await load();
+        }
+
         /** Delete all selected projects after confirmation */
         async function onBulkDelete() {
           if (!selected.value.length) return;
@@ -2378,7 +2430,7 @@
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok, projectIconLink, trimName,
-          toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkDelete,
+          toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkDelete,
           api: window.api,
         };
       },
