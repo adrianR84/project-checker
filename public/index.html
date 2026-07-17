@@ -1960,8 +1960,12 @@
               <button class="secondary" data-tooltip="Disable Website for all selected" @click="onBulkWebsiteDisable">✗</button>
               <span class="mr10"></span>
 
+              <span class="icon icon-github mr5"></span>
+              <button class="secondary" data-tooltip="Enable GitHub for all selected" @click="onBulkGithubEnable">✓</button>
+              <button class="secondary" data-tooltip="Disable GitHub for all selected" @click="onBulkGithubDisable">✗</button>
+              <span class="mr10"></span>
 
-              <button class="secondary" data-tooltip="Enable all selected" @click="onBulkEnable">✓</button>
+              <button class="secondary ml5" data-tooltip="Enable all selected" @click="onBulkEnable">✓</button>
               <button class="secondary" data-tooltip="Disable all selected" @click="onBulkDisable">✗</button>
 
               <button class="secondary mr10 ml10" data-tooltip="Delete all selected" @click="onBulkDelete">🗑</button>
@@ -2273,6 +2277,24 @@
           await load();
         }
 
+        /** Enable GitHub for all selected projects */
+        async function onBulkGithubEnable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { github_enabled: 1 })));
+          selected.value = [];
+          await load();
+        }
+
+        /** Disable GitHub for all selected projects */
+        async function onBulkGithubDisable() {
+          if (!selected.value.length) return;
+          error.value = '';
+          await Promise.all(selected.value.map(id => api.updateProject(id, { github_enabled: 0 })));
+          selected.value = [];
+          await load();
+        }
+
         /** Delete all selected projects after confirmation */
         async function onBulkDelete() {
           if (!selected.value.length) return;
@@ -2430,7 +2452,7 @@
           openCreate, openEdit, openManageRepos, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok, projectIconLink, trimName,
-          toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkDelete,
+          toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkGithubEnable, onBulkGithubDisable, onBulkDelete,
           api: window.api,
         };
       },
