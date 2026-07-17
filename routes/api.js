@@ -37,16 +37,21 @@ router.post('/projects/import', requireApiToken, async (req, res) => {
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const { name, website, github, twitter, telegram, symbol, contractAddress, chainId } = item || {};
-    if (!name) { errors.push({ index: i, error: 'name is required' }); continue; }
+    const tr = v => typeof v === 'string' ? v.trim() : v;
+    const empty = v => !v || !tr(v);
+    const val = v => tr(v) || null;
+
+    if (empty(name)) { errors.push({ index: i, error: 'name is required' }); continue; }
+    if (empty(symbol)) { errors.push({ index: i, error: 'symbol is required' }); continue; }
+    if (empty(contractAddress)) { errors.push({ index: i, error: 'contractAddress is required' }); continue; }
+    if (empty(chainId)) { errors.push({ index: i, error: 'chainId is required' }); continue; }
 
     const ts = new Date().toISOString();
-    const websiteJson  = website    ? JSON.stringify({ url: website, cc: 1 }) : null;
-    const githubJson  = github     ? JSON.stringify({ url: github }) : null;
-    const twitterJson = twitter    ? JSON.stringify({ url: twitter, pc: 1 }) : null;
-    const telegramJson = telegram   ? JSON.stringify({ url: telegram }) : null;
-    const tokenJson = (symbol || contractAddress || chainId)
-      ? JSON.stringify({ symbol: symbol || '', contract: contractAddress || '', chain: chainId || 'solana' })
-      : null;
+    const websiteJson  = !empty(website)  ? JSON.stringify({ url: tr(website), cc: 1 }) : null;
+    const githubJson   = !empty(github)   ? JSON.stringify({ url: tr(github) }) : null;
+    const twitterJson  = !empty(twitter) ? JSON.stringify({ url: tr(twitter), pc: 1 }) : null;
+    const telegramJson = !empty(telegram) ? JSON.stringify({ url: tr(telegram) }) : null;
+    const tokenJson = JSON.stringify({ symbol: tr(symbol), contract: tr(contractAddress), chain: tr(chainId) });
 
     const existing = await db.prepare(
       'SELECT id FROM projects WHERE name = ? AND user_id = ?'
