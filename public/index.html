@@ -1950,9 +1950,9 @@
             <button v-if="selected.length" class="secondary" @click="onBulkEnable">Enable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDisable">Disable ({{ selected.length }})</button>
             <button v-if="selected.length" class="secondary" @click="onBulkDelete">Delete ({{ selected.length }})</button>
-            <button @click="exportProjects">Export JSON</button>
-            <button @click="openModal('import')">Import JSON</button>
-            <button class="primary" @click="openCreate">+ Add Project</button>
+            <button @click="exportProjects">Export</button>
+            <button @click="openModal('import')">Import</button>
+            <button class="primary" @click="openCreate">Add</button>
           </div>
 
           <div v-if="error" class="[role="alert"]">{{ error }}</div>
@@ -1965,7 +1965,7 @@
             No projects yet. Click <strong>+ Add Project</strong> to start.
           </div>
 
-          <div style="overflow-x: scroll;" v-else>
+          <div style="overflow-x: auto;" v-else>
             <table class="compact">
               <thead>
                 <tr>
