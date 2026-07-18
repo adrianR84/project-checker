@@ -2001,16 +2001,16 @@
             <table class="compact sticky" style="overflow-x: auto;">
               <thead>
                 <tr>
-                  <th style="width:2.5em"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
-                  <th class="project_cell" data-tooltip="Project name">Name</th>
-                  <th class="resource_cell" data-tooltip="Website URL">Website</th>
-                  <th class="action_cell" data-tooltip="Website enabled">WE</th>
-                  <th class="resource_cell" data-tooltip="GitHub organization URL">GitHub</th>
-                  <th class="action_cell" data-tooltip="GitHub enabled">GE</th>
-                  <th class="resource_cell" data-tooltip="Twitter handle or URL">Twitter</th>
-                  <th class="action_cell" data-tooltip="Twitter enabled">TE</th>
-                  <th class="type_cell" data-tooltip="Token info">Token</th>
-                  <th class="action_cell" data-tooltip="Token enabled">TE</th>
+                  <th style="width:2.5em" data-placement="bottom"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
+                  <th class="project_cell" data-tooltip="Project name" data-placement="bottom">Name</th>
+                  <th class="resource_cell" data-tooltip="Website URL" data-placement="bottom">Website</th>
+                  <th class="action_cell" data-tooltip="Website enabled" data-placement="bottom">WE</th>
+                  <th class="resource_cell" data-tooltip="GitHub organization URL" data-placement="bottom">GitHub</th>
+                  <th class="action_cell" data-tooltip="GitHub enabled" data-placement="bottom">GE</th>
+                  <th class="resource_cell" data-tooltip="Twitter handle or URL" data-placement="bottom">Twitter</th>
+                  <th class="action_cell" data-tooltip="Twitter enabled" data-placement="bottom">TE</th>
+                  <th class="type_cell" data-tooltip="Token info" data-placement="bottom">Token</th>
+                  <th class="action_cell" data-tooltip="Token enabled" data-placement="bottom">TE</th>
                   <th class="col-actions" class="text-right">Actions</th>
                 </tr>
               </thead>
