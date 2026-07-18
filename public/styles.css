@@ -100,7 +100,6 @@ table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; 
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
 
-
 table.compact.sticky thead th { position: sticky; top: 0; background: var(--app-surface); overflow: visible; }
 table.compact.sticky thead { position: sticky; top: 0; z-index: 3; background: var(--app-surface); }
 table.compact.sticky tbody tr > td:nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--app-surface); }
@@ -192,7 +191,7 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 
 .toolbar {
   display: flex;
-  gap: 0px;
+  gap: 10px 0;
   align-items: center;
   margin-bottom: 22px;
   flex-wrap: wrap;
