@@ -1997,8 +1997,8 @@
             No projects yet. Click <strong>+ Add Project</strong> to start.
           </div>
 
-          <div style="overflow-x: auto;" v-else>
-            <table class="compact">
+          <div style="max-height: 80vh; overflow-y: auto;" v-else>
+            <table class="compact sticky" style="overflow-x: auto;">
               <thead>
                 <tr>
                   <th style="width:2.5em"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>

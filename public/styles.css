@@ -97,6 +97,17 @@ table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bott
 table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
+
+
+table.compact.sticky thead th { position: sticky; top: 0; background: var(--app-surface); overflow: visible; }
+table.compact.sticky thead { position: sticky; top: 0; z-index: 3; background: var(--app-surface); }
+table.compact.sticky tbody tr > td:nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--app-surface); }
+table.compact.sticky thead tr > th:nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--app-surface); }
+table.compact.sticky tbody tr > td:nth-child(2) { position: sticky; left: 2.5em; z-index: 2; background: var(--app-surface); }
+table.compact.sticky thead tr > th:nth-child(2) { position: sticky; left: 2.5em; z-index: 2; background: var(--app-surface); }
+table.compact.sticky tbody tr > td:last-child { position: sticky; right: 0; z-index: 2; background: var(--app-surface); }
+table.compact.sticky thead tr > th:last-child { position: sticky; right: 0; z-index: 2; background: var(--app-surface); }
+
 table.compact .text-center{text-align: center;}
 table.compact .text-right{text-align: right;}
 
