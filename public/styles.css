@@ -92,6 +92,8 @@ tr.disabled td:last-child {
   pointer-events: auto;
 }
 table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
+table.compact.sticky tbody tr:hover > td:nth-child(1),
+table.compact.sticky tbody tr:hover > td:nth-child(2) { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
 table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bottom:0px; }
 table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
@@ -105,8 +107,6 @@ table.compact.sticky tbody tr > td:nth-child(1) { position: sticky; left: 0; z-i
 table.compact.sticky thead tr > th:nth-child(1) { position: sticky; left: 0; z-index: 2; background: var(--app-surface); }
 table.compact.sticky tbody tr > td:nth-child(2) { position: sticky; left: 2.5em; z-index: 2; background: var(--app-surface); }
 table.compact.sticky thead tr > th:nth-child(2) { position: sticky; left: 2.5em; z-index: 2; background: var(--app-surface); }
-table.compact.sticky tbody tr > td:last-child { position: sticky; right: 0; z-index: 2; background: var(--app-surface); }
-table.compact.sticky thead tr > th:last-child { position: sticky; right: 0; z-index: 2; background: var(--app-surface); }
 
 table.compact .text-center{text-align: center;}
 table.compact .text-right{text-align: right;}

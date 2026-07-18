@@ -535,7 +535,7 @@
                 <th class="time_cell" data-tooltip="Time of the event">When</th>
                 <th class="details_cell hide-sm" data-tooltip="Additional event details">Details</th>
                 <th style="width:40px;overflow:visible" data-tooltip="Confirm all unconfirmed events at once" data-placement="left">
-                  <button style="font-size:0.8em;padding:2px;" @click.ctrl="confirmAllCtrl" @click="confirmAll">CA</button>
+                  <button style="font-size:0.8em;padding:2px;" @click="confirmAll">CA</button>
                 </th>
               </tr>
             </thead>
@@ -605,8 +605,8 @@
             alert('Failed: ' + e.message);
           }
         },
-        async confirmAll() {
-          if (!confirm('Do you want to set all events as Confirmed ?')) return;
+        async confirmAll(e) {
+          if (!e.ctrlKey && !confirm('Do you want to set all events as Confirmed ?')) return;
           try {
             await api.confirmAllStatusChanges();
             showToast('All confirmed', 'ok');
