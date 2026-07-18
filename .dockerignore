@@ -1,0 +1,6 @@
+node_modules
+.git
+*.log
+logs
+.env
+data/*.db
