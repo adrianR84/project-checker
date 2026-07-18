@@ -9,4 +9,4 @@ node_modules/
 .idea/
 .devlogger/
 data/
-logs/
+logs/project-checker.db-shm
