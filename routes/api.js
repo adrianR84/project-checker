@@ -84,4 +84,28 @@ router.post('/projects/import', requireApiToken, async (req, res) => {
   res.status(results.length ? 201 : 400).json({ created: results, errors });
 });
 
+// DELETE /api/v1/projects/remove — delete project by matching fields (same keys as import)
+router.delete('/projects/remove', requireApiToken, async (req, res) => {
+  const { name, website, github, twitter, telegram, symbol, contractAddress, chainId } = req.body || {};
+  const tr = v => typeof v === 'string' ? v.trim() : v;
+  const empty = v => !v || !tr(v);
+
+  if (empty(symbol)) return res.status(400).json({ error: 'symbol is required' });
+  if (empty(contractAddress)) return res.status(400).json({ error: 'contractAddress is required' });
+  if (empty(chainId)) return res.status(400).json({ error: 'chainId is required' });
+
+  const conditions = ['user_id = ?'];
+  const params = [req.userId];
+  if (!empty(symbol))
+    { conditions.push('token = ?'); params.push(JSON.stringify({ symbol: tr(symbol), contract: tr(contractAddress), chain: tr(chainId) })); }
+
+  const existing = await db.prepare(
+    `SELECT id FROM projects WHERE ${conditions.join(' AND ')}`
+  ).get(...params);
+  if (!existing) return res.status(404).json({ error: 'Project not found' });
+
+  await db.prepare('DELETE FROM projects WHERE id = ?').run(existing.id);
+  res.json({ ok: true, deleted: existing.id });
+});
+
 module.exports = router;
