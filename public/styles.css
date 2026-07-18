@@ -150,9 +150,9 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 .mr15 {margin-right: 15px;}
 
 
-.page { max-width: 1200px; padding: 28px 0px; overflow-x: visible; margin:0 auto; }
+.page { max-width: 1200px; padding: 28px 0px; overflow-x: hidden; margin:0 auto; }
 
-.logs-section { margin-top: 1rem; overflow-x: auto; }
+.logs-section { margin-top: 1rem; overflow-x: visible; }
 
 .page-nav-arrows {
   position: fixed;
