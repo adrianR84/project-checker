@@ -21,11 +21,21 @@ if (process.env.SKIP_AUTH === '1') {
 }
 app.use(express.json({ limit: '1mb' }));
 
+// Routes — imported after db init so they can use the proxy
+const projectsRouter = require('./routes/projects');
+const checkLogsRouter = require('./routes/checkLogs');
+const settingsRouter = require('./routes/settings');
+const dashboardRouter = require('./routes/dashboard');
+const apiRouter = require('./routes/api');
+
+app.use('/api/v1', apiRouter);   // public bearer-token API — handles its own auth (mounted before session middleware)
+
 // Session middleware — extracts userId from cookie and attaches to req
-// All /api/* routes (except /api/auth/*) require authentication
+// All /api/* routes (except /api/auth/* and /api/v1/*) require authentication
 const { fromNodeHeaders } = require('better-auth/node');
 app.use('/api', async (req, res, next) => {
   if (req.path.startsWith('/auth')) return next(); // better-auth handles its own routes
+  if (req.path.startsWith('/v1')) return next();  // /api/v1/* has its own auth
   // ponytail: dev bypass — use DEFAULT_USER_ID env var or fall back to first user in DB
   if (process.env.SKIP_AUTH === '1') {
     req.userId = process.env.DEFAULT_USER_ID || '';
@@ -43,14 +53,6 @@ app.use('/api', async (req, res, next) => {
   next();
 });
 
-// Routes — imported after db init so they can use the proxy
-const projectsRouter = require('./routes/projects');
-const checkLogsRouter = require('./routes/checkLogs');
-const settingsRouter = require('./routes/settings');
-const dashboardRouter = require('./routes/dashboard');
-const apiRouter = require('./routes/api');
-
-app.use('/api/v1', apiRouter);   // public bearer-token API (before session middleware)
 app.use('/api/projects', projectsRouter);
 app.use('/api/check-logs', checkLogsRouter);
 app.use('/api/settings', settingsRouter);
