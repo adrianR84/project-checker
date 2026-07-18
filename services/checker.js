@@ -142,14 +142,25 @@ async function checkWebsite(url, projectId, contentCheck = true) {
   let lastHash = null;
   let lastHttpStatus = null;
   if (contentCheck && projectId) {
-    // Skip 'changed' transition rows — find the last real steady-state status
-    const row = await db.prepare(
-      "SELECT details, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'website' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
+    // lastHash: most recent row's content_hash; COALESCE handles the case where the
+    // most recent row is 'changed' (transitional) — we still want its hash as baseline
+    // so we don't re-fire the same event on the next check. Fallback to previous row
+    // only if the most recent row has null details (e.g. error state with no hash).
+    const hashRow = await db.prepare(
+      "SELECT details FROM check_logs WHERE project_id = ? AND resource_type = 'website' ORDER BY checked_at DESC LIMIT 1"
     ).get(projectId);
-    if (row?.details) {
-      try { lastHash = JSON.parse(row.details).content_hash || null; } catch (_) {}
+    const prevHashRow = hashRow?.details == null ? await db.prepare(
+      "SELECT details FROM check_logs WHERE project_id = ? AND resource_type = 'website' AND details IS NOT NULL ORDER BY checked_at DESC LIMIT 1"
+    ).get(projectId) : null;
+    const targetHashRow = hashRow?.details != null ? hashRow : prevHashRow;
+    if (targetHashRow?.details) {
+      try { lastHash = JSON.parse(targetHashRow.details).content_hash || null; } catch (_) {}
     }
-    lastHttpStatus = row?.http_status ?? null;
+    // lastHttpStatus: most recent steady-state row (skip transitional 'changed' rows)
+    const statusRow = await db.prepare(
+      "SELECT http_status FROM check_logs WHERE project_id = ? AND resource_type = 'website' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
+    ).get(projectId);
+    lastHttpStatus = statusRow?.http_status ?? null;
   }
 
   try {
@@ -347,12 +358,16 @@ async function checkTwitter(url, projectId, opts = {}) {
   let lastStatus = null;
   let lastHttpStatus = null;
   if (projectId) {
-    // Skip 'changed' transition rows — find the last real steady-state status
-    const row = await db.prepare(
-      "SELECT status, http_status FROM check_logs WHERE project_id = ? AND resource_type = 'twitter' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
+    // lastStatus: most recent steady-state row (skip transitional 'changed' rows)
+    const statusRow = await db.prepare(
+      "SELECT status FROM check_logs WHERE project_id = ? AND resource_type = 'twitter' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
     ).get(projectId);
-    lastStatus = row?.status || null;
-    lastHttpStatus = row?.http_status ?? null;
+    lastStatus = statusRow?.status || null;
+    // lastHttpStatus: most recent steady-state row (skip transitional 'changed' rows)
+    const httpRow = await db.prepare(
+      "SELECT http_status FROM check_logs WHERE project_id = ? AND resource_type = 'twitter' AND status != 'changed' ORDER BY checked_at DESC LIMIT 1"
+    ).get(projectId);
+    lastHttpStatus = httpRow?.http_status ?? null;
   }
 
   try {
