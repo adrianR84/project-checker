@@ -17,6 +17,10 @@ if (process.env.SKIP_AUTH === '1') {
     res.json({ user: { id: process.env.DEFAULT_USER_ID || '' } });
   });
 } else {
+
+  // Hide register endpoint — return 404 so it appears unavailable
+  app.post('/api/auth/sign-up/email', (req, res) => res.status(404).end());
+  
   app.all('/api/auth/*', toNodeHandler(auth));
 }
 app.use(express.json({ limit: '1mb' }));
