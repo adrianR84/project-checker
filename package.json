@@ -13,7 +13,8 @@
     "drop-tables": "node --disable-warning=ExperimentalWarning utils/drop-tables.js",
     "drop-tables:keep-data": "node --disable-warning=ExperimentalWarning utils/drop-tables.js --keep-data",
     "deploy-app": "bash ./utils/deploy.sh",
-    "see-me": "bash -c \"node utils/kill-ports.js && node --disable-warning=ExperimentalWarning index.js & see-me 3004\""
+    "dev:see-me": "node utils/kill-ports.js && bash -c \"node --watch --disable-warning=ExperimentalWarning index.js & until curl -s http://localhost:3004 > /dev/null 2>&1; do sleep 0.2; done && concurrently \\\"live-server --port=3005 --no-browser --proxy=/api:http://localhost:3004/api public\\\" \\\"bash /c/Users/adria/.local/bin/see-me 3004\\\"\"",
+    "see-me": "bash -c \"node utils/kill-ports.js && node --watch --disable-warning=ExperimentalWarning index.js & see-me 3004\""
   },
   "dependencies": {
     "better-auth": "^1.6.22",

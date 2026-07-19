@@ -14,9 +14,10 @@ Open [http://localhost:3004](http://localhost:3004).
 For live reload during development:
 
 ```bash
-pnpm dev      # starts Express + live-reload server
-pnpm dev:log  # same, but also saves output to logs/output.log
-pnpm dev | pnpm log:pipe  # same as pnpm dev:log
+pnpm dev         # Express + live-reload frontend (port 3005)
+pnpm dev:see-me  # dev + browser activity monitoring via `see-me 3004`
+pnpm dev:log     # dev, with output saved to logs/output.log
+pnpm see-me      # kill ports, start server, monitor browser at `see-me 3004`
 ```
 
 Maintenance utilities:
@@ -141,6 +142,7 @@ All settings are stored in the `config` table as JSON group columns:
 | `PORT` | `3004` | Server port |
 | `LIVE_RELOAD_PORT` | `3005` | Live-reload dev server port |
 | `SCHEDULER_DEBUG` | `0` | Set to `1` for verbose scheduler tick logging |
+| `SHOW_DB_OPTIONS` | `0` | Enable extra DB operations in settings UI |
 | `SKIP_AUTH` | — | Set to `1` to bypass authentication (dev mode only) |
 | `DEFAULT_USER_ID` | — | Fallback user ID when `SKIP_AUTH=1` or scheduler has no session |
 | `BETTER_AUTH_URL` | `http://localhost:3004` | OAuth callback origin — must match registered redirect URI |
@@ -233,12 +235,31 @@ Runs via `node-cron`. Cron expressions are recomputed from config on every setti
 
 | Job | Default interval | What it does |
 |-----|-----------------|--------------|
-| Website tick | `0 */6 * * *` (every 6 hrs, configurable) | GET each enabled website URL, detect content changes |
-| GitHub tick | `0 */6 * * *` (every 6 hrs, configurable) | Fetch org repos, detect deletions, check each active repo |
-| Twitter tick | Daily (configurable) | GET each Twitter URL, detect suspended-account via `defuddle` |
-| Token price tick | Every 60 s | Batch-fetch DexScreener, upsert `token_prices` |
-| Alert tick | Every 1 min | Fire Telegram/Pushbullet for unconfirmed events past their interval |
-| Log purge | Daily at midnight | Delete `check_logs` older than `log_retention_days`; prune `twitter_posts` to `twitter_posts_per_project` per project |
+| GitHub tick | Every 60 min | Fetch org repos, detect deletions, check each active repo |
+| Website tick | Every 20 min | GET each enabled website URL, detect content changes |
+| Twitter tick | Every 10 min | GET each Twitter URL, detect new posts, suspended-account via `defuddle` |
+| Alert tick | Every 1 min | Fire Telegram/Pushbullet for unconfirmed events past their interval; auto-confirm after stop threshold |
+| Price tick | Every 60 s | Batch-fetch DexScreener prices, upsert `token_prices` |
+| Price alert tick | Every 1 min | Evaluate price pump/dump vs user thresholds, fire alerts |
+| Log purge | Daily at midnight | Delete `check_logs` older than `log_retention_days`; prune `twitter_posts` to `twitter_posts_per_project` |
+
+## Browser Activity Logging (see-me)
+
+Dev tool for capturing browser console errors and auto-crawling the app:
+
+```bash
+# See all browser activity
+see-me logs
+
+# Find recent errors
+grep "ERROR" .devlogger/browser.log | tail -5
+
+# Search specific issues
+grep -i "cannot read property" .devlogger/browser.log
+
+# Live monitoring
+tail -f .devlogger/browser.log
+```
 
 ## License
 
