@@ -1458,7 +1458,7 @@
                   <th class="cen" title="Website">
                     <span class="icon icon-website"></span>
                   </th>
-                  <th class="cen hide-sm" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
+                  <th class="cen hide-sm" style="width:150px;" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
                   <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
