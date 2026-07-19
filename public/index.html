@@ -1918,6 +1918,7 @@
 
           <div class="toolbar">
             <h2>Projects</h2>
+            <button class="secondary" data-tooltip="Reload projects" @click="load">↻</button>
             <input v-model="projFilter" type="search" placeholder="Filter…" aria-label="Filter projects" style="margin: 10px 10px 0 0; width: 160px; padding: 2px 12px 2px 40px; height: 40px" />
             <template v-if="selected.length">
               <span class="mr10">{{ selected.length }} sel:</span>
@@ -2425,6 +2426,7 @@
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok, projectIconLink, trimName,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkGithubEnable, onBulkGithubDisable, onBulkDelete,
+          load,
           api: window.api,
         };
       },
