@@ -14,6 +14,23 @@ Before creating or styling HTML elements, check [Pico CSS docs via Context7](htt
 ## Logs
 Dev server output is captured in `logs/output.log`. When user asks to check/read logs, read that file.
 
+### Browser Activity (see-me)
+When debugging user issues, read the browser log file:
+
+```bash
+# See all browser activity
+see-me logs
+
+# Find recent errors
+grep "ERROR" .devlogger/browser.log | tail -5
+
+# Search specific issues
+grep -i "cannot read property" .devlogger/browser.log
+
+# Live monitoring
+tail -f .devlogger/browser.log
+```
+
 ## Planning
 When creating a plan, delegate both research AND writing to subagents (e.g., a `Plan` agent or parallel agents). Research relevant subsystems first, then write the plan itself — do not draft plans inline in the main conversation.
 
