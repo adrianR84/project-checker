@@ -148,6 +148,29 @@
       ['second', 1],
     ];
 
+    /** Format a past date as a compact non-relative string: "3mo", "2w", "5d". No "ago" suffix. */
+    function ageFormat(v) {
+      if (!v) return '—';
+      let ms;
+      const parsed = parseFloat(v);
+      if (!isNaN(parsed) && parsed > 1e12) {
+        ms = parsed;
+      } else if (!isNaN(parsed) && parsed > 1e9) {
+        ms = parsed * 1000;
+      } else {
+        ms = new Date(v).getTime();
+      }
+      if (isNaN(ms)) return '—';
+      const diff = (Date.now() - ms) / 1000;
+      if (diff >= 31536e3) return Math.round(diff / 31536e3) + 'y';
+      if (diff >= 2592e3) return Math.round(diff / 2592e3) + 'mo';
+      if (diff >= 604800) return Math.round(diff / 604800) + 'w';
+      if (diff >= 86400) return Math.round(diff / 86400) + 'd';
+      if (diff >= 3600) return Math.round(diff / 3600) + 'h';
+      if (diff >= 60) return Math.round(diff / 60) + 'm';
+      return '<1m';
+    }
+
     function relativeTime(v) {
       if (!v) return 'never';
       let ms;
@@ -1458,7 +1481,7 @@
                   <th class="cen" title="Website">
                     <span class="icon icon-website"></span>
                   </th>
-                  <th class="cen hide-sm" style="width:150px;" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
+                  <th class="cen hide-sm" style="width:70px;" :class="['sortable', priceSort.col === 'pair_created_at' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('pair_created_at')">Age</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_usd')">Price</th>
                   <th class="cen hide-sm" :class="['sortable', priceSort.col === 'price_change_h1' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h1')">1h</th>
                   <th class="cen" :class="['sortable', priceSort.col === 'price_change_h6' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('price_change_h6')">6h</th>
@@ -1503,7 +1526,7 @@
                     </a>
                     <span v-else>—</span>
                   </td>
-                  <td class="cen hide-sm">{{ row.pair_created_at ? relativeTime(row.pair_created_at) : '—' }}</td>
+                  <td class="cen hide-sm">{{ ageFormat(row.pair_created_at) }}</td>
                   <td class="cen">
                     <a v-if="row.price_usd" :href="'https://dexscreener.com/' + row.chain + '/' + row.contract"
                         target="_blank" rel="noopener"
@@ -1901,7 +1924,7 @@
           filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
-          api: window.api, relativeTime, fmtShortNum, fmtPct, copyContract, openIframe,
+          api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
           scrollToTop, scrollToLogs,
         };
       },
