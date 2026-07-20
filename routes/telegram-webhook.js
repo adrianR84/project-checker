@@ -4,25 +4,38 @@ const db = require('../services/db');
 
 module.exports = async function telegramWebhook(req, res) {
   const tgCfg = await db.config.getTelegram();
-  if (!tgCfg?.enabled || !tgCfg?.bot_token) return res.status(200).end();
 
+  // ponytail: extract callback_query once and ALWAYS ack — otherwise Telegram shows a perpetual spinner
   const update = req.body;
-  if (!update?.callback_query) return res.status(200).end();
+  const cb = update?.callback_query;
+  if (!cb) return res.status(200).end();
 
-  const { callback_query } = update;
-  const chatId = callback_query.message?.chat?.id;
-  if (String(chatId) !== String(tgCfg.chat_id)) return res.status(200).end();
+  // ponytail: helper that answers the callback with a toast (or silently if no bot token)
+  async function ack(text) {
+    if (!tgCfg?.bot_token || !cb.id) return;
+    await fetch(`https://api.telegram.org/bot${tgCfg.bot_token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: cb.id, text, show_alert: false })
+    });
+  }
 
-  if (callback_query.data?.startsWith('confirm:')) {
-    const [, id] = callback_query.data.split(':');
-    if (id) {
+  if (!tgCfg?.enabled || !tgCfg?.bot_token) { await ack('Bot disabled'); return res.status(200).end(); }
+
+  const chatId = cb.message?.chat?.id;
+  if (String(chatId) !== String(tgCfg.chat_id)) { await ack('Unauthorized chat'); return res.status(200).end(); }
+
+  if (cb.data?.startsWith('confirm:')) {
+    const [, id] = cb.data.split(':');
+    if (!id) { await ack('Missing id'); return res.status(200).end(); }
+    try {
       await db.prepare('UPDATE event_logs SET confirmed=1 WHERE id=?').run(id);
-      await fetch(`https://api.telegram.org/bot${tgCfg.bot_token}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callback_query_id: callback_query.id })
-      });
+      await ack('✅ Confirmed');
+    } catch (err) {
+      await ack(`❌ Failed: ${err.message}`);
     }
+  } else {
+    await ack('Unknown action');
   }
 
   res.status(200).json({ ok: true });
