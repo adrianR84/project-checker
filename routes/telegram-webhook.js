@@ -3,7 +3,7 @@
 const db = require('../services/db');
 
 module.exports = async function telegramWebhook(req, res) {
-  const tgCfg = db.config.getTelegram();
+  const tgCfg = await db.config.getTelegram();
   if (!tgCfg?.enabled || !tgCfg?.bot_token) return res.status(200).end();
 
   const update = req.body;
