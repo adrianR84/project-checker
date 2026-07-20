@@ -25,6 +25,10 @@ if (process.env.SKIP_AUTH === '1') {
 }
 app.use(express.json({ limit: '1mb' }));
 
+// Telegram webhook — no session cookie, must be registered before session middleware
+const telegramWebhook = require('./routes/telegram-webhook');
+app.post('/telWHook2345721453', telegramWebhook);
+
 // Routes — imported after db init so they can use the proxy
 const projectsRouter = require('./routes/projects');
 const checkLogsRouter = require('./routes/checkLogs');

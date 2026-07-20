@@ -7,14 +7,14 @@ const now = () => new Date().toISOString();
 // ─── Telegram ─────────────────────────────────────────────────────────────────
 
 /** Sends a message via the Telegram Bot API. Returns {ok, error}. */
-async function sendTelegramMessage(botToken, chatId, text) {
+async function sendTelegramMessage(botToken, chatId, text, replyMarkup) {
   if (!botToken || !chatId) return { ok: false, error: 'missing bot_token or chat_id' };
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   try {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true })
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(replyMarkup && { reply_markup: replyMarkup }) })
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) {
@@ -156,7 +156,10 @@ async function sendAlert(event, projectName) {
   const html = await formatAlertHtml(event, projectName);
 
   if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id) {
-    const r = await sendTelegramMessage(tgCfg.bot_token, tgCfg.chat_id, html);
+    const replyMarkup = {
+      inline_keyboard: [[{ text: '✅ Confirm', callback_data: `confirm:${event.id}` }]]
+    };
+    const r = await sendTelegramMessage(tgCfg.bot_token, tgCfg.chat_id, html, replyMarkup);
     if (!r.ok) console.error(`[${now()}] Alert Telegram failed: ${r.error}`);
   }
   if (pbCfg?.enabled && pbCfg.access_token) {
