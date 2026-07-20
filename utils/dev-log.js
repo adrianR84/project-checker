@@ -10,7 +10,7 @@ fs.mkdirSync(logDir, { recursive: true });
 fs.writeFileSync(logFile, '');
 
 // Spawn concurrently
-const child = spawn('npx concurrently "node --watch index.js" "live-server --port=3001 --no-browser --proxy=/api:http://localhost:3000/api public"', {
+const child = spawn('npx concurrently "node --watch index.js" "live-server --port=3005 --no-browser --proxy=/api:http://localhost:3004/api public"', {
   cwd: path.join(__dirname, '..'),
   shell: true,
   stdio: ['ignore', 'pipe', 'pipe']

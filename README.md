@@ -16,7 +16,7 @@ For live reload during development:
 ```bash
 pnpm dev         # Express + live-reload frontend (port 3005)
 pnpm dev:see-me  # dev + browser activity monitoring via `see-me 3004`
-pnpm dev:log     # dev, with output saved to logs/output.log
+pnpm dev:log     # dev, with output saved to logs/output.log   same as "pnpm dev | pnpm log:pipe"
 pnpm see-me      # kill ports, start server, monitor browser at `see-me 3004`
 ```
 
