@@ -1458,7 +1458,7 @@
           </div>
 
           <!-- Prices tab: token price table -->
-          <div class="price-table-wrapper" v-else-if="activityTab === 'prices'" :class="pricesMaximized ? 'maximized' : ''">
+          <div class="price-table-wrapper" v-else-if="activityTab === 'prices'" :class="pricesMaximized ? 'maximized' : ''" @mouseenter="pausePricesRefresh" @mouseleave="resumePricesRefresh">
             <div v-if="pricesLoading" class="center-loader">
               <span class="spinner lg"></span>
             </div>
@@ -1649,6 +1649,20 @@
           } finally {
             pricesLoading.value = false;
           }
+        }
+
+        // ponytail: pause auto-refresh while cursor is over the table so sort/scroll aren't disrupted
+        function startPricesTimer() {
+          if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
+          pricesTimer = setInterval(loadPrices, pricesRefreshMs);
+        }
+        function pausePricesRefresh() {
+          if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
+        }
+        function resumePricesRefresh() {
+          if (activityTab.value !== 'prices') return;
+          if (pricesTimer) return;
+          startPricesTimer();
         }
 
         /** Load log entries for the current page */
@@ -1923,6 +1937,7 @@
           logSearch,
           filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
+          pausePricesRefresh, resumePricesRefresh,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
           scrollToTop, scrollToLogs,
