@@ -30,7 +30,18 @@ module.exports = async function telegramWebhook(req, res) {
     if (!id) { await ack('Missing id'); return res.status(200).end(); }
     try {
       await db.prepare('UPDATE event_logs SET confirmed=1 WHERE id=?').run(id);
-      await ack('✅ Confirmed');
+      await Promise.all([
+        ack('✅ Confirmed'),
+        fetch(`https://api.telegram.org/bot${tgCfg.bot_token}/editMessageReplyMarkup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cb.message.chat.id,
+            message_id: cb.message.message_id,
+            reply_markup: { inline_keyboard: [] }
+          })
+        })
+      ]);
     } catch (err) {
       await ack(`❌ Failed: ${err.message}`);
     }
