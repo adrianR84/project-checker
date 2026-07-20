@@ -15,11 +15,23 @@ function expandProjectUrls(row) {
   };
 }
 
-// GET /api/check-logs?project_id=X&resource_type=Y&search=TEXT&limit=N&offset=M
+// ponytail: sort whitelists — accept only known column aliases, never raw user input
+const CHECK_LOGS_SORT = { project_name: 'p.name', when: 'cl.checked_at' };
+const STATUS_CHANGES_SORT = { project_name: 'p.name', when: 'rsc.created_at' };
+const ALERT_LOGS_SORT = { project_name: 'p.name', when: 'al.created_at' };
+function orderClause(map, sort, dir) {
+  const col = map[sort] || map.when;
+  const d = dir === 'asc' ? 'ASC' : 'DESC';
+  return `ORDER BY ${col} ${d}, id DESC`;
+}
+
+// GET /api/check-logs?project_id=X&resource_type=Y&search=TEXT&sort=COL&dir=DIR&limit=N&offset=M
 router.get('/', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
   const search = req.query.search || null;
+  const sort = req.query.sort || 'when';
+  const dir = req.query.dir || 'desc';
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
@@ -48,7 +60,7 @@ router.get('/', async (req, res) => {
     LEFT JOIN projects p ON p.id = cl.project_id
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
     ${where}
-    ORDER BY cl.checked_at DESC, cl.id DESC
+    ${orderClause(CHECK_LOGS_SORT, sort, dir)}
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
@@ -61,6 +73,8 @@ router.get('/status-changes', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
   const search = req.query.search || null;
+  const sort = req.query.sort || 'when';
+  const dir = req.query.dir || 'desc';
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
@@ -87,7 +101,7 @@ router.get('/status-changes', async (req, res) => {
     FROM event_logs rsc
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
-    ORDER BY rsc.created_at DESC
+    ${orderClause(STATUS_CHANGES_SORT, sort, dir)}
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
@@ -120,6 +134,8 @@ router.get('/alerts', async (req, res) => {
   const projectId = req.query.project_id ? parseInt(req.query.project_id, 10) : null;
   const resourceType = req.query.resource_type || null;
   const search = req.query.search || null;
+  const sort = req.query.sort || 'when';
+  const dir = req.query.dir || 'desc';
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
   const offset = parseInt(req.query.offset, 10) || 0;
 
@@ -147,7 +163,7 @@ router.get('/alerts', async (req, res) => {
     LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
-    ORDER BY al.created_at DESC, al.id DESC
+    ${orderClause(ALERT_LOGS_SORT, sort, dir)}
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 

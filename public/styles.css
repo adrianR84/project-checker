@@ -95,7 +95,7 @@ table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%,
 table.compact.sticky tbody tr:hover > td:nth-child(1),
 table.compact.sticky tbody tr:hover > td:nth-child(2) { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
-table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bottom:0px; }
+table.compact { width: 100%; table-layout: fixed; font-size: 0.85rem; margin-bottom:0px; }
 table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
@@ -120,6 +120,8 @@ table.compact .action_cell   { min-width: 40px;  width: 40px;  }
 table.compact .details_cell   { min-width: 70px; }
 table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
+table.compact th.sortable { cursor: pointer; user-select: none; }
+table.compact th.sortable:hover { color: var(--app-primary); }
 
 /* ── Toast notification ─────────────────────────────────────────────────── */
 #toast {

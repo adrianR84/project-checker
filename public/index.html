@@ -450,8 +450,8 @@
        Emits: change-page
     ───────────────────────────────────────────────────────────────────────── */
     const CheckLogList = {
-      props: ['logs', 'showProject', 'page', 'total', 'limit'],
-      emits: ['changePage'],
+      props: ['logs', 'showProject', 'page', 'total', 'limit', 'sort', 'dir'],
+      emits: ['changePage', 'sort'],
 
       template: `
         <div>
@@ -460,10 +460,10 @@
           <table v-else class="compact">
             <thead>
               <tr>
-                <th class="project_cell" data-tooltip="Project name">Project</th>
+                <th class="project_cell sortable" :class="sort === 'project_name' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Project name" @click="$emit('sort', 'project_name')">Project</th>
                 <th class="resource_cell" data-tooltip="Resource type: website, GitHub, or Twitter">Type</th>
                 <th class="status_cell" data-tooltip="Check result status">Status</th>
-                <th class="time_cell" data-tooltip="Time of the check">When</th>
+                <th class="time_cell sortable" :class="sort === 'when' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Time of the check" @click="$emit('sort', 'when')">When</th>
                 <th class="details_cell" data-tooltip="Response details">Details</th>
               </tr>
             </thead>
@@ -542,8 +542,8 @@
        Emits: changePage, refresh
     ───────────────────────────────────────────────────────────────────────── */
     const StatusChangeList = {
-      props: ['logs', 'showProject', 'page', 'total', 'limit'],
-      emits: ['changePage', 'refresh'],
+      props: ['logs', 'showProject', 'page', 'total', 'limit', 'sort', 'dir'],
+      emits: ['changePage', 'refresh', 'sort'],
       inject: ['openIframe'],
 
       template: `
@@ -552,10 +552,10 @@
           <table v-else class="compact">
             <thead>
               <tr>
-                <th class="project_cell" data-tooltip="Project name">Project</th>
+                <th class="project_cell sortable" :class="sort === 'project_name' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Project name" @click="$emit('sort', 'project_name')">Project</th>
                 <th class="resource_cell" data-tooltip="Resource type: website, GitHub, or Twitter">Type</th>
                 <th class="type_cell" data-tooltip="Type of status change event">Event</th>
-                <th class="time_cell" data-tooltip="Time of the event">When</th>
+                <th class="time_cell sortable" :class="sort === 'when' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Time of the event" @click="$emit('sort', 'when')">When</th>
                 <th class="details_cell hide-sm" data-tooltip="Additional event details">Details</th>
                 <th style="width:40px;overflow:visible" data-tooltip="Confirm all unconfirmed events at once" data-placement="left">
                   <button style="font-size:0.8em;padding:2px;" @click="confirmAll">CA</button>
@@ -647,8 +647,8 @@
        Emits: change-page
     ───────────────────────────────────────────────────────────────────────── */
     const AlertLogsList = {
-      props: ['logs', 'page', 'total', 'limit'],
-      emits: ['changePage'],
+      props: ['logs', 'page', 'total', 'limit', 'sort', 'dir'],
+      emits: ['changePage', 'sort'],
       inject: ['openIframe'],
 
       template: `
@@ -657,10 +657,10 @@
           <table v-else class="compact">
             <thead>
               <tr>
-                <th class="project_cell alert" data-tooltip="Project name">Project</th>
+                <th class="project_cell alert sortable" :class="sort === 'project_name' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Project name" @click="$emit('sort', 'project_name')">Project</th>
                 <th class="type_cell" data-tooltip="Resource type">Resource</th>
                 <th class="type_cell" data-tooltip="Event type">Event</th>
-                <th class="time_cell" data-tooltip="Time the alert was recorded">When</th>
+                <th class="time_cell sortable" :class="sort === 'when' ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : ''" data-tooltip="Time the alert was recorded" @click="$emit('sort', 'when')">When</th>
                 <th class="details_cell" data-tooltip="Alert details">Details</th>
               </tr>
             </thead>
@@ -1411,7 +1411,7 @@
       template: `
         <div class="page">
 
-          <div class="toolbar">
+          <div class="toolbar" style="display:none">
             <h2>Activity</h2>
           </div>
 
@@ -1562,11 +1562,17 @@
             </div>
             <div>
               <CheckLogList v-if="logTab === 'check-logs'" :logs="logs" :show-project="true"
-                :page="logPage" :total="logTotal" :limit="logLimit" @change-page="loadLogs" />
+                :page="logPage" :total="logTotal" :limit="logLimit"
+                :sort="checkLogsSort.col" :dir="checkLogsSort.dir"
+                @change-page="loadLogs" @sort="c => sortLogCol('check-logs', c)" />
               <StatusChangeList v-else-if="logTab === 'status-changes'" :logs="statusChanges" :show-project="true"
-                :page="scPage" :total="scTotal" :limit="scLimit" @change-page="loadStatusChanges" @refresh="loadStatusChanges(scPage)" />
+                :page="scPage" :total="scTotal" :limit="scLimit"
+                :sort="eventLogsSort.col" :dir="eventLogsSort.dir"
+                @change-page="loadStatusChanges" @refresh="loadStatusChanges(scPage)" @sort="c => sortLogCol('status-changes', c)" />
               <AlertLogsList v-else :logs="alertLogs"
-                :page="alertPage" :total="alertTotal" :limit="alertLimit" @change-page="loadAlertLogs" />
+                :page="alertPage" :total="alertTotal" :limit="alertLimit"
+                :sort="alertLogsSort.col" :dir="alertLogsSort.dir"
+                @change-page="loadAlertLogs" @sort="c => sortLogCol('alert-logs', c)" />
             </div>
           </section>
 
@@ -1601,6 +1607,15 @@
         const alertLimit = ref(20);
         const logSearch  = ref('');
         let logSearchTimer = null;
+
+        // ponytail: per-tab sort state, persisted to localStorage so reloads keep the choice
+        function loadSort(tab) {
+          try { return JSON.parse(localStorage.getItem(`pc_log_sort_${tab}`)) || null; } catch { return null; }
+        }
+        const checkLogsSort  = ref(loadSort('check-logs')     || { col: 'when', dir: 'desc' });
+        const eventLogsSort  = ref(loadSort('status-changes')  || { col: 'when', dir: 'desc' });
+        const alertLogsSort  = ref(loadSort('alert-logs')      || { col: 'when', dir: 'desc' });
+        function saveSort(tab, s) { localStorage.setItem(`pc_log_sort_${tab}`, JSON.stringify(s)); }
 
         watch(activityTab, v => localStorage.setItem('pc_activity_tab', v));
         watch(logTab, v => localStorage.setItem('pc_log_tab', v));
@@ -1670,7 +1685,7 @@
           logPage.value = page;
           const offset = (page - 1) * logLimit.value;
           try {
-            const r = await api.getCheckLogs({ limit: logLimit.value, offset, search: logSearch.value });
+            const r = await api.getCheckLogs({ limit: logLimit.value, offset, search: logSearch.value, sort: checkLogsSort.value.col, dir: checkLogsSort.value.dir });
             logs.value = r.logs || [];
             logTotal.value = r.total || 0;
           } catch (e) {
@@ -1683,7 +1698,7 @@
           scPage.value = page;
           const offset = (page - 1) * scLimit.value;
           try {
-            const r = await api.getStatusChanges({ limit: scLimit.value, offset, search: logSearch.value });
+            const r = await api.getStatusChanges({ limit: scLimit.value, offset, search: logSearch.value, sort: eventLogsSort.value.col, dir: eventLogsSort.value.dir });
             statusChanges.value = r.logs || [];
             scTotal.value = r.total || 0;
           } catch (e) {
@@ -1696,12 +1711,27 @@
           alertPage.value = page;
           const offset = (page - 1) * alertLimit.value;
           try {
-            const r = await api.getAlertLogs({ limit: alertLimit.value, offset, search: logSearch.value });
+            const r = await api.getAlertLogs({ limit: alertLimit.value, offset, search: logSearch.value, sort: alertLogsSort.value.col, dir: alertLogsSort.value.dir });
             alertLogs.value = r.logs || [];
             alertTotal.value = r.total || 0;
           } catch (e) {
             console.error(e);
           }
+        }
+
+        // ponytail: sortLogCol — click handler for sortable headers on log tables; toggles direction, persists, reloads
+        function sortLogCol(tab, col) {
+          const state = tab === 'check-logs' ? checkLogsSort
+                       : tab === 'status-changes' ? eventLogsSort
+                       : alertLogsSort;
+          if (state.value.col === col) {
+            state.value.dir = state.value.dir === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.value.col = col;
+            state.value.dir = col === 'project_name' ? 'asc' : 'desc';
+          }
+          saveSort(tab, state.value);
+          logLoaders[tab]?.(1);
         }
 
         
@@ -1937,6 +1967,7 @@
           logSearch,
           filter, filteredProjects, filteredPrices, priceRowTint, priceCellTint,
           load, loadPrices, loadLogs, loadStatusChanges, loadAlertLogs, sortCol, priceSort,
+          checkLogsSort, eventLogsSort, alertLogsSort, sortLogCol,
           pausePricesRefresh, resumePricesRefresh,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
