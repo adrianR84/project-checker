@@ -1126,7 +1126,7 @@
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
-                <td><span :class="['badge', project.twitter_enabled ? 'success' : 'secondary']">{{ project.twitter_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', project.twitter_enabled ? 'ok' : 'error']">{{ project.twitter_enabled ? '✓' : '✗' }}</span></td>
                 <td><span :class="['badge', statusClass(twitter.status)]">{{ twitter.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(twitter.checked_at) }}</span></td>
                 <td><span class="muted">{{ twitterLastChanged ? relativeTime(twitterLastChanged) : '—' }}</span></td>
@@ -1154,7 +1154,7 @@
                     <span class="icon icon-website"></span>
                   </a>
                 </td>
-                <td><span :class="['badge', project.website_enabled ? 'success' : 'secondary']">{{ project.website_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', project.website_enabled ? 'ok' : 'error']">{{ project.website_enabled ? '✓' : '✗' }}</span></td>
                 <td><span :class="['badge', statusClass(website.status)]">{{ website.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(website.checked_at) }}</span></td>
                 <td><span class="muted">{{ websiteLastChanged ? relativeTime(websiteLastChanged) : '—' }}</span></td>
@@ -1182,7 +1182,7 @@
                     <span class="icon icon-github"></span>
                   </a>
                 </td>
-                <td><span :class="['badge', project.github_enabled ? 'success' : 'secondary']">{{ project.github_enabled ? '✓' : '✕' }}</span></td>
+                <td><span :class="['badge', project.github_enabled ? 'ok' : 'error']">{{ project.github_enabled ? '✓' : '✕' }}</span></td>
                 <td><span :class="['badge', statusClass(github.status)]">{{ github.status || 'pending' }}</span></td>
                 <td><span class="muted">{{ relativeTime(github.checked_at) }}</span></td>
                 <td><span class="muted">{{ githubLastChanged ? relativeTime(githubLastChanged) : '—' }}</span></td>
@@ -2049,13 +2049,13 @@
                   <td><input type="checkbox" :checked="selected.includes(p.id)" @change="toggleSelect(p.id)" /></td>
                   <td>{{ trimName(p.name) }}</td>
                   <td v-html="projectIconLink(p, 'website', p.website_url)"></td>
-                  <td :class="p.website_enabled ? 'muted' : 'alert'">{{ p.website_enabled ? '✓' : '✗' }}</td>
+                  <td><span :class="['badge', p.website_enabled ? 'ok' : 'error']">{{ p.website_enabled ? '✓' : '✗' }}</span></td>
                   <td v-html="projectIconLink(p, 'github', p.github_url)"></td>
-                  <td :class="p.github_enabled ? 'muted' : 'alert'">{{ p.github_enabled ? '✓' : '✗' }}</td>
+                  <td><span :class="['badge', p.github_enabled ? 'ok' : 'error']">{{ p.github_enabled ? '✓' : '✗' }}</span></td>
                   <td v-html="projectIconLink(p, 'twitter', p.twitter_url)"></td>
-                  <td :class="p.twitter_enabled ? 'muted' : 'alert'">{{ p.twitter_enabled ? '✓' : '✗' }}</td>
+                  <td><span :class="['badge', p.twitter_enabled ? 'ok' : 'error']">{{ p.twitter_enabled ? '✓' : '✗' }}</span></td>
                   <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
-                  <td :class="p.token_enabled ? 'muted' : 'alert'">{{ p.token_enabled ? '✓' : '✗' }}</td>
+                  <td><span :class="['badge', p.token_enabled ? 'ok' : 'error']">{{ p.token_enabled ? '✓' : '✗' }}</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
                     <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>

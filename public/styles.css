@@ -46,7 +46,7 @@ button, .btn {
   gap: 6px;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -118,6 +118,13 @@ table.compact .time_cell     { min-width: 120px; width: 150px; }
 table.compact .status_cell   { min-width: 70px;  width: 90px;  }
 table.compact .action_cell   { min-width: 40px;  width: 40px;  }
 table.compact .details_cell   { min-width: 70px; }
+
+/* ── Projects table: right border after each resource pair ── */
+table.compact tbody > tr > td:nth-child(4),   /* website enabled */
+table.compact tbody > tr > td:nth-child(6),   /* github enabled */
+table.compact tbody > tr > td:nth-child(8),   /* twitter enabled */
+table.compact tbody > tr > td:nth-child(10)   /* token enabled */
+  { border-right: 2px solid var(--app-border); }
 table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 table.compact th.sortable { cursor: pointer; user-select: none; }
