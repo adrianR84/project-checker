@@ -192,8 +192,13 @@ async function checkWebsite(url, projectId, contentCheck = true) {
       status = res.ok ? 'ok' : 'error';
     }
 
-    // Record HTTP status changes (e.g. 200 → 404 or 200 → 500) as events, skip if content-change already fired
-    if (lastHttpStatus !== null && lastHttpStatus !== res.status && projectId && !_contentChangedEvent) {
+    // Record HTTP status changes (e.g. 200 → 404 or 200 → 500) as events, skip if content-change already fired.
+    // Also record when lastHttpStatus is null (first check or prior error) and current result is non-ok — so
+    // a brand-new project that starts with a failure still gets an event logged.
+    const statusNonOk = !res.ok || status === 'error' || status === 'unavailable';
+    if (lastHttpStatus !== null
+      ? (lastHttpStatus !== res.status && projectId && !_contentChangedEvent)
+      : (statusNonOk && projectId && !_contentChangedEvent)) {
       const eventType = res.status === 404 ? 'deleted' : 'changed';
       recordStatusChange(projectId, 'website', eventType, { bhs: lastHttpStatus, ahs: res.status });
     }
