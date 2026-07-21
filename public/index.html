@@ -454,7 +454,7 @@
       emits: ['changePage', 'sort'],
 
       template: `
-        <div>
+        <div class="table-wrapper">
           <div v-if="!logs.length" class="muted">No check logs yet.</div>
 
           <table v-else class="compact">
@@ -547,7 +547,7 @@
       inject: ['openIframe'],
 
       template: `
-        <div>
+        <div class="table-wrapper">
           <div v-if="!logs.length" class="muted">No status changes yet.</div>
           <table v-else class="compact">
             <thead>
@@ -652,7 +652,7 @@
       inject: ['openIframe'],
 
       template: `
-        <div>
+        <div class="table-wrapper">
           <div v-if="!logs.length" class="muted">No alert logs yet.</div>
           <table v-else class="compact">
             <thead>

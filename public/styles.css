@@ -86,6 +86,8 @@ button, .btn {
 .form-row-group input { flex: 1; min-width: 100px; }
 
 /* ── tables ───────────────────────────────────────────────────── */
+
+.table-wrapper{overflow-x: auto;}
 tr.disabled td { opacity: 0.4; }
 tr.disabled td:last-child {
   opacity: 1;
