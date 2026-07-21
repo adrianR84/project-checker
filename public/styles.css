@@ -629,7 +629,6 @@ nav.navbar a[aria-current="page"] {
 
   .page { padding: 28px 5px; }
   .page-nav-arrows { display: none; }
-  .price-table .hide-sm { display: none; }
   .project-grid {  grid-template-columns: 1fr; }  
 
   .grid { grid-template-columns: repeat(2, 1fr); }
@@ -671,7 +670,7 @@ nav.navbar a[aria-current="page"] {
     white-space: nowrap;
   }
 
-  table.compact .hide-sm { display: none; }
+  .hide-sm { display: none; }
 
 
   /* Tabs: reduce padding, allow wrapping */
