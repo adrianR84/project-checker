@@ -36,8 +36,17 @@ function _saveCache() {
   }
 }
 
+function _saveCache() {
+  try {
+    fs.writeFileSync(POOL_PATH, JSON.stringify({ pool: _pool, fetchedAt: _lastFetchedAt }), 'utf8');
+  } catch (e) {
+    console.error(`[proxy-fetch] cache write failed: ${e.message}`);
+  }
+}
+
 // ponytail: load cache synchronously at module load — before any requests are made
 _loadCache();
+_saveCache(); // persist with fresh timestamp on every startup
 
 async function _getDownloadToken(apiKey) {
   const res = await fetch('https://proxy.webshare.io/api/v2/download_token/proxy_list/', {
