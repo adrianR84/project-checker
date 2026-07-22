@@ -35,6 +35,11 @@
 
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
+    // Shared modal state — accessible from any page component
+    const activeModal = ref(null);
+    function openModal(name) { activeModal.value = name; }
+    function closeModal()    { activeModal.value = null; }
+    function isActive(name)  { return activeModal.value === name; }
 
     /** Current authenticated user — null when logged out */
     const currentUser = ref(null);
@@ -2157,22 +2162,10 @@
         const submitting = ref(false);
 
         function useModal() {
-          const activeModal = ref(null);
-          const modalWidth = ref('');
-          const modalClosable = ref(true);
-          function openModal(name, w, closable = false) {
-            activeModal.value = name;
-            modalWidth.value = w || '';
-            modalClosable.value = closable;
-          }
-          function closeModal()    { activeModal.value = null; }
-          function isActive(name)  { return activeModal.value === name; }
-          return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
+          // ponytail: reuse module-level shared state
+          return { activeModal, modalWidth: ref(''), modalClosable: ref(true), openModal, closeModal, isActive };
         }
         const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
-        provide('openModal', openModal);
-        provide('closeModal', closeModal);
-        provide('isActive', isActive);
         function onEscClose() { closeModal(); }
         onMounted(() => document.addEventListener('modal:close', onEscClose));
         onUnmounted(() => document.removeEventListener('modal:close', onEscClose));
