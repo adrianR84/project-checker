@@ -104,7 +104,8 @@ async function init() {
       alert_stops TEXT NOT NULL DEFAULT '{"github":1440,"website":1440,"twitter":1440}',
       telegram TEXT NOT NULL DEFAULT '{"bot_token":"","chat_id":"","enabled":false}',
       pushbullet TEXT NOT NULL DEFAULT '{"access_token":"","enabled":false}',
-      price_alerts TEXT NOT NULL DEFAULT '{"alerts":[{"price_for":"6h","price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}'
+      price_alerts TEXT NOT NULL DEFAULT '{"alerts":[{"price_for":"6h","price_change":10,"price_interval":5,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":25,"price_interval":15,"enabled":1,"telegram":1,"pushbullet":1,"log":1},{"price_for":"6h","price_change":50,"price_interval":60,"enabled":1,"telegram":1,"pushbullet":1,"log":1}]}',
+      webshare TEXT NOT NULL DEFAULT '{"enabled":false,"token":null,"country":""}'
     );
   `);
 
@@ -284,6 +285,40 @@ const dbProxy = {
     async getPriceAlerts(userId = process.env.DEFAULT_USER_ID || '') {
       const row = await dbProxy.prepare('SELECT price_alerts FROM config WHERE user_id = ?').get(userId);
       return row ? JSON.parse(row.price_alerts) : null;
+    },
+    async getWebshare(userId = process.env.DEFAULT_USER_ID || '') {
+      const row = await dbProxy.prepare('SELECT webshare FROM config WHERE user_id = ?').get(userId);
+      return row ? JSON.parse(row.webshare) : null;
+    },
+    async saveWebshare(userId, data) {
+      await dbProxy.prepare('UPDATE config SET webshare = ? WHERE user_id = ?').run(JSON.stringify(data), userId);
+    },
+    async getProxyStats() {
+      return dbProxy.prepare('SELECT * FROM proxy_stats ORDER BY failures DESC, successes ASC').all();
+    },
+    async upsertProxyStat({ host, ok, responseMs }) {
+      const now = new Date().toISOString();
+      const row = await dbProxy.prepare('SELECT successes, failures, total_response_ms FROM proxy_stats WHERE host = ?').get(host);
+      if (row) {
+        await dbProxy.prepare(`
+          UPDATE proxy_stats SET
+            successes = successes + ?,
+            failures = failures + ?,
+            total_response_ms = total_response_ms + ?,
+            last_used_at = ?,
+            last_success_at = CASE WHEN ? THEN ? ELSE last_success_at END,
+            last_fail_at = CASE WHEN NOT ? THEN ? ELSE last_fail_at END
+          WHERE host = ?
+        `).run(ok ? 1 : 0, ok ? 0 : 1, responseMs || 0, now, ok ? 1 : 0, now, ok ? 0 : 1, now, host);
+      } else {
+        await dbProxy.prepare(`
+          INSERT INTO proxy_stats (host, successes, failures, total_response_ms, last_used_at, last_success_at, last_fail_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(host, ok ? 1 : 0, ok ? 0 : 1, responseMs || 0, now, ok ? now : null, ok ? null : now);
+      }
+    },
+    async clearProxyStats() {
+      await dbProxy.prepare('DELETE FROM proxy_stats').run();
     }
   }
 };

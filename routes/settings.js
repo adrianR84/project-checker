@@ -15,14 +15,15 @@ const DUMMY_PUSHBULLET_TOKEN = 'DUMMY_TOKEN_pushbullet';
 // GET /api/settings
 router.get('/', async (req, res) => {
   await db.ensureConfig(req.userId);
-  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts] = await Promise.all([
+  const [settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts, webshare] = await Promise.all([
     db.config.getSettings(req.userId),
     db.config.getCheckIntervals(req.userId),
     db.config.getAlertIntervals(req.userId),
     db.config.getAlertStops(req.userId),
     db.config.getTelegram(req.userId),
     db.config.getPushbullet(req.userId),
-    db.config.getPriceAlerts(req.userId)
+    db.config.getPriceAlerts(req.userId),
+    db.config.getWebshare(req.userId)
   ]);
   if (!settings) return res.status(500).json({ error: 'config not found' });
   // Return flat shape for frontend compatibility
@@ -53,7 +54,20 @@ router.get('/', async (req, res) => {
     telegram: telegram ? { ...telegram, bot_token: telegram.bot_token ? DUMMY_TELEGRAM_TOKEN : '', chat_id: telegram.chat_id ? DUMMY_TELEGRAM_CHAT_ID : '' } : null,
     pushbullet: pushbullet ? { ...pushbullet, access_token: pushbullet.access_token ? DUMMY_PUSHBULLET_TOKEN : '' } : null,
     price_alerts,
+    webshare: webshare ? { ...webshare, token: webshare.token ? DUMMY_TELEGRAM_TOKEN : '' } : null,
   });
+});
+
+// GET /api/settings/proxy-stats — return per-proxy stats
+router.get('/proxy-stats', async (req, res) => {
+  const stats = await db.config.getProxyStats();
+  res.json(stats);
+});
+
+// DELETE /api/settings/proxy-stats — clear all stats
+router.delete('/proxy-stats', async (req, res) => {
+  await db.config.clearProxyStats();
+  res.json({ ok: true });
 });
 
 // PUT /api/settings — update check intervals and log retention
@@ -159,7 +173,7 @@ router.put('/', async (req, res) => {
     }
   }
 
-  if (Object.keys(updates).length === 0 && !req.body?.telegram && !req.body?.pushbullet && !req.body?.price_alerts) {
+  if (Object.keys(updates).length === 0 && !req.body?.telegram && !req.body?.pushbullet && !req.body?.price_alerts && !req.body?.webshare) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
@@ -210,6 +224,18 @@ router.put('/', async (req, res) => {
       };
       await db.prepare('UPDATE config SET pushbullet = ? WHERE user_id = ?').run(JSON.stringify(merged), req.userId);
     }
+  }
+
+  // webshare { enabled, token, country }
+  if (req.body?.webshare && typeof req.body.webshare === 'object') {
+    const cur = await db.config.getWebshare(req.userId);
+    const incoming = req.body.webshare;
+    const merged = {
+      enabled:  !!(incoming.enabled),
+      token:   typeof incoming.token === 'string' && incoming.token !== '' && incoming.token !== DUMMY_TELEGRAM_TOKEN ? incoming.token : (cur?.token ?? null),
+      country: typeof incoming.country === 'string' ? incoming.country.trim() : (cur?.country ?? ''),
+    };
+    await db.config.saveWebshare(req.userId, merged);
   }
 
   // Flat columns no longer exist — update JSON groups directly

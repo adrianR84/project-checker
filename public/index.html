@@ -2820,6 +2820,64 @@
               </button>
             </article>
 
+            <!-- Webshare Proxy -->
+            <article>
+              <h3>Webshare Proxy</h3>
+              <p class="muted">Rotate outbound IPs through Webshare residential proxies for website and Twitter checks.</p>
+
+              <div class="grid col2">
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" v-model="form.webshare_enabled" />
+                    Enable Webshare Proxy
+                  </label>
+                  <input v-model="form.webshare_token" type="password" placeholder="Webshare API Key"
+                    autocomplete="off" :disabled="!form.webshare_enabled" />
+                  <label>
+                    Country
+                    <select v-model="form.webshare_country" :disabled="!form.webshare_enabled">
+                      <option value="">All Countries</option>
+                      <option value="US">United States</option>
+                      <option value="GB">United Kingdom</option>
+                      <option value="DE">Germany</option>
+                      <option value="FR">France</option>
+                      <option value="NL">Netherlands</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <button :disabled="saving" @click="saveWebshareSettings">
+                <span v-if="!saving">Save</span>
+                <span v-else class="spinner"></span>
+              </button>
+
+              <details v-if="form.webshare_enabled">
+                <summary class="muted" style="cursor:pointer;margin-top:.75rem">Proxy Stats</summary>
+                <div v-if="proxyStats.length === 0" class="muted" style="padding:.5rem 0">No stats yet — run a check to see proxy performance.</div>
+                <table v-else style="width:100%;font-size:.85rem;margin-top:.5rem">
+                  <thead>
+                    <tr style="text-align:left">
+                      <th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="s in proxyStats" :key="s.host">
+                      <td><code>{{ s.host }}</code></td>
+                      <td>{{ s.successes }}</td>
+                      <td :class="s.failures > 0 ? 'error' : ''">{{ s.failures }}</td>
+                      <td>{{ s.total_response_ms && s.successes ? Math.round(s.total_response_ms / s.successes) : '—' }}</td>
+                      <td class="muted">{{ s.last_used_at ? new Date(s.last_used_at).toLocaleTimeString() : '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style="margin-top:.5rem;display:flex;gap:.5rem">
+                  <button style="font-size:.8rem" :disabled="loadingStats" @click="loadProxyStats">Refresh</button>
+                  <button style="font-size:.8rem" class="secondary" :disabled="loadingStats" @click="clearProxyStats">Clear</button>
+                </div>
+              </details>
+            </article>
+
             <!-- Danger zone: wipe all data (keeps config) -->
             <article v-if="form.showDangerZone" class="danger-zone">
               <h3>Danger Zone</h3>
@@ -2875,6 +2933,9 @@
           telegram_chat_id:         '',
           pushbullet_enabled:       false,
           pushbullet_access_token:  '',
+          webshare_enabled:        false,
+          webshare_token:          '',
+          webshare_country:        '',
           price_alerts: [
             { price_for: '6h', price_change: 10, price_interval: 5, enabled: 1, telegram: 1, pushbullet: 1, _enabled: true, _telegram: true, _pushbullet: true },
             { price_for: '6h', price_change: 25, price_interval: 15, enabled: 1, telegram: 1, pushbullet: 1, _enabled: true, _telegram: true, _pushbullet: true },
@@ -2887,6 +2948,8 @@
         const clearing  = ref(false);
         const clearingLogs  = ref(false);
         const clearingAlerts = ref(false);
+        const proxyStats    = ref([]);
+        const loadingStats  = ref(false);
         const generatedApiToken = ref('');
         const generatingToken = ref(false);
 
@@ -2939,6 +3002,9 @@
               telegram_chat_id:          settings.value.telegram?.chat_id || '',
               pushbullet_enabled:       !!settings.value.pushbullet?.enabled,
               pushbullet_access_token:   settings.value.pushbullet?.access_token || '',
+              webshare_enabled:        !!settings.value.webshare?.enabled,
+              webshare_token:          settings.value.webshare?.token || '',
+              webshare_country:        settings.value.webshare?.country || '',
               price_alerts: (settings.value.price_alerts?.alerts || []).map(a => ({
                 price_for:    a.price_for ?? '6h',
                 price_change: a.price_change ?? 10,
@@ -3044,6 +3110,34 @@
           });
         }
 
+        /** Save Webshare Proxy */
+        async function saveWebshareSettings() {
+          await saveSettings({
+            webshare: {
+              enabled: form.value.webshare_enabled,
+              token:   form.value.webshare_token,
+              country: form.value.webshare_country,
+            },
+          });
+        }
+
+        async function loadProxyStats() {
+          loadingStats.value = true;
+          try { proxyStats.value = await fetch('/api/settings/proxy-stats').then(r => r.json()); }
+          catch (e) { showToast(e.message, 'error'); }
+          finally { loadingStats.value = false; }
+        }
+
+        async function clearProxyStats() {
+          loadingStats.value = true;
+          try {
+            await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
+            proxyStats.value = [];
+            showToast('Proxy stats cleared', 'info', 2000);
+          } catch (e) { showToast(e.message, 'error'); }
+          finally { loadingStats.value = false; }
+        }
+
         /** Save Price Alerts */
         async function savePriceAlertsSettings() {
           await saveSettings({
@@ -3136,7 +3230,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           generatedApiToken, generatingToken,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats,
           relativeTime,
           api: window.api,
         };

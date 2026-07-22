@@ -752,6 +752,28 @@ async function runMigrations(db) {
   try { add_config_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_twitter_posts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_projects_activity_display(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_webshare_config(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_proxy_stats_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+}
+
+function add_webshare_config(db) {
+  try { db.exec("ALTER TABLE config ADD COLUMN webshare TEXT NOT NULL DEFAULT '{\"enabled\":false,\"token\":null,\"country\":\"\"}'"); } catch (e) { /* already exists */ }
+}
+
+function add_proxy_stats_table(db) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='proxy_stats'").get();
+  if (row) return;
+  db.exec(`
+    CREATE TABLE proxy_stats (
+      host TEXT PRIMARY KEY,
+      successes INTEGER NOT NULL DEFAULT 0,
+      failures INTEGER NOT NULL DEFAULT 0,
+      total_response_ms INTEGER NOT NULL DEFAULT 0,
+      last_used_at TEXT,
+      last_success_at TEXT,
+      last_fail_at TEXT
+    )
+  `);
 }
 
 module.exports = { runMigrations };
