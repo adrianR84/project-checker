@@ -148,32 +148,34 @@ function _tunnelFetch(proxy, targetUrl, headers = {}, timeoutMs = 15000) {
       const status = s.match(/HTTP\/1\.\d (\d+)/)?.[1];
       if (status !== '200') { cleanup(); return reject(new Error('CONNECT ' + status)); }
 
+      // ponytail: TLSv1.2 only to avoid EPROTO issues with some proxies
       const tlsSocket = tls.connect({
         socket: sock,
         servername: u.hostname,
         rejectUnauthorized: false,
-        // ponytail: TLSv1.2 only — TLSv1.3 causes EPROTO with some proxy servers
         minVersion: 'TLSv1.2',
         maxVersion: 'TLSv1.2',
       });
 
-      tlsSocket.setTimeout(timeoutMs);
+      // ponytail: wait for 'secureConnect', not just socket 'connect' — TLS handshake must complete before writing
+      tlsSocket.on('secureConnect', () => {
+        const req = `GET ${u.pathname}${u.search} HTTP/1.1\r\nHost: ${u.host}\r\n`;
+        const extra = Object.entries(headers).map(([k, v]) => k + ': ' + v).join('\r\n');
+        tlsSocket.write(req + (extra ? extra + '\r\n' : '') + 'Connection: close\r\n\r\n');
+
+        let response = '';
+        tlsSocket.on('data', c => response += c.toString());
+        tlsSocket.on('end', () => {
+          const hdrEnd = response.indexOf('\r\n\r\n');
+          if (hdrEnd === -1) { reject(new Error('malformed response')); return; }
+          const statusLine = response.slice(0, hdrEnd);
+          const statusCode = parseInt(statusLine.match(/HTTP\/1\.\d (\d+)/)?.[1] ?? '0');
+          resolve({ status: statusCode, body: response.slice(hdrEnd + 4) });
+        });
+      });
+
       tlsSocket.on('timeout', () => { cleanup(); reject(new Error('timeout')); });
       tlsSocket.on('error', e => { cleanup(); reject(e); });
-
-      const req = `GET ${u.pathname}${u.search} HTTP/1.1\r\nHost: ${u.host}\r\n`;
-      const extra = Object.entries(headers).map(([k, v]) => k + ': ' + v).join('\r\n');
-      tlsSocket.write(req + (extra ? extra + '\r\n' : '') + 'Connection: close\r\n\r\n');
-
-      let response = '';
-      tlsSocket.on('data', c => response += c.toString());
-      tlsSocket.on('end', () => {
-        const hdrEnd = response.indexOf('\r\n\r\n');
-        if (hdrEnd === -1) { reject(new Error('malformed response')); return; }
-        const statusLine = response.slice(0, hdrEnd);
-        const statusCode = parseInt(statusLine.match(/HTTP\/1\.\d (\d+)/)?.[1] ?? '0');
-        resolve({ status: statusCode, body: response.slice(hdrEnd + 4) });
-      });
     });
 
     sock.on('error', e => reject(e));
