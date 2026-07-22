@@ -1,7 +1,9 @@
 // services/proxy-fetch.js
-// ponytail: Webshare rotating proxy pool. Round-robins across IP:PORT:USER:PASS entries via undici.ProxyAgent.
-// Falls back to direct undici.fetch when disabled, pool unavailable, or a specific proxy fails.
-const { fetch, ProxyAgent } = require('undici');
+// ponytail: Webshare rotating proxy pool. Round-robins across IP:PORT:USER:PASS entries via manual HTTP CONNECT tunnel (HTTP/1.1).
+// Falls back to direct Node https when disabled, pool unavailable, or a specific proxy fails.
+const { fetch } = require('undici');
+const net = require('net');
+const tls = require('tls');
 const db = require('./db');
 const fs = require('fs');
 const path = require('path');
@@ -116,16 +118,81 @@ async function _ensurePool() {
   return _refreshing;
 }
 
+/** Performs an HTTP/1.1 GET request through a CONNECT tunnel over a Webshare proxy. */
+function _tunnelFetch(proxy, targetUrl, headers = {}, timeoutMs = 15000) {
+  const u = new URL(targetUrl);
+  const proxyHost = proxy.host.split(':')[0];
+  const proxyPort = parseInt(proxy.host.split(':')[1]);
+  const auth = Buffer.from(`${proxy.user}:${proxy.pass}`).toString('base64');
+
+  return new Promise((resolve, reject) => {
+    const sock = net.connect(proxyPort, proxyHost);
+    const cleanup = () => { try { sock.destroy(); } catch (_) {} };
+
+    sock.on('connect', () => {
+      sock.write(
+        `CONNECT ${u.host} HTTP/1.1\r\n` +
+        `Proxy-Authorization: Basic ${auth}\r\n` +
+        `Host: ${u.host}\r\n\r\n`
+      );
+    });
+
+    let headersDone = false;
+
+    sock.on('data', d => {
+      if (headersDone) return;
+      const s = d.toString();
+      if (!s.includes('\r\n\r\n')) return;
+      headersDone = true;
+
+      const status = s.match(/HTTP\/1\.\d (\d+)/)?.[1];
+      if (status !== '200') { cleanup(); return reject(new Error('CONNECT ' + status)); }
+
+      const tlsSocket = tls.connect({
+        socket: sock,
+        servername: u.hostname,
+        rejectUnauthorized: false,
+        // ponytail: TLSv1.2 only — TLSv1.3 causes EPROTO with some proxy servers
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.2',
+      });
+
+      tlsSocket.setTimeout(timeoutMs);
+      tlsSocket.on('timeout', () => { cleanup(); reject(new Error('timeout')); });
+      tlsSocket.on('error', e => { cleanup(); reject(e); });
+
+      const req = `GET ${u.pathname}${u.search} HTTP/1.1\r\nHost: ${u.host}\r\n`;
+      const extra = Object.entries(headers).map(([k, v]) => k + ': ' + v).join('\r\n');
+      tlsSocket.write(req + (extra ? extra + '\r\n' : '') + 'Connection: close\r\n\r\n');
+
+      let response = '';
+      tlsSocket.on('data', c => response += c.toString());
+      tlsSocket.on('end', () => {
+        const hdrEnd = response.indexOf('\r\n\r\n');
+        if (hdrEnd === -1) { reject(new Error('malformed response')); return; }
+        const statusLine = response.slice(0, hdrEnd);
+        const statusCode = parseInt(statusLine.match(/HTTP\/1\.\d (\d+)/)?.[1] ?? '0');
+        resolve({ status: statusCode, body: response.slice(hdrEnd + 4) });
+      });
+    });
+
+    sock.on('error', e => reject(e));
+    sock.on('timeout', () => { cleanup(); reject(new Error('timeout')); });
+    sock.setTimeout(timeoutMs + 2000, () => { cleanup(); reject(new Error('timeout')); });
+  });
+}
+
 /** Fetches url through a rotating Webshare proxy. Falls back to direct on pool failure or dead proxy. */
 async function proxyFetch(url, opts = {}) {
   await _ensurePool();
+  const ua = opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0';
+
   if (!_pool.length) {
     const t0 = Date.now();
     try {
-      // ponytail: use Node's https (HTTP/1.1) — nitter returns empty over HTTP/2
       const u = new URL(url);
       const text = await new Promise((resolve, reject) => {
-        require('https').get(u, { headers: { 'User-Agent': opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0' } }, res => {
+        require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
           if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           let body = '';
           res.on('data', chunk => body += chunk);
@@ -139,33 +206,29 @@ async function proxyFetch(url, opts = {}) {
       throw e;
     }
   }
+
   const proxy = _pickProxy();
-  const { host, user, pass } = proxy;
-  const agent = new ProxyAgent({
-    uri: `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}`,
-    connectTimeout: 10_000,
-  });
+  const { host } = proxy;
   const t0 = Date.now();
+
   try {
-    const res = await fetch(url, { ...opts, dispatcher: agent });
-    // ponytail: read body early to detect empty/HTTP2 issue — nitter returns empty over HTTP/2
-    const text = await res.text();
-    if (!text.trim()) throw new Error('empty body');
+    const { status, body } = await _tunnelFetch(proxy, url, { 'User-Agent': ua });
+    if (status >= 400) throw new Error(`HTTP ${status}`);
     const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
     proxyStats.set(host, { failures: prev.failures, successes: prev.successes + 1, totalMs: prev.totalMs + (Date.now() - t0) });
     await db.config.upsertProxyStat({ host, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-    return text;
+    return body;
   } catch (proxyErr) {
     const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
     proxyStats.set(host, { successes: prev.successes, failures: prev.failures + 1, totalMs: prev.totalMs });
     await db.config.upsertProxyStat({ host, ok: false, responseMs: 0 }).catch(() => {});
     console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
+
     const t0d = Date.now();
     try {
-      // ponytail: use Node's https (HTTP/1.1) for direct fallback — nitter returns empty over HTTP/2
       const u = new URL(url);
       const text = await new Promise((resolve, reject) => {
-        require('https').get(u, { headers: { 'User-Agent': opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0' } }, res => {
+        require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
           if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           let body = '';
           res.on('data', chunk => body += chunk);
