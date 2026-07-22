@@ -305,11 +305,26 @@ const FIRST_RUN_POST_LIMIT = 20;
 async function fetchAndStoreTwitterPosts(projectId, handle) {
   if (!projectId || !handle) return { newPosts: 0, newPostIds: [] };
   const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
+
+  // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
   let feed;
-  try {
-    feed = await rssParser.parseURL(rssUrl);
-  } catch (err) {
-    console.error(`[${now()}] rss-parser failed for ${rssUrl}: ${err.message}`);
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      feed = await rssParser.parseURL(rssUrl);
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      }
+    }
+  }
+  if (lastErr) {
+    console.error(`[${now()}] rss-parser failed for ${rssUrl} after ${MAX_RETRIES} attempts: ${lastErr.message}`);
     return { newPosts: 0, newPostIds: [] };
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
