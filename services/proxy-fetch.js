@@ -71,7 +71,7 @@ function _pickProxy() {
 async function _downloadList(apiKey, country) {
   const cc = (country && country.trim()) ? country.trim() : '-';
   const downloadToken = await _getDownloadToken(apiKey);
-  const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${downloadToken}/${cc}/any/username/backbone/-/`;
+  const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${downloadToken}/${cc}/any/username/direct/-/`;
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`Proxy list ${res.status}`);
   const text = await res.text();
