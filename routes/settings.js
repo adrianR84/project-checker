@@ -11,6 +11,7 @@ const DUMMY_API_TOKEN        = 'DUMMY_TOKEN_api';
 const DUMMY_TELEGRAM_TOKEN   = 'DUMMY_TOKEN_telegram';
 const DUMMY_TELEGRAM_CHAT_ID = 'DUMMY_TOKEN_telegram_chat_id';
 const DUMMY_PUSHBULLET_TOKEN = 'DUMMY_TOKEN_pushbullet';
+const DUMMY_WEBSHARE_TOKEN   = 'DUMMY_TOKEN_webshare';
 
 // GET /api/settings
 router.get('/', async (req, res) => {
@@ -232,7 +233,7 @@ router.put('/', async (req, res) => {
     const incoming = req.body.webshare;
     const merged = {
       enabled:  !!(incoming.enabled),
-      token:   typeof incoming.token === 'string' && incoming.token !== '' && incoming.token !== DUMMY_TELEGRAM_TOKEN ? incoming.token : (cur?.token ?? null),
+      token:   typeof incoming.token === 'string' && incoming.token !== '' && incoming.token !== DUMMY_WEBSHARE_TOKEN ? incoming.token : (cur?.token ?? null),
       country: typeof incoming.country === 'string' ? incoming.country.trim() : (cur?.country ?? ''),
     };
     await db.config.saveWebshare(req.userId, merged);

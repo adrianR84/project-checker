@@ -35,11 +35,6 @@
 
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
-    // Shared modal state — accessible from any page component
-    const activeModal = ref(null);
-    function openModal(name) { activeModal.value = name; }
-    function closeModal()    { activeModal.value = null; }
-    function isActive(name)  { return activeModal.value === name; }
 
     /** Current authenticated user — null when logged out */
     const currentUser = ref(null);
@@ -135,6 +130,10 @@
       setTimeout(() => el.remove(), duration);
     }
     window.showToast = showToast;
+    window.closeIframe = () => document.querySelector('.modal-backdrop')?.click();
+
+    // Expose modalHtml so child components can call it without inject
+    window.modalHtml = null; // set after App setup
 
     /* ── Shared helpers ─────────────────────────────────────────────────────────
        Used directly in templates via Vue's template expression evaluation.
@@ -1598,7 +1597,7 @@
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
-        const openIframe    = inject('openIframe');
+        const openIframe = inject('openIframe');
         const loading       = ref(true);
         const error         = ref('');
         const logTab        = ref(localStorage.getItem('pc_log_tab') || 'status-changes');
@@ -2162,8 +2161,17 @@
         const submitting = ref(false);
 
         function useModal() {
-          // ponytail: reuse module-level shared state
-          return { activeModal, modalWidth: ref(''), modalClosable: ref(true), openModal, closeModal, isActive };
+          const activeModal = ref(null);
+          const modalWidth = ref('');
+          const modalClosable = ref(true);
+          function openModal(name, w, closable = false) {
+            activeModal.value = name;
+            modalWidth.value = w || '';
+            modalClosable.value = closable;
+          }
+          function closeModal()    { activeModal.value = null; }
+          function isActive(name)  { return activeModal.value === name; }
+          return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
         }
         const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
         function onEscClose() { closeModal(); }
@@ -2843,44 +2851,15 @@
                 </div>
               </div>
 
+              <button v-if="form.webshare_enabled" class="secondary" style="font-size:.8rem;float:right" :disabled="loadingStats" @click="openProxyStatsModal">
+                {{ loadingStats ? '…' : 'Proxy Stats' }}
+              </button>
+              <br>
               <button :disabled="saving" @click="saveWebshareSettings">
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
               </button>
-              <button v-if="form.webshare_enabled" class="secondary" style="margin-left:.25rem" @click="loadProxyStats().then(() => openModal('proxystats'))">Proxy Stats</button>
             </article>
-
-            <!-- Proxy Stats modal -->
-            <div class="modal" :class="{ active: isActive('proxystats') }" @click.self="closeModal">
-              <header class="modal-header">
-                <h3 style="margin:0;">Proxy Stats</h3>
-                <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
-              </header>
-              <div class="modal-body">
-                <div v-if="proxyStats.length === 0" class="muted">No stats yet — run a check to see proxy performance.</div>
-                <table v-else style="width:100%;font-size:.85rem">
-                  <thead>
-                    <tr style="text-align:left">
-                      <th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="s in proxyStats" :key="s.host">
-                      <td><code>{{ s.host }}</code></td>
-                      <td>{{ s.successes }}</td>
-                      <td :class="s.failures > 0 ? 'error' : ''">{{ s.failures }}</td>
-                      <td>{{ s.total_response_ms && s.successes ? Math.round(s.total_response_ms / s.successes) : '—' }}</td>
-                      <td class="muted">{{ s.last_used_at ? new Date(s.last_used_at).toLocaleTimeString() : '—' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="modal-actions">
-                <button @click="loadProxyStats" :disabled="loadingStats">{{ loadingStats ? '…' : 'Refresh' }}</button>
-                <button class="secondary" @click="clearProxyStats(); closeModal()" :disabled="loadingStats">Clear</button>
-                <button @click="closeModal">Close</button>
-              </div>
-            </div>
 
             <!-- Danger zone: wipe all data (keeps config) -->
             <article v-if="form.showDangerZone" class="danger-zone">
@@ -2909,9 +2888,6 @@
       `,
 
       setup() {
-        const openModal   = inject('openModal');
-        const closeModal  = inject('closeModal');
-        const isActive    = inject('isActive');
         const settings    = ref(null);
         const form        = ref({
           github_interval_minutes:   360,
@@ -2955,7 +2931,6 @@
         const clearing  = ref(false);
         const clearingLogs  = ref(false);
         const clearingAlerts = ref(false);
-        const proxyStats    = ref([]);
         const loadingStats  = ref(false);
         const generatedApiToken = ref('');
         const generatingToken = ref(false);
@@ -3128,23 +3103,6 @@
           });
         }
 
-        async function loadProxyStats() {
-          loadingStats.value = true;
-          try { proxyStats.value = await fetch('/api/settings/proxy-stats').then(r => r.json()); }
-          catch (e) { showToast(e.message, 'error'); }
-          finally { loadingStats.value = false; }
-        }
-
-        async function clearProxyStats() {
-          loadingStats.value = true;
-          try {
-            await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
-            proxyStats.value = [];
-            showToast('Proxy stats cleared', 'info', 2000);
-          } catch (e) { showToast(e.message, 'error'); }
-          finally { loadingStats.value = false; }
-        }
-
         /** Save Price Alerts */
         async function savePriceAlertsSettings() {
           await saveSettings({
@@ -3192,6 +3150,32 @@
           }
         }
 
+        /** Open proxy stats in the modal */
+        async function openProxyStatsModal() {
+          loadingStats.value = true;
+          try {
+            const stats = await fetch('/api/settings/proxy-stats').then(r => r.json());
+            const rows = stats.map(s => `<tr><td><code>${s.host}</code></td><td>${s.successes}</td><td class="${s.failures > 0 ? 'error' : ''}">${s.failures}</td><td>${s.total_response_ms && s.successes ? Math.round(s.total_response_ms / s.successes) : '—'}</td><td class="muted">${s.last_used_at ? new Date(s.last_used_at).toLocaleTimeString() : '—'}</td></tr>`).join('');
+            const html = `
+              <table style="width:100%;font-size:.9rem">
+                <thead><tr style="text-align:left"><th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="muted">No stats yet — run a check to see proxy performance.</td></tr>'}</tbody>
+              </table>
+              <div style="margin-top:1rem;display:flex;gap:.5rem">
+                <button onclick="window._reloadProxyStats()">Refresh</button>
+                <button class="secondary" onclick="window._clearProxyStats()">Clear</button>
+              </div>`;
+            modalHtml(html, 'Proxy Stats', true);
+            window._reloadProxyStats = openProxyStatsModal;
+            window._clearProxyStats = async () => {
+              await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
+              window.closeIframe();
+              showToast('Proxy stats cleared', 'info', 2000);
+            };
+          } catch (e) { showToast(e.message, 'error'); }
+          finally { loadingStats.value = false; }
+        }
+
         /** Clear check logs only, keep projects and repos */
         async function onClearLogs() {
           if (!confirm('Delete all check logs?')) return;
@@ -3236,8 +3220,8 @@
 
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
-          generatedApiToken, generatingToken, proxyStats, loadingStats,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats,
+          generatedApiToken, generatingToken,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, openProxyStatsModal,
           relativeTime,
           api: window.api,
         };
@@ -3285,6 +3269,7 @@
         const iframeActive  = ref(false);
         const iframeWidth   = ref('');
         const iframeClosable = ref(false);
+        const iframeHtml    = ref(''); // raw HTML for modal body (no iframe)
         const currentView   = ref(hashRouter().render());
 
         function openIframe(url, title = '', w = '', closable = false) {
@@ -3293,14 +3278,23 @@
           iframeLoading.value = true;
           iframeWidth.value = w;
           iframeClosable.value = closable;
+          iframeHtml.value = '';
           iframeActive.value = true;
         }
         function closeIframe() {
           iframeActive.value = false;
           iframeUrl.value = '';
+          iframeHtml.value = '';
+        }
+        function modalHtml(html, title = '', closable = false) {
+          iframeTitle.value = title;
+          iframeClosable.value = closable;
+          iframeHtml.value = html;
+          iframeActive.value = true;
         }
 
         provide('openIframe', openIframe);
+        provide('modalHtml', modalHtml);
 
         function onEsc(e) {
           if (e.key === 'Escape') {
@@ -3310,6 +3304,7 @@
         }
 
         onMounted(() => {
+          window.modalHtml = modalHtml;
           window.addEventListener('hashchange', () => {
             currentView.value = hashRouter().render();
           });
@@ -3319,7 +3314,7 @@
           document.removeEventListener('keydown', onEsc);
         });
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, closeIframe, currentView };
+        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, iframeHtml, closeIframe, currentView };
       },
 
       template: `
@@ -3336,8 +3331,9 @@
               <h3 style="margin:0;">{{ iframeTitle }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
             </header>
-            <div class="modal-body" style="padding:0; display:flex; flex-direction:column;">
-              <div class="iframe-wrap" style="flex:1; min-height:0;">
+            <div class="modal-body" :style="iframeHtml ? 'padding:1rem;overflow:auto;' : 'padding:0; display:flex; flex-direction:column;'">
+              <div v-if="iframeHtml" v-html="iframeHtml"></div>
+              <div v-else class="iframe-wrap" style="flex:1; min-height:0;">
                 <div v-if="iframeLoading" class="center-loader"><span>Loading…</span></div>
                 <iframe v-show="!iframeLoading" :src="iframeUrl" @load="iframeLoading = false" />
               </div>
