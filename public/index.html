@@ -728,6 +728,7 @@
             <div class="form-row">
               <div class="form-row-header">
                 <label>Name *</label>
+                <label data-tooltip="Show in Activity card row" data-placement="left"><input type="checkbox" v-model="f.activity_display" /> Show in Activity</label>
                 <label data-tooltip="Master switch: disables all checks and alerts are off" data-placement="left"><input type="checkbox" v-model="f.project_enabled" /> Project enabled</label>
               </div>
               <input v-model="f.name" required placeholder="My Project" />
@@ -805,7 +806,7 @@
         const f = ref({
           name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
           website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true, twitter_posts_check: true,
-          project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '',
+          activity_display: true, project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '',
         });
         const jsonEditText  = ref('');
         const jsonEditError = ref('');
@@ -834,6 +835,7 @@
                 telegram_enabled: !!v.telegram_enabled,
                 project_enabled: !!v.enabled,
                 price_enabled: !!v.price_enabled,
+                activity_display: !!v.activity_display,
                 token_symbol: tok.symbol || '',
                 token_contract: tok.contract || '',
                 token_chain: tok.chain || '',
@@ -841,7 +843,7 @@
             } else {
               f.value = { name: '', website_url: '', github_url: '', twitter_url: '', telegram_url: '',
                 website_enabled: true, website_content_check: true, github_enabled: true, twitter_enabled: true, telegram_enabled: true, twitter_posts_check: true,
-                project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '' };
+                activity_display: true, project_enabled: true, price_enabled: true, token_symbol: '', token_contract: '', token_chain: '' };
             }
           },
           { immediate: true }
@@ -912,7 +914,7 @@
             website_enabled: p.website_enabled, website_content_check: p.website_content_check,
             github_enabled: p.github_enabled, twitter_enabled: p.twitter_enabled, telegram_enabled: p.telegram_enabled,
             twitter_posts_check: p.twitter_posts_check,
-            token, enabled: p.project_enabled ? 1 : 0, price_enabled: p.price_enabled ? 1 : 0,
+            token, enabled: p.project_enabled ? 1 : 0, activity_display: p.activity_display ? 1 : 0, price_enabled: p.price_enabled ? 1 : 0,
           });
         }
 
@@ -1423,6 +1425,7 @@
           <div class="tabs" id="activity-tabs">
             <button :class="['tab', activityTab === 'resources' ? 'active' : '']" @click="activityTab = 'resources'">Resources</button>
             <button :class="['tab', activityTab === 'prices' ? 'active' : '']" @click="activityTab = 'prices'">Prices</button>
+            <button class="refresh-btn" data-tooltip="Refresh current tab" @click="activityTab === 'resources' ? load() : loadPrices()" aria-label="Refresh current tab">↻</button>
             <input
               v-model="filter"
               type="search"
@@ -1792,13 +1795,13 @@
 
         const filteredProjects = computed(() => {
           const q = filter.value.toLowerCase();
-          const all = q
-            ? projects.value.filter(p =>
-                p.name.toLowerCase().includes(q) ||
-                (p.website_url || '').toLowerCase().includes(q) ||
-                (p.github_url || '').toLowerCase().includes(q)
-              )
-            : projects.value;
+          const all = projects.value
+            .filter(p => p.activity_display !== 0)
+            .filter(p => !q ||
+              p.name.toLowerCase().includes(q) ||
+              (p.website_url || '').toLowerCase().includes(q) ||
+              (p.github_url || '').toLowerCase().includes(q)
+            );
 
           // Most recent event timestamp across the three resource types
           const recentTs = p => {
@@ -2041,6 +2044,7 @@
                   <th class="action_cell" data-tooltip="Twitter enabled" data-placement="bottom">TE</th>
                   <th class="type_cell" data-tooltip="Token info" data-placement="bottom">Token</th>
                   <th class="action_cell" data-tooltip="Token enabled" data-placement="bottom">TE</th>
+                  <th class="action_cell" data-tooltip="Activity Display" data-placement="bottom">AD</th>
                   <th class="col-actions" class="text-right">Actions</th>
                 </tr>
               </thead>
@@ -2056,6 +2060,7 @@
                   <td><span :class="['badge', p.twitter_enabled ? 'ok' : 'error']">{{ p.twitter_enabled ? '✓' : '✗' }}</span></td>
                   <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
                   <td><span :class="['badge', p.token_enabled ? 'ok' : 'error']">{{ p.token_enabled ? '✓' : '✗' }}</span></td>
+                  <td><span :class="['badge', p.activity_display ? 'ok' : 'error']">{{ p.activity_display ? '✓' : '✗' }}</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
                     <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>

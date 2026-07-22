@@ -660,6 +660,16 @@ function compact_projects_url_cols(db) {
   }
 }
 
+/** Migration: adds activity_display column to projects (idempotent). */
+function add_projects_activity_display(db) {
+  if (!hasColumn(db, 'projects', 'activity_display')) {
+    console.log(`[${now()}] Migration: adding activity_display to projects`);
+    try { db.exec("ALTER TABLE projects ADD COLUMN activity_display INTEGER NOT NULL DEFAULT 1"); } catch (e) {
+      console.error(`[${now()}] add_projects_activity_display failed: ${e.message}`);
+    }
+  }
+}
+
 /** Migration: drops repo_name column from repos via table rebuild (idempotent). */
 function drop_repos_repo_name_col(db) {
   if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='repos'").get()) return;
@@ -741,6 +751,7 @@ async function runMigrations(db) {
   try { add_projects_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_config_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   try { add_twitter_posts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_projects_activity_display(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
 }
 
 module.exports = { runMigrations };

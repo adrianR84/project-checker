@@ -23,12 +23,12 @@ function parseProjectRow(row) {
 // GET /api/dashboard
 router.get('/', async (req, res) => {
   const rows = await db.prepare(`
-    SELECT id, name, enabled, token, token_enabled,
+    SELECT id, name, enabled, activity_display, token, token_enabled,
            website, github, twitter, telegram,
            website_enabled, github_enabled, twitter_enabled, telegram_enabled,
            created_at, updated_at
     FROM projects
-    WHERE enabled = 1 AND user_id = ?
+    WHERE enabled = 1 AND activity_display = 1 AND user_id = ?
     ORDER BY id
   `).all(req.userId);
 
@@ -87,6 +87,7 @@ router.get('/', async (req, res) => {
       id: p.id,
       name: p.name,
       enabled: !!p.enabled,
+      activity_display: !!p.activity_display,
       token: p.token || null,
       price_enabled: !!p.price_enabled,
       website_enabled: !!p.website_enabled,

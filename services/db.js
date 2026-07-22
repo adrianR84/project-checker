@@ -36,6 +36,7 @@ async function init() {
       telegram_enabled INTEGER NOT NULL DEFAULT 1,
       token_enabled INTEGER NOT NULL DEFAULT 1,
       enabled INTEGER NOT NULL DEFAULT 1,
+      activity_display INTEGER NOT NULL DEFAULT 1,
       user_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))

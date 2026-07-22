@@ -20,6 +20,7 @@ function parseProjectRow(row) {
     twitter_posts_check:  row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
     telegram_url:         row.telegram  ? JSON.parse(row.telegram).url : null,
     price_enabled:        row.token_enabled,
+    activity_display:     row.activity_display,
   };
 }
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   const rows = await db.prepare(`
     SELECT id, name, website, github, twitter, telegram,
            website_enabled, github_enabled, twitter_enabled, telegram_enabled,
-           token, token_enabled, enabled,
+           token, token_enabled, enabled, activity_display,
            created_at, updated_at
     FROM projects
     WHERE user_id = ?
@@ -120,7 +121,7 @@ async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
 router.post('/', async (req, res) => {
   const { name, website_url, github_url, twitter_url, telegram_url,
           website_enabled, website_content_check, twitter_posts_check,
-          token, enabled, price_enabled } = req.body || {};
+          token, enabled, price_enabled, activity_display } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   // Default twitter_posts_check to 1 when caller didn't specify (mirrors website_content_check)
@@ -152,10 +153,12 @@ router.post('/', async (req, res) => {
   const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
     INSERT INTO projects (name, user_id, website, github, twitter, telegram,
-      website_enabled, token, enabled, token_enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      website_enabled, token, enabled, activity_display, token_enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, req.userId, websiteJson, githubJson, twitterJson, telegramJson,
-    website_enabled ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1, price_enabled ? 1 : 0, ts, ts);
+    website_enabled ? 1 : 0, tokenJson, enabled === 0 ? 0 : 1,
+    activity_display !== undefined ? (activity_display ? 1 : 0) : 1,
+    price_enabled ? 1 : 0, ts, ts);
 
   const projectId = result.lastInsertRowid;
 
@@ -191,7 +194,7 @@ router.put('/:id', async (req, res) => {
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
                    'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled',
                    'twitter_posts_check',
-                   'token', 'enabled', 'price_enabled'];
+                   'token', 'enabled', 'price_enabled', 'activity_display'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
