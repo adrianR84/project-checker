@@ -2041,10 +2041,12 @@
                   <th style="width:2.5em" data-placement="bottom"><input type="checkbox" :checked="selected.length === filteredProjects.length && filteredProjects.length > 0" @change="toggleSelectAll" /></th>
                   <th class="project_cell" data-tooltip="Project name" data-placement="bottom">Name</th>
                   <th class="resource_cell text-center" data-tooltip="Website URL" data-placement="bottom">Website</th>
+                  <th class="action_cell" data-tooltip="Website content check" data-placement="bottom">CC</th>
                   <th class="action_cell" data-tooltip="Website enabled" data-placement="bottom">WE</th>
                   <th class="resource_cell text-center" data-tooltip="GitHub organization URL" data-placement="bottom">GitHub</th>
                   <th class="action_cell" data-tooltip="GitHub enabled" data-placement="bottom">GE</th>
                   <th class="resource_cell text-center" data-tooltip="Twitter handle or URL" data-placement="bottom">Twitter</th>
+                  <th class="action_cell" data-tooltip="Twitter posts check" data-placement="bottom">PC</th>
                   <th class="action_cell" data-tooltip="Twitter enabled" data-placement="bottom">TE</th>
                   <th class="type_cell" data-tooltip="Token info" data-placement="bottom">Token</th>
                   <th class="action_cell" data-tooltip="Token enabled" data-placement="bottom">TE</th>
@@ -2057,10 +2059,12 @@
                   <td><input type="checkbox" :checked="selected.includes(p.id)" @change="toggleSelect(p.id)" /></td>
                   <td>{{ trimName(p.name) }}</td>
                   <td class="text-center" v-html="projectIconLink(p, 'website', p.website_url)"></td>
+                  <td><span :class="['badge', p.website_content_check ? 'ok' : 'error']">{{ p.website_content_check ? '✓' : '✗' }}</span></td>
                   <td><span :class="['badge', p.website_enabled ? 'ok' : 'error']">{{ p.website_enabled ? '✓' : '✗' }}</span></td>
                   <td class="text-center" v-html="projectIconLink(p, 'github', p.github_url)"></td>
                   <td><span :class="['badge', p.github_enabled ? 'ok' : 'error']">{{ p.github_enabled ? '✓' : '✗' }}</span></td>
                   <td class="text-center" v-html="projectIconLink(p, 'twitter', p.twitter_url)"></td>
+                  <td><span :class="['badge', p.twitter_posts_check ? 'ok' : 'error']">{{ p.twitter_posts_check ? '✓' : '✗' }}</span></td>
                   <td><span :class="['badge', p.twitter_enabled ? 'ok' : 'error']">{{ p.twitter_enabled ? '✓' : '✗' }}</span></td>
                   <td><a v-if="p.token && tok(p).contract" :href="'https://dexscreener.com/' + tok(p).chain + '/' + tok(p).contract" target="_blank" rel="noopener">{{ tok(p).symbol }}</a><span v-else>—</span></td>
                   <td><span :class="['badge', p.token_enabled ? 'ok' : 'error']">{{ p.token_enabled ? '✓' : '✗' }}</span></td>

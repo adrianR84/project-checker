@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
     telegram: telegram ? { ...telegram, bot_token: telegram.bot_token ? DUMMY_TELEGRAM_TOKEN : '', chat_id: telegram.chat_id ? DUMMY_TELEGRAM_CHAT_ID : '' } : null,
     pushbullet: pushbullet ? { ...pushbullet, access_token: pushbullet.access_token ? DUMMY_PUSHBULLET_TOKEN : '' } : null,
     price_alerts,
-    webshare: webshare ? { ...webshare, token: webshare.token ? DUMMY_TELEGRAM_TOKEN : '' } : null,
+    webshare: webshare ? { ...webshare, token: webshare.token ? DUMMY_WEBSHARE_TOKEN : '' } : null,
   });
 });
 
