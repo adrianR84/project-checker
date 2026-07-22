@@ -1,15 +1,43 @@
 // services/proxy-fetch.js
 // ponytail: Webshare rotating proxy pool. Round-robins across IP:PORT:USER:PASS entries via undici.ProxyAgent.
-// Falls open to direct undici.fetch when disabled, pool unavailable, or a specific proxy fails.
+// Falls back to direct undici.fetch when disabled, pool unavailable, or a specific proxy fails.
 const { fetch, ProxyAgent } = require('undici');
 const db = require('./db');
+const fs = require('fs');
+const path = require('path');
 
+const POOL_PATH = path.join(__dirname, '..', 'data', 'proxies.json');
 const REFRESH_MS = 3_600_000; // 1 hour
 let _pool = [];
 let _lastFetchedAt = 0;
 let _refreshing = null;
-let _statsLoaded = false; // ponytail: lazy-load proxyStats from DB
-const proxyStats = new Map(); // in-memory cache: host → {failures, successes}
+let _statsLoaded = false;
+const proxyStats = new Map(); // host → {failures, successes}
+
+// Load cached pool from disk (survives restarts, avoids unnecessary re-downloads)
+function _loadCache() {
+  try {
+    if (!fs.existsSync(POOL_PATH)) return;
+    const { pool, fetchedAt } = JSON.parse(fs.readFileSync(POOL_PATH, 'utf8'));
+    if (!Array.isArray(pool) || !pool.length) return;
+    _pool = pool;
+    _lastFetchedAt = fetchedAt || 0;
+    console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache (stale for ${Math.round((Date.now() - _lastFetchedAt) / 1000 / 60)}m)`);
+  } catch (e) {
+    // cache read failure — proceed without cache
+  }
+}
+
+function _saveCache() {
+  try {
+    fs.writeFileSync(POOL_PATH, JSON.stringify({ pool: _pool, fetchedAt: _lastFetchedAt }), 'utf8');
+  } catch (e) {
+    console.error(`[proxy-fetch] cache write failed: ${e.message}`);
+  }
+}
+
+// ponytail: load cache synchronously at module load — before any requests are made
+_loadCache();
 
 async function _getDownloadToken(apiKey) {
   const res = await fetch('https://proxy.webshare.io/api/v2/download_token/proxy_list/', {
@@ -65,6 +93,7 @@ async function _ensurePool() {
     .then(pool => {
       _pool = pool;
       _lastFetchedAt = Date.now();
+      _saveCache();
       console.error(`[proxy-fetch] loaded ${pool.length} proxies`);
     })
     .catch(err => {
