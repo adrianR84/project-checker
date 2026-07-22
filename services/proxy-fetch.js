@@ -1,7 +1,7 @@
 // services/proxy-fetch.js
 // ponytail: Webshare rotating proxy pool. Round-robins across IP:PORT:USER:PASS entries via manual HTTP CONNECT tunnel (HTTP/1.1).
 // Falls back to direct Node https when disabled, pool unavailable, or a specific proxy fails.
-const { fetch } = require('undici');
+const https = require('https');
 const net = require('net');
 const tls = require('tls');
 const db = require('./db');
@@ -43,14 +43,26 @@ function _saveCache() {
 _loadCache();
 _saveCache(); // persist with fresh timestamp on every startup
 
-async function _getDownloadToken(apiKey) {
-  const res = await fetch('https://proxy.webshare.io/api/v2/download_token/proxy_list/', {
-    headers: { Authorization: `Token ${apiKey}` },
-    signal: AbortSignal.timeout(10_000),
+function _httpsGet(url, headers, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const opts = { headers: { ...headers, Host: u.host }, hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search, method: 'GET' };
+    const req = https.request(opts, res => {
+      if (res.statusCode >= 400) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('timeout')); });
+    req.end();
   });
-  if (!res.ok) throw new Error(`Download token ${res.status}`);
-  const data = await res.json();
-  return data.key; // short-lived token, used in the download URL
+}
+
+async function _getDownloadToken(apiKey) {
+  const text = await _httpsGet('https://proxy.webshare.io/api/v2/download_token/proxy_list/', { Authorization: `Token ${apiKey}` }, 10_000);
+  const data = JSON.parse(text);
+  return data.key;
 }
 
 async function _loadStats() {
@@ -85,9 +97,7 @@ async function _downloadList(apiKey, country) {
   const cc = (country && country.trim()) ? country.trim() : '-';
   const downloadToken = await _getDownloadToken(apiKey);
   const url = `https://proxy.webshare.io/api/v2/proxy/list/download/${downloadToken}/${cc}/any/username/direct/-/`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`Proxy list ${res.status}`);
-  const text = await res.text();
+  const text = await _httpsGet(url, {}, 15_000);
   const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
   if (!lines.length) throw new Error('Empty proxy list');
   return lines.map(l => {
