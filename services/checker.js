@@ -314,8 +314,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   let lastErr;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await proxyFetch(rssUrl);
-      const text = await res.text();
+      const text = await proxyFetch(rssUrl);
       feed = await rssParser.parseString(text);
       lastErr = null;
       break;
@@ -327,8 +326,23 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
     }
   }
   if (lastErr) {
-    console.error(`[${now()}] rss-parser failed for ${rssUrl} after ${MAX_RETRIES} attempts: ${lastErr.message}`);
-    return { newPosts: 0, newPostIds: [] };
+    // ponytail: last resort — try direct without proxy using Node's https (HTTP/1.1)
+    try {
+      const text = await new Promise((resolve, reject) => {
+        const u = new URL(rssUrl);
+        require('https').get(u, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; project-checker/1.0)' } }, res => {
+          if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => resolve(body));
+        }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
+      });
+      feed = await rssParser.parseString(text);
+      lastErr = null;
+    } catch (directErr) {
+      console.error(`[${now()}] rss-parser failed for ${rssUrl} after ${MAX_RETRIES} proxy attempts and direct fallback: ${directErr.message}`);
+      return { newPosts: 0, newPostIds: [] };
+    }
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
   if (!items.length) return { newPosts: 0, newPostIds: [] };

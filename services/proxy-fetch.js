@@ -122,9 +122,18 @@ async function proxyFetch(url, opts = {}) {
   if (!_pool.length) {
     const t0 = Date.now();
     try {
-      const res = await fetch(url, opts);
+      // ponytail: use Node's https (HTTP/1.1) — nitter returns empty over HTTP/2
+      const u = new URL(url);
+      const text = await new Promise((resolve, reject) => {
+        require('https').get(u, { headers: { 'User-Agent': opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0' } }, res => {
+          if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => resolve(body));
+        }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
+      });
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-      return res;
+      return text;
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
@@ -139,10 +148,13 @@ async function proxyFetch(url, opts = {}) {
   const t0 = Date.now();
   try {
     const res = await fetch(url, { ...opts, dispatcher: agent });
+    // ponytail: read body early to detect empty/HTTP2 issue — nitter returns empty over HTTP/2
+    const text = await res.text();
+    if (!text.trim()) throw new Error('empty body');
     const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
     proxyStats.set(host, { failures: prev.failures, successes: prev.successes + 1, totalMs: prev.totalMs + (Date.now() - t0) });
     await db.config.upsertProxyStat({ host, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-    return res;
+    return text;
   } catch (proxyErr) {
     const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
     proxyStats.set(host, { successes: prev.successes, failures: prev.failures + 1, totalMs: prev.totalMs });
@@ -150,9 +162,18 @@ async function proxyFetch(url, opts = {}) {
     console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
     const t0d = Date.now();
     try {
-      const res = await fetch(url, opts);
+      // ponytail: use Node's https (HTTP/1.1) for direct fallback — nitter returns empty over HTTP/2
+      const u = new URL(url);
+      const text = await new Promise((resolve, reject) => {
+        require('https').get(u, { headers: { 'User-Agent': opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0' } }, res => {
+          if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => resolve(body));
+        }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
+      });
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0d }).catch(() => {});
-      return res;
+      return text;
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
