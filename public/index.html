@@ -2170,6 +2170,9 @@
           return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
         }
         const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
+        provide('openModal', openModal);
+        provide('closeModal', closeModal);
+        provide('isActive', isActive);
         function onEscClose() { closeModal(); }
         onMounted(() => document.addEventListener('modal:close', onEscClose));
         onUnmounted(() => document.removeEventListener('modal:close', onEscClose));
@@ -2913,6 +2916,9 @@
       `,
 
       setup() {
+        const openModal   = inject('openModal');
+        const closeModal  = inject('closeModal');
+        const isActive    = inject('isActive');
         const settings    = ref(null);
         const form        = ref({
           github_interval_minutes:   360,
@@ -3238,7 +3244,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           generatedApiToken, generatingToken, proxyStats, loadingStats,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats, openModal, closeModal, isActive,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats,
           relativeTime,
           api: window.api,
         };
