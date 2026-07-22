@@ -12,6 +12,7 @@ let _pool = [];
 let _lastFetchedAt = 0;
 let _refreshing = null;
 let _statsLoaded = false;
+let _proxyIdx = 0;
 const proxyStats = new Map(); // host → {failures, successes}
 
 // Load cached pool from disk (survives restarts, avoids unnecessary re-downloads)
@@ -25,14 +26,6 @@ function _loadCache() {
     console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache`);
   } catch (e) {
     // cache read failure — proceed without cache
-  }
-}
-
-function _saveCache() {
-  try {
-    fs.writeFileSync(POOL_PATH, JSON.stringify({ pool: _pool, fetchedAt: _lastFetchedAt }), 'utf8');
-  } catch (e) {
-    console.error(`[proxy-fetch] cache write failed: ${e.message}`);
   }
 }
 

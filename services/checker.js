@@ -1,5 +1,6 @@
 // Health-check services: website, github, twitter
 const db = require('./db');
+const { proxyFetch } = require('./proxy-fetch');
 const { createHash } = require('crypto');
 const { execSync } = require('child_process');
 const { JSDOM } = require('jsdom');
@@ -126,7 +127,7 @@ async function fetchWithTimeout(url, ms, opts = {}) {
   const timeout = setTimeout(() => controller.abort(), ms);
   const t0 = Date.now();
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow', ...opts });
+    const res = await proxyFetch(url, { signal: controller.signal, redirect: 'follow', ...opts });
     return { res, responseTimeMs: Date.now() - t0 };
   } finally {
     clearTimeout(timeout);
@@ -313,7 +314,9 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   let lastErr;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      feed = await rssParser.parseURL(rssUrl);
+      const res = await proxyFetch(rssUrl);
+      const text = await res.text();
+      feed = await rssParser.parseString(text);
       lastErr = null;
       break;
     } catch (err) {

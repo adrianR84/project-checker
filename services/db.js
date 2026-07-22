@@ -294,7 +294,7 @@ const dbProxy = {
       await dbProxy.prepare('UPDATE config SET webshare = ? WHERE user_id = ?').run(JSON.stringify(data), userId);
     },
     async getProxyStats() {
-      return dbProxy.prepare('SELECT * FROM proxy_stats ORDER BY failures DESC, successes ASC').all();
+      return dbProxy.prepare('SELECT * FROM proxy_stats ORDER BY successes DESC, (CAST(total_response_ms AS REAL) / NULLIF(successes, 0)) ASC').all();
     },
     async upsertProxyStat({ host, ok, responseMs }) {
       const now = new Date().toISOString();
