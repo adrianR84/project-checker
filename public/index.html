@@ -2851,11 +2851,18 @@
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
               </button>
+              <button v-if="form.webshare_enabled" class="secondary" style="margin-left:.25rem" @click="loadProxyStats().then(() => openModal('proxystats'))">Proxy Stats</button>
+            </article>
 
-              <details v-if="form.webshare_enabled">
-                <summary class="muted" style="cursor:pointer;margin-top:.75rem">Proxy Stats</summary>
-                <div v-if="proxyStats.length === 0" class="muted" style="padding:.5rem 0">No stats yet — run a check to see proxy performance.</div>
-                <table v-else style="width:100%;font-size:.85rem;margin-top:.5rem">
+            <!-- Proxy Stats modal -->
+            <div class="modal" :class="{ active: isActive('proxystats') }" @click.self="closeModal">
+              <header class="modal-header">
+                <h3 style="margin:0;">Proxy Stats</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
+              </header>
+              <div class="modal-body">
+                <div v-if="proxyStats.length === 0" class="muted">No stats yet — run a check to see proxy performance.</div>
+                <table v-else style="width:100%;font-size:.85rem">
                   <thead>
                     <tr style="text-align:left">
                       <th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th>
@@ -2871,12 +2878,13 @@
                     </tr>
                   </tbody>
                 </table>
-                <div style="margin-top:.5rem;display:flex;gap:.5rem">
-                  <button style="font-size:.8rem" :disabled="loadingStats" @click="loadProxyStats">Refresh</button>
-                  <button style="font-size:.8rem" class="secondary" :disabled="loadingStats" @click="clearProxyStats">Clear</button>
-                </div>
-              </details>
-            </article>
+              </div>
+              <div class="modal-actions">
+                <button @click="loadProxyStats" :disabled="loadingStats">{{ loadingStats ? '…' : 'Refresh' }}</button>
+                <button class="secondary" @click="clearProxyStats(); closeModal()" :disabled="loadingStats">Clear</button>
+                <button @click="closeModal">Close</button>
+              </div>
+            </div>
 
             <!-- Danger zone: wipe all data (keeps config) -->
             <article v-if="form.showDangerZone" class="danger-zone">
@@ -3230,7 +3238,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           generatedApiToken, generatingToken, proxyStats, loadingStats,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, loadProxyStats, clearProxyStats, openModal, closeModal, isActive,
           relativeTime,
           api: window.api,
         };
