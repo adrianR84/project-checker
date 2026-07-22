@@ -54,7 +54,7 @@ async function _loadStats() {
   _statsLoaded = true;
   try {
     const rows = await db.config.getProxyStats();
-    for (const r of rows) proxyStats.set(r.host, { failures: r.failures, successes: r.successes });
+    for (const r of rows) proxyStats.set(r.host, { failures: r.failures, successes: r.successes, totalMs: r.total_response_ms });
     console.error(`[proxy-fetch] loaded ${proxyStats.size} proxy stat rows`);
   } catch (e) {
     console.error(`[proxy-fetch] failed to load proxy stats: ${e.message}`);
@@ -63,9 +63,18 @@ async function _loadStats() {
 
 function _pickProxy() {
   _loadStats();
-  const alive = _pool.filter(p => (proxyStats.get(p.host)?.failures ?? 0) < 3);
-  const list = alive.length ? alive : _pool;
-  return list[Math.floor(Math.random() * list.length)];
+  // ponytail: pick the proxy with the lowest failure count, ties broken by avg response time
+  const alive = _pool
+    .map(p => {
+      const stats = proxyStats.get(p.host) ?? { failures: 0, successes: 0, totalMs: 0 };
+      return { proxy: p, failures: stats.failures, avgMs: stats.successes > 0 ? Math.round(stats.totalMs / stats.successes) : 0 };
+    })
+    .filter(p => p.failures < 3)
+    .sort((a, b) => a.failures - b.failures || a.avgMs - b.avgMs);
+  const list = alive.length ? alive.map(p => p.proxy) : _pool;
+  // ponytail: round-robin across sorted pool
+  const proxy = list[_proxyIdx++ % list.length];
+  return proxy;
 }
 
 async function _downloadList(apiKey, country) {
@@ -128,11 +137,13 @@ async function proxyFetch(url, opts = {}) {
   const t0 = Date.now();
   try {
     const res = await fetch(url, { ...opts, dispatcher: agent });
-    proxyStats.set(host, { failures: proxyStats.get(host)?.failures ?? 0, successes: (proxyStats.get(host)?.successes ?? 0) + 1 });
+    const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
+    proxyStats.set(host, { failures: prev.failures, successes: prev.successes + 1, totalMs: prev.totalMs + (Date.now() - t0) });
     await db.config.upsertProxyStat({ host, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
     return res;
   } catch (proxyErr) {
-    proxyStats.set(host, { successes: proxyStats.get(host)?.successes ?? 0, failures: (proxyStats.get(host)?.failures ?? 0) + 1 });
+    const prev = proxyStats.get(host) ?? { failures: 0, successes: 0, totalMs: 0 };
+    proxyStats.set(host, { successes: prev.successes, failures: prev.failures + 1, totalMs: prev.totalMs });
     await db.config.upsertProxyStat({ host, ok: false, responseMs: 0 }).catch(() => {});
     console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
     const t0d = Date.now();
