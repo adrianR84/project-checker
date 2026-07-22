@@ -18,11 +18,11 @@ const proxyStats = new Map(); // host → {failures, successes}
 function _loadCache() {
   try {
     if (!fs.existsSync(POOL_PATH)) return;
-    const { pool, fetchedAt } = JSON.parse(fs.readFileSync(POOL_PATH, 'utf8'));
+    const { pool } = JSON.parse(fs.readFileSync(POOL_PATH, 'utf8'));
     if (!Array.isArray(pool) || !pool.length) return;
     _pool = pool;
-    _lastFetchedAt = fetchedAt || 0;
-    console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache (stale for ${Math.round((Date.now() - _lastFetchedAt) / 1000 / 60)}m)`);
+    _lastFetchedAt = Date.now(); // reset so full REFRESH_MS applies from last restart
+    console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache`);
   } catch (e) {
     // cache read failure — proceed without cache
   }
