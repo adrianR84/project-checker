@@ -500,12 +500,19 @@
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
+    const NITTER_BASE = 'https://nitter.net';
+
     const statusChangeHelpers = {
       badgeClass(eventType) {
         if (eventType === 'tag_changed') return 'pending';
         if (eventType === 'changed') return 'changed';
         if (eventType === 'deleted') return 'error';
         return 'pending';
+      },
+      nitterUrl(twitterUrl) {
+        if (!twitterUrl) return null;
+        const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
+        return handle ? NITTER_BASE + '/' + handle : null;
       },
       resourceIcon(resourceType) {
         return `<span class="icon icon-${resourceType}"></span>`;
@@ -605,7 +612,7 @@
         twitterIframeUrl(log) {
           const u = this.scResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          return 'https://nitter.net' + u.replace('https://x.com', '').replace('https://twitter.com', '');
+          return statusChangeHelpers.nitterUrl(u);
         },
         async toggleConfirm(log, event) {
           if (log.confirmed) {
@@ -704,7 +711,7 @@
         twitterIframeUrl(log) {
           const u = this.alertResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          return 'https://nitter.net' + u.replace('https://x.com', '').replace('https://twitter.com', '');
+          return statusChangeHelpers.nitterUrl(u);
         },
       },
     };
@@ -1128,7 +1135,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + project.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe(nitterUrl(project.twitter_url), 'Twitter'))">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1322,6 +1329,7 @@
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
           appSettings: sharedSettings,
+          nitterUrl: statusChangeHelpers.nitterUrl,
         };
       },
     };
@@ -1522,7 +1530,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe('https://nitter.net' + row.twitter_url.replace('https://x.com','').replace('https://twitter.com',''), 'Twitter'))">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openIframe(nitterUrl(row.twitter_url), 'Twitter'))">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
@@ -1979,6 +1987,7 @@
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
           scrollToTop, scrollToLogs,
+          nitterUrl: statusChangeHelpers.nitterUrl,
         };
       },
     };

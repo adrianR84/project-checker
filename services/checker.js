@@ -324,6 +324,7 @@ const FIRST_RUN_POST_LIMIT = 20;
 async function fetchAndStoreTwitterPosts(projectId, handle) {
   if (!projectId || !handle) return { newPosts: 0, newPostIds: [] };
   const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
+  const fallbackRssUrl = `https://xcancel.com/${encodeURIComponent(handle)}/rss`;
 
   // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust.
   // Each attempt calls proxyFetch() independently — picks may land on different proxy IPs (no sticky session).
@@ -344,6 +345,17 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
       if (attempt < MAX_RETRIES) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
       }
+    }
+  }
+  if (lastErr) {
+    // ponytail: fallback — try xcancel.com before direct
+    try {
+      const res = await proxyFetch(fallbackRssUrl);
+      const text = await res.text();
+      feed = await rssParser.parseString(text);
+      lastErr = null;
+    } catch (fallbackErr) {
+      lastErr = fallbackErr;
     }
   }
   if (lastErr) {
