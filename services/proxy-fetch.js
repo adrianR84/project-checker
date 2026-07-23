@@ -175,7 +175,7 @@ async function proxyFetch(url, opts = {}) {
         }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
       });
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-      return { ok: res.ok, status: res.status, text: () => Promise.resolve(res.body) };
+      return { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
@@ -216,7 +216,7 @@ async function proxyFetch(url, opts = {}) {
         }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
       });
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0d }).catch(() => {});
-      return { ok: res.ok, status: res.status, text: () => Promise.resolve(res.body) };
+      return { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
