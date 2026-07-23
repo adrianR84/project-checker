@@ -509,14 +509,12 @@
         if (eventType === 'deleted') return 'error';
         return 'pending';
       },
-      nitterUrl(twitterUrl) {
+      nitterInfo(twitterUrl) {
         if (!twitterUrl) return null;
         const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
         if (!handle) return null;
-        return NITTER_BASE.value + '/' + handle;
-      },
-      nitterIframeable() {
-        return NITTER_BASE.value === 'https://nitter.net';
+        const base = NITTER_BASE.value;
+        return { url: base + '/' + handle, newTab: base !== 'https://nitter.net' };
       },
       resourceIcon(resourceType) {
         return `<span class="icon icon-${resourceType}"></span>`;
@@ -616,10 +614,10 @@
         twitterIframeUrl(log) {
           const u = this.scResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          const url = statusChangeHelpers.nitterUrl(u);
-          if (!url) return;
-          if (statusChangeHelpers.nitterIframeable()) this.openIframe(url, 'Twitter');
-          else window.open(url, '_blank');
+          const info = statusChangeHelpers.nitterInfo(u);
+          if (!info) return;
+          if (info.newTab) window.open(info.url, '_blank');
+          else this.openIframe(info.url, 'Twitter');
         },
         async toggleConfirm(log, event) {
           if (log.confirmed) {
@@ -718,10 +716,10 @@
         twitterIframeUrl(log) {
           const u = this.alertResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          const url = statusChangeHelpers.nitterUrl(u);
-          if (!url) return;
-          if (statusChangeHelpers.nitterIframeable()) this.openIframe(url, 'Twitter');
-          else window.open(url, '_blank');
+          const info = statusChangeHelpers.nitterInfo(u);
+          if (!info) return;
+          if (info.newTab) window.open(info.url, '_blank');
+          else this.openIframe(info.url, 'Twitter');
         },
       },
     };
@@ -1145,7 +1143,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), nitterIframeable() ? openIframe(nitterUrl(project.twitter_url), 'Twitter') : windowOpen(nitterUrl(project.twitter_url)))">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter" @click="e => { const i = nitterInfo(project.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else { e.preventDefault(); openIframe(i.url, 'Twitter'); } }">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1340,8 +1338,7 @@
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
           appSettings: sharedSettings,
-          nitterUrl: statusChangeHelpers.nitterUrl,
-          nitterIframeable: statusChangeHelpers.nitterIframeable,
+          nitterInfo: statusChangeHelpers.nitterInfo,
         };
       },
     };
@@ -1542,7 +1539,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), nitterIframeable() ? openIframe(nitterUrl(row.twitter_url), 'Twitter') : windowOpen(nitterUrl(row.twitter_url)))">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter" @click="e => { const i = nitterInfo(row.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else { e.preventDefault(); openIframe(i.url, 'Twitter'); } }">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
@@ -2000,9 +1997,7 @@
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
           windowOpen: (url) => window.open(url, '_blank'),
           scrollToTop, scrollToLogs,
-          nitterUrl: statusChangeHelpers.nitterUrl,
-          nitterUrl: statusChangeHelpers.nitterUrl,
-          nitterIframeable: statusChangeHelpers.nitterIframeable,
+          nitterInfo: statusChangeHelpers.nitterInfo,
         };
       },
     };
