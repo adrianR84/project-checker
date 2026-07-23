@@ -22,6 +22,7 @@
     "defuddle": "^0.19.1",
     "dotenv": "^17.4.2",
     "express": "^4.21.0",
+    "https-proxy-agent": "^9.1.0",
     "jsdom": "^29.1.1",
     "node-cron": "^3.0.3",
     "rss-parser": "^3.13.0"

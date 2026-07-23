@@ -126,12 +126,13 @@ router.get('/token-prices', async (req, res) => {
     JOIN projects p ON p.id = tp.project_id AND p.enabled = 1 AND p.user_id = ?
     ORDER BY p.name
   `).all(req.userId);
-  res.json(rows.map(r => ({
-    ...r,
-    website_url:  r.website  ? JSON.parse(r.website).url  : null,
-    github_url:   r.github   ? JSON.parse(r.github).url  : null,
-    twitter_url:  r.twitter   ? JSON.parse(r.twitter).url : null,
-  })));
+  res.json(rows.map(r => {
+    let website_url = null, github_url = null, twitter_url = null;
+    try { website_url = r.website  ? JSON.parse(r.website).url  : null; } catch {}
+    try { github_url  = r.github   ? JSON.parse(r.github).url  : null; } catch {}
+    try { twitter_url = r.twitter  ? JSON.parse(r.twitter).url : null; } catch {}
+    return { ...r, website_url, github_url, twitter_url };
+  }));
 });
 
 module.exports = router;
