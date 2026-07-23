@@ -139,8 +139,7 @@ async function purgeAlertLogs() {
   const settings = await db.config.getSettings();
   if (!settings?.alert_log_retention_days) return;
   const cutoff = new Date(Date.now() - settings.alert_log_retention_days * 86400_000).toISOString();
-  // Cascade FK: alert_logs.status_change_id references event_logs.id ON DELETE CASCADE
-  await db.prepare('DELETE FROM event_logs WHERE created_at < ?').run(cutoff);
+  await db.prepare('DELETE FROM alert_logs WHERE created_at < ?').run(cutoff);
   scheduleLog(`[${now()}] Scheduler: purged alert_logs older than ${settings.alert_log_retention_days} days`);
 }
 

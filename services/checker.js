@@ -10,8 +10,6 @@ const RssParser = require('rss-parser');
 const rssParser = new RssParser();
 // ponytail: cached defuddle availability, checked once on first Twitter check
 let _defuddleAvailable = undefined;
-// ponytail: set to false before calling checkTwitter to skip defuddle suspended-account check
-let enableDefuddleSuspendedCheck = true;
 
 /** Runs defuddle and returns stdout, or throws on non-zero exit / timeout. */
 function defuddleParse(url) {
@@ -412,7 +410,7 @@ async function checkTwitter(url, projectId, opts = {}) {
   const start = Date.now();
   if (!url) return { ...emptyUrlResult('No URL provided'), details: null };
 
-  const { postsCheck = false } = opts;
+  const { postsCheck = false, defuddleCheck = false } = opts;
   const handle = opts.handle || handleFromTwitterUrl(url);
 
   let lastStatus = null;
@@ -440,7 +438,7 @@ async function checkTwitter(url, projectId, opts = {}) {
     let _defuddleDetails = null;
 
     // ponytail: defuddle parse to detect suspended accounts when HTTP 200
-    if (res.ok && _defuddleAvailable !== false && enableDefuddleSuspendedCheck) {
+    if (res.ok && _defuddleAvailable !== false && defuddleCheck) {
       try {
         if (_defuddleAvailable === undefined) {
           await new Promise((resolve, reject) => {
@@ -520,6 +518,4 @@ module.exports = {
   recordStatusChange,
   fetchAndStoreTwitterPosts,
   handleFromTwitterUrl,
-  get enableDefuddleSuspendedCheck() { return enableDefuddleSuspendedCheck; },
-  set enableDefuddleSuspendedCheck(v) { enableDefuddleSuspendedCheck = v; },
 };
