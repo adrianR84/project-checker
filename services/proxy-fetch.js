@@ -10,11 +10,14 @@ const path = require('path');
 
 const POOL_PATH = path.join(__dirname, '..', 'data', 'proxies.json');
 const REFRESH_MS = 86_400_000; // 24 hours
+const DECAY_MS = 21_600_000; // 6 hours
+// ponytail: reduce failure counts by 25% every DECAY_MS so proxies slowly recover over time
 let _pool = [];
 let _lastFetchedAt = 0;
 let _refreshing = null;
 let _statsLoaded = false;
 let _proxyIdx = 0;
+let _decayInterval = null;
 const proxyStatsByIp = new Map(); // ip → {failures, successes}  — aggregated across ports
 
 // ponytail: extract IP from "1.2.3.4:80" → "1.2.3.4"
@@ -81,18 +84,19 @@ async function _loadStats() {
 
 function _pickProxy() {
   _loadStats();
-  // ponytail: pick the proxy with the lowest failure count, ties broken by avg response time
-  const alive = _pool
-    .map(p => {
-      const stats = proxyStatsByIp.get(_ip(p)) ?? { failures: 0, successes: 0, totalMs: 0 };
-      return { proxy: p, failures: stats.failures, avgMs: stats.successes > 0 ? Math.round(stats.totalMs / stats.successes) : 0 };
-    })
-    .filter(p => p.failures < 6)
-    .sort((a, b) => a.failures - b.failures || a.avgMs - b.avgMs);
-  const list = alive.length ? alive.map(p => p.proxy) : _pool;
-  // ponytail: round-robin across sorted pool
-  const proxy = list[_proxyIdx++ % list.length];
-  return proxy;
+  // ponytail: weighted random — probability proportional to 1/(failures+1).
+  // Lower failure count = higher weight. No hard exclusion; every proxy has a non-zero chance.
+  const weighted = _pool.map(p => {
+    const stats = proxyStatsByIp.get(_ip(p)) ?? { failures: 0, successes: 0, totalMs: 0 };
+    return { proxy: p, weight: 1 / (stats.failures + 1) };
+  });
+  const total = weighted.reduce((sum, p) => sum + p.weight, 0);
+  let r = Math.random() * total;
+  for (const { proxy, weight } of weighted) {
+    r -= weight;
+    if (r <= 0) return proxy;
+  }
+  return weighted[weighted.length - 1].proxy; // fallback to last
 }
 
 async function _downloadList(apiKey, country) {
@@ -132,6 +136,13 @@ async function _ensurePool() {
   return _refreshing;
 }
 
+// ponytail: reduce failure counts by 25% every DECAY_MS so proxies slowly recover over time
+function _decayStats() {
+  for (const [ip, stats] of proxyStatsByIp) {
+    proxyStatsByIp.set(ip, { ...stats, failures: Math.floor(stats.failures * 0.75) });
+  }
+}
+
 /** Performs an HTTP/1.1 GET request through a CONNECT tunnel over a Webshare proxy. */
 function _tunnelFetch(proxy, targetUrl, headers = {}, timeoutMs = 15000) {
   const u = new URL(targetUrl);
@@ -159,6 +170,10 @@ function _tunnelFetch(proxy, targetUrl, headers = {}, timeoutMs = 15000) {
 
 /** Fetches url through a rotating Webshare proxy. Falls back to direct on pool failure or dead proxy. */
 async function proxyFetch(url, opts = {}) {
+  // ponytail: start failure-decay interval lazily on first use (only runs when webshare is enabled)
+  if (!_decayInterval) {
+    _decayInterval = setInterval(_decayStats, DECAY_MS);
+  }
   await _ensurePool();
   const ua = opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0';
 
@@ -198,8 +213,8 @@ async function proxyFetch(url, opts = {}) {
     return { ok: true, status, text: () => Promise.resolve(body) };
   } catch (proxyErr) {
     // ponytail: proxy tunnel failed — record failure to proxy IP, then fall back to direct.
-    // This fallback fires on every proxy failure, giving each proxy a chance before it's
-    // excluded by the failure threshold (failures < 6 in _pickProxy).
+    // Failures decay over time via _decayStats, and _pickProxy uses weighted random,
+    // so no hard exclusion — every proxy has a non-zero chance of being picked.
     console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
     // ponytail: record proxy IP failure
     await db.config.upsertProxyStat({ host: ip, ok: false, responseMs: 0 }).catch(() => {});
