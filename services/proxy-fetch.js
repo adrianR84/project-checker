@@ -73,7 +73,7 @@ async function _loadStats() {
         totalMs: agg.totalMs + r.total_response_ms,
       });
     }
-    console.error(`[proxy-fetch] loaded ${proxyStatsByIp.size} unique IPs from proxy stat rows`);
+    //console.error(`[proxy-fetch] loaded ${proxyStatsByIp.size} unique IPs from proxy stat rows`);
   } catch (e) {
     console.error(`[proxy-fetch] failed to load proxy stats: ${e.message}`);
   }
@@ -197,6 +197,9 @@ async function proxyFetch(url, opts = {}) {
     // ponytail: return a Response-like object so callers (.ok, .text()) work the same as undici fetch
     return { ok: true, status, text: () => Promise.resolve(body) };
   } catch (proxyErr) {
+    // ponytail: proxy tunnel failed — record failure to proxy IP, then fall back to direct.
+    // This fallback fires on every proxy failure, giving each proxy a chance before it's
+    // excluded by the failure threshold (failures < 6 in _pickProxy).
     console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
     // ponytail: record proxy IP failure
     await db.config.upsertProxyStat({ host: ip, ok: false, responseMs: 0 }).catch(() => {});

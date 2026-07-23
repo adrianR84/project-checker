@@ -307,7 +307,9 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   if (!projectId || !handle) return { newPosts: 0, newPostIds: [] };
   const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
 
-  // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust
+  // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust.
+  // Each attempt calls proxyFetch() independently — picks may land on different proxy IPs (no sticky session).
+  // No per-attempt direct fallback — direct is only tried after all 3 proxy attempts have failed.
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
   let feed;
