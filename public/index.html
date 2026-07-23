@@ -500,7 +500,7 @@
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
-    const NITTER_BASE = 'https://nitter.space';
+    const NITTER_BASE = computed(() => sharedSettings.value?.twitter_nitter_instance || 'https://nitter.space');
 
     const statusChangeHelpers = {
       badgeClass(eventType) {
@@ -513,16 +513,10 @@
         if (!twitterUrl) return null;
         const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
         if (!handle) return null;
-        const url = NITTER_BASE + '/' + handle;
-        return { url, iframeable: NITTER_BASE === 'https://nitter.net' };
+        return NITTER_BASE.value + '/' + handle;
       },
-      openNitterUrl(twitterUrl) {
-        if (!twitterUrl) return;
-        const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
-        if (!handle) return;
-        const url = NITTER_BASE + '/' + handle;
-        if (NITTER_BASE === 'https://nitter.net') openIframe(url, 'Twitter');
-        else window.open(url, '_blank');
+      nitterIframeable() {
+        return NITTER_BASE.value === 'https://nitter.net';
       },
       resourceIcon(resourceType) {
         return `<span class="icon icon-${resourceType}"></span>`;
@@ -586,7 +580,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ trimName(log.project_name) || log.project_id }}</td>
-                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
+                <td><a v-if="scResourceUrl(log)" :href="scResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), twitterIframeUrl(log))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -622,7 +616,10 @@
         twitterIframeUrl(log) {
           const u = this.scResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          return statusChangeHelpers.nitterUrl(u);
+          const url = statusChangeHelpers.nitterUrl(u);
+          if (!url) return;
+          if (statusChangeHelpers.nitterIframeable()) this.openIframe(url, 'Twitter');
+          else window.open(url, '_blank');
         },
         async toggleConfirm(log, event) {
           if (log.confirmed) {
@@ -688,7 +685,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ trimName(log.project_name) || log.status_change_id }}</td>
-                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), openIframe(twitterIframeUrl(log), 'Twitter'))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
+                <td><a v-if="alertResourceUrl(log)" :href="alertResourceUrl(log)" target="_blank" rel="noopener" :title="log.resource_type === 'twitter' ? 'Twitter — Click for iframe modal, Ctrl+click for new tab' : ''" @click="e => log.resource_type === 'twitter' && !e.ctrlKey && (e.preventDefault(), twitterIframeUrl(log))" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', badgeClass(log.event_type)]">
                     {{ log.event_type }}
@@ -721,7 +718,10 @@
         twitterIframeUrl(log) {
           const u = this.alertResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          return statusChangeHelpers.nitterUrl(u);
+          const url = statusChangeHelpers.nitterUrl(u);
+          if (!url) return;
+          if (statusChangeHelpers.nitterIframeable()) this.openIframe(url, 'Twitter');
+          else window.open(url, '_blank');
         },
       },
     };
@@ -1145,7 +1145,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openNitterUrl(project.twitter_url))">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), nitterIframeable() ? openIframe(nitterUrl(project.twitter_url), 'Twitter') : windowOpen(nitterUrl(project.twitter_url)))">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1335,11 +1335,13 @@
           statusClass,
           openProjectEdit,
           openIframe,
+          windowOpen: (url) => window.open(url, '_blank'),
           copyContract,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
           appSettings: sharedSettings,
-          openNitterUrl: statusChangeHelpers.openNitterUrl,
+          nitterUrl: statusChangeHelpers.nitterUrl,
+          nitterIframeable: statusChangeHelpers.nitterIframeable,
         };
       },
     };
@@ -1540,7 +1542,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), openNitterUrl(row.twitter_url))">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter — Click for iframe modal, Ctrl+click for new tab" @click="e => !e.ctrlKey && (e.preventDefault(), nitterIframeable() ? openIframe(nitterUrl(row.twitter_url), 'Twitter') : windowOpen(nitterUrl(row.twitter_url)))">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
@@ -1996,9 +1998,11 @@
           pausePricesRefresh, resumePricesRefresh,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
+          windowOpen: (url) => window.open(url, '_blank'),
           scrollToTop, scrollToLogs,
           nitterUrl: statusChangeHelpers.nitterUrl,
-          openNitterUrl: statusChangeHelpers.openNitterUrl,
+          nitterUrl: statusChangeHelpers.nitterUrl,
+          nitterIframeable: statusChangeHelpers.nitterIframeable,
         };
       },
     };
@@ -2788,6 +2792,16 @@
                 </label>
               </fieldset>
 
+              <fieldset role="group">
+                <label>
+                  Twitter nitter instance
+                  <select v-model="form.twitter_nitter_instance">
+                    <option value="https://nitter.net">nitter.net (iframe)</option>
+                    <option value="https://xcancel.com">xcancel.com (new tab)</option>
+                  </select>
+                </label>
+              </fieldset>
+
               <button :disabled="saving" @click="saveCleanUpSettings">
                 <span v-if="!saving">Save</span>
                 <span v-else class="spinner"></span>
@@ -2921,6 +2935,7 @@
           event_log_retention_days:       14,
           alert_log_retention_days:       14,
           twitter_posts_per_project:      50,
+          twitter_nitter_instance:   'https://nitter.net',
           ui_refresh_seconds:        60,
           ui_refresh_enabled:        false,
           showDangerZone:           false,
@@ -2989,6 +3004,7 @@
               event_log_retention_days:  settings.value.event_log_retention_days ?? 14,
               alert_log_retention_days:  settings.value.alert_log_retention_days ?? 14,
               twitter_posts_per_project: settings.value.twitter_posts_per_project ?? 50,
+              twitter_nitter_instance: settings.value.twitter_nitter_instance || 'https://nitter.net',
               ui_refresh_seconds:    settings.value.ui_refresh_seconds || 60,
               ui_refresh_enabled:    !!settings.value.ui_refresh_seconds,
               compact_activity:     !!settings.value.compact_activity,
@@ -3086,6 +3102,7 @@
             event_log_retention_days: Math.max(10, Math.min(60, Number(form.value.event_log_retention_days) || 14)),
             alert_log_retention_days: Math.max(10, Math.min(30, Number(form.value.alert_log_retention_days) || 14)),
             twitter_posts_per_project: Math.max(50, Math.min(100, Number(form.value.twitter_posts_per_project) || 50)),
+            twitter_nitter_instance: form.value.twitter_nitter_instance,
           });
         }
 
