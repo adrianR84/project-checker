@@ -1143,7 +1143,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter" @click="e => { const i = nitterInfo(project.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else { e.preventDefault(); openIframe(i.url, 'Twitter'); } }">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter" @click="e => { if (e.ctrlKey) return; e.preventDefault(); const i = nitterInfo(project.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else openIframe(i.url, 'Twitter'); }">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1539,7 +1539,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter" @click="e => { const i = nitterInfo(row.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else { e.preventDefault(); openIframe(i.url, 'Twitter'); } }">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter" @click="e => { if (e.ctrlKey) return; e.preventDefault(); const i = nitterInfo(row.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else openIframe(i.url, 'Twitter'); }">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
