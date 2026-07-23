@@ -133,6 +133,9 @@ All settings are stored in the `config` table as JSON group columns:
 | | `enabled` | `false` | Enable Telegram alerts |
 | `pushbullet` | `access_token` | `''` | Pushbullet OAuth token |
 | | `enabled` | `false` | Enable Pushbullet alerts |
+| `webshare` | `enabled` | `false` | Enable Webshare proxy rotation |
+| | `token` | `null` | Webshare API token |
+| | `country` | `''` | Country filter for proxy list |
 | `price_alerts` | `alerts[]` | `[{price_change:10,price_interval:5,...}, {...25,...15}, {...50,...60}]` | Price change thresholds with throttle windows |
 
 ## Environment variables
@@ -219,6 +222,8 @@ Mounted at `/api/v1`. Uses `Authorization: Bearer <api_token>` — no session co
 ### Settings
 
 - `GET /api/settings` — full config snapshot (flat + group shapes); sensitive tokens masked to `DUMMY_TOKEN_*`
+- `GET /api/settings/proxy-stats` — per-proxy success/failure counts and response times from proxy_stats table
+- `DELETE /api/settings/proxy-stats` — clear all proxy stats
 - `PUT /api/settings` — update any subset of: check/alert intervals, log retention, UI refresh, tokens, notification channels, price alerts
 - `POST /api/settings/trigger-all` — run website + Twitter + GitHub checks for all owned projects
 - `POST /api/settings/trigger-websites` — run website checks for all projects
