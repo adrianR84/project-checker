@@ -2788,10 +2788,13 @@
               </fieldset>
 
               <fieldset role="group">
-                <label>
-                  Twitter nitter instance
+                <label data-tooltip="Nitter is a way to visualize Twitter without being registered">
+                  Twitter Nitter instance
                   <select v-model="form.twitter_nitter_instance">
-                    <option value="https://nitter.net">nitter.net (iframe)</option>
+                    <option value="https://nitter.net">nitter.net (Best - iframe)</option>
+                    <option value="https://nitter.space">nitter.space (new tab)</option>
+                    <option value="https://lightbrd.com">lightbrd.com (new tab)</option>
+                    <option value="https://nitter.kareem.one">nitter.kareem.one (new tab)</option>
                     <option value="https://xcancel.com">xcancel.com (new tab)</option>
                   </select>
                 </label>
