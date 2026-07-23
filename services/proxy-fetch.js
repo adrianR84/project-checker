@@ -12,6 +12,7 @@ const POOL_PATH = path.join(__dirname, '..', 'data', 'proxies.json');
 const REFRESH_MS = 86_400_000; // 24 hours
 const DECAY_MS = 21_600_000; // 6 hours
 // ponytail: reduce failure counts by 25% every DECAY_MS so proxies slowly recover over time
+const DECAY_PERSIST = 0; // 1 = write decayed failures back to proxy_stats DB (survives restarts), 0 = in-memory only
 let _pool = [];
 let _lastFetchedAt = 0;
 let _refreshing = null;
@@ -139,7 +140,11 @@ async function _ensurePool() {
 // ponytail: reduce failure counts by 25% every DECAY_MS so proxies slowly recover over time
 function _decayStats() {
   for (const [ip, stats] of proxyStatsByIp) {
-    proxyStatsByIp.set(ip, { ...stats, failures: Math.floor(stats.failures * 0.75) });
+    const decayed = Math.floor(stats.failures * 0.75);
+    proxyStatsByIp.set(ip, { ...stats, failures: decayed });
+    if (DECAY_PERSIST) {
+      db.config.setProxyFailures(ip, decayed).catch(() => {});
+    }
   }
 }
 

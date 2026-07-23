@@ -331,6 +331,10 @@ const dbProxy = {
     },
     async clearProxyStats() {
       await dbProxy.prepare('DELETE FROM proxy_stats').run();
+    },
+    // ponytail: overwrites failures to a specific value (used by decay to lower failure counts in DB)
+    async setProxyFailures(host, failures) {
+      await dbProxy.prepare('UPDATE proxy_stats SET failures = ? WHERE host = ?').run(failures, host);
     }
   }
 };
