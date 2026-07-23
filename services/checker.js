@@ -314,7 +314,8 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   let lastErr;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const text = await proxyFetch(rssUrl);
+      const res = await proxyFetch(rssUrl);
+      const text = await res.text();
       feed = await rssParser.parseString(text);
       lastErr = null;
       break;

@@ -1,14 +1,15 @@
 // services/proxy-fetch.js
 // ponytail: Webshare rotating proxy pool. Round-robins across IP:PORT:USER:PASS entries via manual HTTP CONNECT tunnel (HTTP/1.1).
 // Falls back to direct Node https when disabled, pool unavailable, or a specific proxy fails.
-const { fetch } = require('undici');
+// ponytail: undici removed — Node 18+ native fetch is used instead
+// const { fetch } = require('undici');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const db = require('./db');
 const fs = require('fs');
 const path = require('path');
 
 const POOL_PATH = path.join(__dirname, '..', 'data', 'proxies.json');
-const REFRESH_MS = 3_600_000; // 1 hour
+const REFRESH_MS = 86_400_000; // 24 hours
 let _pool = [];
 let _lastFetchedAt = 0;
 let _refreshing = null;
