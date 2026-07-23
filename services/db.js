@@ -183,6 +183,18 @@ async function init() {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS proxy_stats (
+      host TEXT PRIMARY KEY,
+      successes INTEGER NOT NULL DEFAULT 0,
+      failures INTEGER NOT NULL DEFAULT 0,
+      total_response_ms INTEGER NOT NULL DEFAULT 0,
+      last_used_at TEXT,
+      last_success_at TEXT,
+      last_fail_at TEXT
+    );
+  `);
+
+  database.exec(`
     CREATE TABLE IF NOT EXISTS token_prices_alerts (
       project_id INTEGER NOT NULL,
       price_change REAL NOT NULL,
