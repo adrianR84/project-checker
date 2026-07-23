@@ -2,7 +2,7 @@
 const db = require('./db');
 const { proxyFetch } = require('./proxy-fetch');
 const { createHash } = require('crypto');
-const { execSync } = require('child_process');
+const { spawn } = require('child_process');
 const { JSDOM } = require('jsdom');
 // ponytail: rss-parser uses Node's legacy https.get which nitter.net accepts;
 // built-in fetch / node-fetch-native both return empty bodies from nitter.
@@ -12,6 +12,26 @@ const rssParser = new RssParser();
 let _defuddleAvailable = undefined;
 // ponytail: set to false before calling checkTwitter to skip defuddle suspended-account check
 let enableDefuddleSuspendedCheck = true;
+
+/** Runs defuddle and returns stdout, or throws on non-zero exit / timeout. */
+function defuddleParse(url) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('defuddle', ['parse', url, '--md'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('defuddle timeout')); }, 10000);
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (code === 0) resolve(stdout);
+      else reject(new Error(stderr || `defuddle exit ${code}`));
+    });
+    child.on('error', err => { clearTimeout(timer); reject(err); });
+  });
+}
 
 /** Returns the current ISO timestamp. */
 const now = () => new Date().toISOString();
@@ -423,18 +443,17 @@ async function checkTwitter(url, projectId, opts = {}) {
     if (res.ok && _defuddleAvailable !== false && enableDefuddleSuspendedCheck) {
       try {
         if (_defuddleAvailable === undefined) {
-          execSync('defuddle --version', { stdio: 'pipe', timeout: 5000, windowsHide: true });
+          await new Promise((resolve, reject) => {
+            const child = spawn('defuddle', ['--version'], { stdio: 'pipe', windowsHide: true });
+            child.on('close', code => code === 0 ? resolve(null) : reject(new Error('defuddle not found')));
+            child.on('error', reject);
+          });
           _defuddleAvailable = true;
         }
-        const defuddleOut = execSync(`defuddle parse "${url}" --md`, {
-          stdio: 'pipe',
-          timeout: 10000,
-          encoding: 'utf8',
-          windowsHide: true,
-        });
+        const defuddleOut = await defuddleParse(url);
         if (defuddleOut.includes('Account suspended')) {
           newStatus = 'disabled';
-          _defuddleDetails = { suspended_detected: true, defuddle_output: defuddleOut };
+          _defuddleDetails = { suspended_detected: true };
         }
       } catch {
         // defuddle unavailable or failed — skip on all subsequent checks
