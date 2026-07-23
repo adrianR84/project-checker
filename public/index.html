@@ -3169,9 +3169,10 @@
                 <button onclick="window._reloadProxyStats()">Refresh</button>
                 <button class="secondary" onclick="window._clearProxyStats()">Clear</button>
               </div>`;
-            modalHtml(html, 'Proxy Stats', true);
+            modalHtml(html, 'Proxy Stats', false);
             window._reloadProxyStats = openProxyStatsModal;
             window._clearProxyStats = async () => {
+              if (!confirm('Clear all proxy stats? This cannot be undone.')) return;
               await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
               window.closeIframe();
               showToast('Proxy stats cleared', 'info', 2000);
