@@ -368,7 +368,7 @@ async function triggerResourceType(resourceType, userId) {
         await logCheck(project.id, 'website', null, r);
         results.push({ project_id: project.id, name: project.name, result: r });
       } else if (resourceType === 'twitter' && project.twitter_enabled && project.twitter_url) {
-        const r = await checkTwitter(project.twitter_url);
+        const r = await checkTwitter(project.twitter_url, null, { postsCheck: true });
         await logCheck(project.id, 'twitter', null, r);
         results.push({ project_id: project.id, name: project.name, result: r });
       } else if (resourceType === 'github' && project.github_enabled) {
