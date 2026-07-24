@@ -3,7 +3,10 @@ require('dotenv/config');
 
 // Sentry must be loaded before other modules to instrument them
 const Sentry = require('@sentry/node');
-Sentry.init({ dsn: process.env.SENTRY_DSN });
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [Sentry.captureConsoleIntegration()],
+});
 
 
 const express = require('express');
