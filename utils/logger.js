@@ -65,14 +65,14 @@ const log = (level, tag, ...args) => {
   const rest = hasTag ? args : [tag, ...args];
   const file = callerFile();
 
-  // sentryMsg: always full args joined (rich context for Sentry)
-  const sentryMsg = rest.map(stringifyArg).join(' ');
-  // terminalMsg: short (tag + first arg) unless LOG_VERBOSE=1 shows full args
-  const terminalMsg = LOG_VERBOSE
-    ? sentryMsg
-    : (rest.length > 1 ? `${stringifyArg(rest[0])}` : sentryMsg);
+  // errorMsg: full args joined — used only in captureException for errors
+  const errorMsg = rest.map(stringifyArg).join(' ');
+  // displayMsg: short (tag + first arg) unless LOG_VERBOSE=1 shows full args
+  const displayMsg = LOG_VERBOSE
+    ? errorMsg
+    : (rest.length > 1 ? `${stringifyArg(rest[0])}` : errorMsg);
 
-  const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '')}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${terminalMsg}`;
+  const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '')}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
 
   // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
   // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
@@ -82,8 +82,8 @@ const log = (level, tag, ...args) => {
     if (errorObj) {
       Sentry.captureException(errorObj, { level: 'error' });
     } else {
-      const err = new Error(sentryMsg);
-      err.stack = `Error: ${sentryMsg}\n    at ${file} (${file})\n`;
+      const err = new Error(errorMsg);
+      err.stack = `Error: ${errorMsg}\n    at ${file} (${file})\n`;
       Sentry.captureException(err, { level: 'error' });
     }
   } else if (level === 'warn') {
