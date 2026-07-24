@@ -229,6 +229,7 @@ const dbProxy = {
     return {
       run(...params) {
         const result = db.prepare(sql).run(...bindParams(params));
+        db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
         return Promise.resolve({ lastInsertRowid: result.lastInsertRowid });
       },
       get(...params) {
