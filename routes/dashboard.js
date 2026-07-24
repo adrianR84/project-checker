@@ -7,6 +7,7 @@ const router = express.Router();
 // Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
 function parseProjectRow(row) {
   if (!row) return row;
+  const pc = row.twitter ? (JSON.parse(row.twitter).pc ?? 1) : 1;
   return {
     ...row,
     website_url:         row.website  ? JSON.parse(row.website).url  : null,
@@ -14,7 +15,7 @@ function parseProjectRow(row) {
     github_url:          row.github   ? JSON.parse(row.github).url  : null,
     twitter_url:         row.twitter   ? JSON.parse(row.twitter).url : null,
     twitter_enabled:     row.twitter_enabled,
-    twitter_posts_check: row.twitter   ? (JSON.parse(row.twitter).pc ?? 1) : 1,
+    twitter_posts_check: pc,
     telegram_url:        row.telegram  ? JSON.parse(row.telegram).url : null,
     price_enabled:       row.token_enabled,
   };
@@ -94,6 +95,7 @@ router.get('/', async (req, res) => {
       website_content_check: !!p.website_content_check,
       github_enabled: !!p.github_enabled,
       twitter_enabled: !!p.twitter_enabled,
+      twitter_posts_check: !!p.twitter_posts_check,
       telegram_enabled: !!p.telegram_enabled,
       website_url: p.website_url,
       github_url: p.github_url,
