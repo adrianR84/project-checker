@@ -228,15 +228,8 @@ const dbProxy = {
   prepare(sql) {
     return {
       run(...params) {
-        try {
-          const stmt = db.prepare(sql);
-          const result = stmt.run(...bindParams(params));
-          console.error(`[db] run result changes=${result.changes} lastInsertRowid=${result.lastInsertRowid}`);
-          return Promise.resolve({ lastInsertRowid: result.lastInsertRowid });
-        } catch (err) {
-          console.error(`[db] run error: ${err.message}`);
-          return Promise.reject(err);
-        }
+        const result = db.prepare(sql).run(...bindParams(params));
+        return Promise.resolve({ lastInsertRowid: result.lastInsertRowid });
       },
       get(...params) {
         const row = db.prepare(sql).get(...bindParams(params));

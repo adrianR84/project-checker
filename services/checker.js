@@ -119,7 +119,6 @@ async function recordStatusChange(projectId, resourceType, eventType, value) {
 
 /** Persists a health-check result to check_logs. */
 async function logCheck(projectId, resourceType, resourceId, result) {
-  console.error(`[checker] logCheck called project=${projectId} type=${resourceType} status=${result.status}`);
   try {
     await db.prepare(`
     INSERT INTO check_logs (project_id, resource_type, resource_id, status, http_status, response_time_ms, error_message, details, checked_at)
@@ -136,7 +135,7 @@ async function logCheck(projectId, resourceType, resourceId, result) {
     now()
   );
   } catch (err) {
-    console.error(`[checker] logCheck DB error: ${err.message} status=${result.status}`);
+    console.error(`[checker] logCheck DB error: ${err.message}`);
   }
 }
 
