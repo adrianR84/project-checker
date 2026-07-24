@@ -73,11 +73,13 @@ const log = (level, tag, ...args) => {
     : (rest.length > 1 ? `${stringifyArg(rest[0])}` : sentryMsg);
 
   const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '')}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${terminalMsg}`;
+  // sentryConsole: no timestamp, no colors — Log Stream doesn't need them and they clutter search
+  const sentryConsole = `${level.toUpperCase()}${hasTag ? ` [${tag}]` : ''} ${sentryMsg}`;
 
-  // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
-  // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
+  // Log to console twice: once with timestamp+colors (terminal), once clean (Sentry Log Stream)
   if (level === 'error') {
     console.error(formatted);
+    console.error(sentryConsole);
     const errorObj = rest.find(a => a instanceof Error);
     if (errorObj) {
       Sentry.captureException(errorObj, { level: 'error' });
@@ -88,10 +90,13 @@ const log = (level, tag, ...args) => {
     }
   } else if (level === 'warn') {
     console.warn(formatted);
+    console.warn(sentryConsole);
   } else if (level === 'info') {
     console.info(formatted);
+    console.info(sentryConsole);
   } else {
     console.log(formatted);
+    console.log(sentryConsole);
   }
 
   // Only append error-level logs to file
