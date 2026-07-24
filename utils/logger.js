@@ -9,7 +9,7 @@ Sentry.init({
   environment: process.env.NODE_ENV || 'development',
   enableLogs: true, // enable Sentry Log Stream (free, no quota)
   integrations: [
-    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info', 'error'] }), // error/warn/info/log → Log Stream (free)
+    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info'] }), // warn/info/log → Log Stream (free)
   ],
 });
 
@@ -19,10 +19,10 @@ const LEVELS = { error: 0, warn: 1, info: 2, log: 3 };
 const MIN_LEVEL = LEVELS[process.env.LOG_LEVEL] ?? LEVELS.info;
 
 // FILE_LOG=1 enables appending error-level logs to logs/error.log
-const FILE_LOG = process.env.LOG_FILE === '1';
+const FILE_LOG = process.env.FILE_LOG === '1';
 
-// LOG_VERBOSE=1 shows all args for all levels (full detail); unset/0 trims non-error to first arg only
-const VERBOSE = process.env.LOG_VERBOSE === '1';
+// LOG_VERBOSE=1 sends full args to Sentry but only tag+message to terminal
+const LOG_VERBOSE = process.env.LOG_VERBOSE === '1';
 
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 const ERROR_LOG = path.join(LOG_DIR, 'error.log');
@@ -65,15 +65,14 @@ const log = (level, tag, ...args) => {
   const rest = hasTag ? args : [tag, ...args];
   const file = callerFile();
 
-  // Sentry always gets the full message (all args)
-  const fullMsg = rest.map(stringifyArg).join(' ');
+  // sentryMsg: always full args joined (rich context for Sentry)
+  const sentryMsg = rest.map(stringifyArg).join(' ');
+  // terminalMsg: short (tag + first arg) unless LOG_VERBOSE=1 shows full args
+  const terminalMsg = LOG_VERBOSE
+    ? sentryMsg
+    : (rest.length > 1 ? `${stringifyArg(rest[0])}` : sentryMsg);
 
-  // Console display: trim to first arg for non-error levels unless LOG_VERBOSE=1
-  const displayArgs = (VERBOSE || level === 'error') ? rest : rest.slice(0, 1);
-  const displayMsg = displayArgs.map(stringifyArg).join(' ');
-
-  const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  const formatted = `[${ts}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
+  const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '')}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${terminalMsg}`;
 
   // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
   // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
@@ -83,17 +82,16 @@ const log = (level, tag, ...args) => {
     if (errorObj) {
       Sentry.captureException(errorObj, { level: 'error' });
     } else {
-      const err = new Error(fullMsg);
-      err.stack = `Error: ${fullMsg}\n   at ${file} (${file})\n`;
+      const err = new Error(sentryMsg);
+      err.stack = `Error: ${sentryMsg}\n    at ${file} (${file})\n`;
       Sentry.captureException(err, { level: 'error' });
     }
+  } else if (level === 'warn') {
+    console.warn(formatted);
+  } else if (level === 'info') {
+    console.info(formatted);
   } else {
-    // Send full message to Sentry as a breadcrumb before the trimmed console output
-    //Sentry.addBreadcrumb(fullMsg, { level });
-    
-    if (level === 'warn') console.warn(formatted);
-    else if (level === 'info') console.info(formatted);
-    else console.log(formatted);
+    console.log(formatted);
   }
 
   // Only append error-level logs to file
@@ -129,12 +127,14 @@ Usage examples:
 
   // With multiple args:
   logger.log('api', 'Request received:', 'GET', '/users');
+  // Terminal (short):   [INFO] [api] [file.js:10] Request received:
+  // Sentry (full):     [INFO] [api] [file.js:10] Request received: GET /users
 
   // Env vars:
   //   LOG_LEVEL=error   — show only errors
   //   LOG_LEVEL=warn    — show errors + warnings
   //   LOG_LEVEL=info    — show errors + warnings + info (default)
   //   LOG_LEVEL=log     — show everything including debug
-  //   LOG_FILE=1        — append error-level logs to logs/error.log
-//   LOG_VERBOSE=1     — show all args for all levels (default trims non-error to first arg)
+  //   FILE_LOG=1        — append error-level logs to logs/error.log
+  //   LOG_VERBOSE=1     — send full args to Sentry, short form to terminal
 */
