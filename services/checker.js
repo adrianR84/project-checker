@@ -31,8 +31,8 @@ function defuddleParse(url) {
   });
 }
 
-/** Returns the current ISO timestamp. */
-const now = () => new Date().toISOString();
+/** Returns the current local timestamp string, e.g. "2026-07-24 11:20:49". */
+const nowFormat = () => new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
 
 /**
  * Extracts stable meta tags from HTML to use as a content fingerprint.
@@ -114,7 +114,7 @@ function extractStableMeta(html) {
 async function recordStatusChange(projectId, resourceType, eventType, value) {
   await db.prepare(
     "INSERT INTO event_logs (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(projectId, resourceType, eventType, typeof value === 'string' ? value : JSON.stringify(value), now());
+  ).run(projectId, resourceType, eventType, typeof value === 'string' ? value : JSON.stringify(value), new Date().toISOString());
 }
 
 /** Persists a health-check result to check_logs. */
@@ -132,7 +132,7 @@ async function logCheck(projectId, resourceType, resourceId, result) {
     result.response_time_ms || null,
     result.error_message || null,
     result.details ? JSON.stringify(result.details) : null,
-    now()
+    new Date().toISOString()
   );
   } catch (err) {
     console.error(`[checker] logCheck DB error: ${err.message}`);
@@ -252,7 +252,7 @@ async function checkGithubRepo(fullName, projectId) {
 
     // Tag change detection
     if (repo && repo.latest_tag !== latestTag) {
-      const ts = now();
+      const ts = new Date().toISOString();
       await db.prepare('UPDATE repos SET latest_tag = ?, updated_at = ? WHERE id = ?').run(latestTag, ts, repo.id);
       if (projectId && repo.latest_tag) {
         recordStatusChange(projectId, 'github', 'tag_changed', { full_name: fullName, ot: repo.latest_tag, nt: latestTag });
@@ -279,7 +279,7 @@ async function checkGithubRepo(fullName, projectId) {
         history.latest_commit_sha,
         history.latest_commit_message,
         history.total_commits,
-        now(),
+        new Date().toISOString(),
         repo.id
       );
       details = { ...details, changed: true, previous_sha: repo.latest_commit_sha, new_sha: history.latest_commit_sha };
@@ -296,13 +296,13 @@ async function checkGithubRepo(fullName, projectId) {
     if (err.message && err.message.includes('404')) {
       const repo = await db.prepare('SELECT * FROM repos WHERE full_name = ? AND project_id = ?').get(fullName, projectId);
       if (repo && repo.status !== 'deleted') {
-        const ts = now();
+        const ts = new Date().toISOString();
         await db.prepare("UPDATE repos SET status = 'deleted', updated_at = ? WHERE id = ?").run(ts, repo.id);
         if (projectId) {
           try {
             recordStatusChange(projectId, 'github', 'deleted', { full_name: fullName, sha: repo.latest_commit_sha });
           } catch (insertErr) {
-            console.error(`[${now()}] Failed to insert deletion event for ${fullName}: ${insertErr.message}`);
+            console.error(`[${nowFormat()}] Failed to insert deletion event for ${fullName}: ${insertErr.message}`);
           }
         }
         return { status: 'deleted', http_status: 404, response_time_ms: 0, error_message: null, details: null };
@@ -383,7 +383,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
         ? 'connection timed out — proxies likely blocked'
         : `nitter.net returned ${directErr.message}`;
       console.error(
-        `[${now()}] Twitter RSS failed for @${handle}: proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`
+        `[${nowFormat()}] Twitter RSS failed for @${handle}: proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`
       );
       return { newPosts: 0, newPostIds: [] };
     }
@@ -497,7 +497,7 @@ async function checkTwitter(url, projectId, opts = {}) {
           });
         }
       } catch (err) {
-        console.error(`[${now()}] fetchAndStoreTwitterPosts failed for project ${projectId}: ${err.message}`);
+        console.error(`[${nowFormat()}] fetchAndStoreTwitterPosts failed for project ${projectId}: ${err.message}`);
       }
     }
 
