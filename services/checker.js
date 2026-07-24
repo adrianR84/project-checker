@@ -386,14 +386,14 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
         : `nitter.net returned ${directErr.message}`;
       const proxyNote = usedProxy ? `proxy×${MAX_RETRIES} + ` : '';
       console.error(
-        `[${nowFormat()}] Twitter RSS failed for @${handle}: ${proxyNote}xcancel fallback + direct all failed. ${likelyCause}`
+        `[${nowFormat()}] Twitter RSS failed for @${handle} (${rssUrl}): ${proxyNote}xcancel fallback + direct all failed. ${likelyCause}`
       );
       return { newPosts: 0, newPostIds: [] };
     }
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
   if (!items.length) {
-    console.error(`[${nowFormat()}] Twitter RSS returned no posts for @${handle}`);
+    console.error(`[${nowFormat()}] Twitter RSS returned no posts for @${handle} (${rssUrl})`);
     return { newPosts: 0, newPostIds: [] };
   }
 
