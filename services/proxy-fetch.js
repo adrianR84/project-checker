@@ -191,6 +191,7 @@ async function proxyFetch(url, opts = {}) {
       const u = new URL(url);
       const res = await new Promise((resolve, reject) => {
         require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
+          console.error(`[proxy-fetch] direct cb statusCode=${res.statusCode} httpVersion=${res.httpVersion}`);
           if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           let body = '';
           res.on('data', chunk => body += chunk);
@@ -238,6 +239,7 @@ async function proxyFetch(url, opts = {}) {
       const u = new URL(url);
       const res = await new Promise((resolve, reject) => {
         require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
+          console.error(`[proxy-fetch] fallback direct cb statusCode=${res.statusCode} httpVersion=${res.httpVersion}`);
           if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           let body = '';
           res.on('data', chunk => body += chunk);
