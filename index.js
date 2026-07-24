@@ -1,5 +1,11 @@
 // Express entry point
 require('dotenv/config');
+
+// Sentry must be loaded before other modules to instrument them
+const Sentry = require('@sentry/node');
+Sentry.init({ dsn: process.env.SENTRY_DSN });
+
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
