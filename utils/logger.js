@@ -55,8 +55,14 @@ const stringifyArg = (a) => {
 
 // Core log handler: filters by level, formats output, writes to file, calls console.*
 const log = (level, tag, ...args) => {
-  // Skip if LOG_LEVEL is more restrictive than this level
-  if (LEVELS[level] > MIN_LEVEL) return;
+  // Extract { verbose, display } options from last arg — must be a plain object
+  const lastArg = args[args.length - 1];
+  const opts = (typeof lastArg === 'object' && !Array.isArray(lastArg) && lastArg !== null)
+    ? args.pop()
+    : {};
+
+  // Skip if LOG_LEVEL is restrictive (unless display: true overrides it)
+  if (LEVELS[level] > MIN_LEVEL && !opts.display) return;
 
   // Detect whether a tag was provided:
   // - tag is a string AND there are more args → tag is real
@@ -67,8 +73,8 @@ const log = (level, tag, ...args) => {
 
   // errorMsg: full args joined — used only in captureException for errors
   const errorMsg = rest.map(stringifyArg).join(' ');
-  // displayMsg: short (tag + first arg) unless LOG_VERBOSE=1 shows full args
-  const displayMsg = LOG_VERBOSE
+  // displayMsg: short unless LOG_VERBOSE=1 or { verbose: true } forces full args
+  const displayMsg = (LOG_VERBOSE || opts.verbose)
     ? errorMsg
     : (rest.length > 1 ? `${stringifyArg(rest[0])}` : errorMsg);
 
@@ -127,8 +133,12 @@ Usage examples:
 
   // With multiple args:
   logger.log('api', 'Request received:', 'GET', '/users');
-  // Terminal (short):   [INFO] [api] [file.js:10] Request received:
-  // Sentry (full):     [INFO] [api] [file.js:10] Request received: GET /users
+  // Default:     [LOG] [api] [file.js:10] Request received:
+  // With { verbose: true }: [LOG] [api] [file.js:10] Request received: GET /users
+
+  // Per-call overrides:
+  logger.log('debug', 'Very detailed trace', { display: true });        // show even if LOG_LEVEL=error
+  logger.log('api', 'Request:', 'GET', '/users', { verbose: true });    // show full args
 
   // Env vars:
   //   LOG_LEVEL=error   — show only errors
@@ -136,5 +146,5 @@ Usage examples:
   //   LOG_LEVEL=info    — show errors + warnings + info (default)
   //   LOG_LEVEL=log     — show everything including debug
   //   FILE_LOG=1        — append error-level logs to logs/error.log
-  //   LOG_VERBOSE=1     — send full args to Sentry, short form to terminal
+  //   LOG_VERBOSE=1     — show full args by default (short otherwise)
 */
