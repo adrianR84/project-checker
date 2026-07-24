@@ -36,7 +36,7 @@ function _loadCache() {
     if (!Array.isArray(pool) || !pool.length) return;
     _pool = pool;
     _lastFetchedAt = Date.now(); // reset so full REFRESH_MS applies from last restart
-    console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache`);
+    //console.error(`[proxy-fetch] loaded ${pool.length} proxies from cache`);
   } catch (e) {
     // cache read failure — proceed without cache
   }
@@ -46,7 +46,7 @@ function _saveCache() {
   try {
     fs.writeFileSync(POOL_PATH, JSON.stringify({ pool: _pool, fetchedAt: _lastFetchedAt }), 'utf8');
   } catch (e) {
-    console.error(`[proxy-fetch] cache write failed: ${e.message}`);
+    //console.error(`[proxy-fetch] cache write failed: ${e.message}`);
   }
 }
 
@@ -128,7 +128,7 @@ async function _ensurePool() {
       _pool = pool;
       _lastFetchedAt = Date.now();
       _saveCache();
-      console.error(`[proxy-fetch] loaded ${pool.length} proxies`);
+      //console.error(`[proxy-fetch] loaded ${pool.length} proxies`);
     })
     .catch(err => {
       console.error(`[proxy-fetch] refresh failed: ${err.message}`);

@@ -32,7 +32,7 @@ function defuddleParse(url) {
 }
 
 /** Returns the current ISO timestamp. */
-const now = () => new Date().toISOString();
+const now = () => new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
 
 /**
  * Extracts stable meta tags from HTML to use as a content fingerprint.
@@ -329,7 +329,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust.
   // Each attempt calls proxyFetch() independently — picks may land on different proxy IPs (no sticky session).
   // No per-attempt direct fallback — direct is only tried after all 3 proxy attempts have failed.
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 2;
   const RETRY_DELAY_MS = 2000;
   let feed;
   let lastErr;
@@ -373,7 +373,14 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
       feed = await rssParser.parseString(text);
       lastErr = null;
     } catch (directErr) {
-      console.error(`[${now()}] rss-parser failed for ${rssUrl} after ${MAX_RETRIES} proxy attempts and direct fallback: ${directErr.message}`);
+      const likelyCause = directErr.message.includes('HTTP 404')
+        ? `@${handle} not found on nitter.net (404)`
+        : directErr.message.includes('timeout')
+        ? 'connection timed out — proxies likely blocked'
+        : `nitter.net returned ${directErr.message}`;
+      console.error(
+        `[${now()}] Twitter RSS failed for @${handle}: proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`
+      );
       return { newPosts: 0, newPostIds: [] };
     }
   }
