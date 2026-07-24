@@ -17,6 +17,7 @@
     "see-me": "bash -c \"node utils/kill-ports.js && node --watch --disable-warning=ExperimentalWarning index.js & see-me 3004\""
   },
   "dependencies": {
+    "@sentry/integrations": "^7.114.0",
     "@sentry/node": "^10.65.0",
     "better-auth": "^1.6.22",
     "cors": "^2.8.5",

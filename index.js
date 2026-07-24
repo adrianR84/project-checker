@@ -3,10 +3,11 @@ require('dotenv/config');
 
 // Sentry must be loaded before other modules to instrument them
 const Sentry = require('@sentry/node');
+const { CaptureConsole } = require('@sentry/integrations');
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || 'development',
-  integrations: [Sentry.captureConsoleIntegration()],
+  integrations: [new CaptureConsole({ levels: ['log', 'warn', 'error'] })],
 });
 
 
