@@ -183,6 +183,7 @@ async function proxyFetch(url, opts = {}) {
   }
   await _ensurePool();
   const ua = opts?.headers?.['User-Agent'] ?? 'Mozilla/5.0';
+  console.error(`[proxy-fetch] url=${url} poolLen=${_pool.length}`);
 
   if (!_pool.length) {
     const t0 = Date.now();
@@ -196,8 +197,11 @@ async function proxyFetch(url, opts = {}) {
           res.on('end', () => resolve({ ok: res.statusCode < 400, status: res.statusCode, body }));
         }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
       });
+      console.error(`[proxy-fetch] direct ok res.statusCode=${res.statusCode} bodyLen=${res.body?.length}`);
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-      return { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
+      const ret = { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
+      console.error(`[proxy-fetch] returning direct ret ok=${ret.ok} status=${ret.status}`);
+      return ret;
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
@@ -211,13 +215,16 @@ async function proxyFetch(url, opts = {}) {
 
   try {
     const { status, body } = await _tunnelFetch(proxy, url, { 'User-Agent': ua });
+    console.error(`[proxy-fetch] tunnel ok status=${status} bodyLen=${body?.length}`);
     if (status >= 400) throw new Error(`HTTP ${status}`);
     // ponytail: record success — proxyStatsByIp already reflects correct state via _pickProxy
     const prev = proxyStatsByIp.get(ip) ?? { failures: 0, successes: 0, totalMs: 0 };
     proxyStatsByIp.set(ip, { failures: prev.failures, successes: prev.successes + 1, totalMs: prev.totalMs + (Date.now() - t0) });
     await db.config.upsertProxyStat({ host: ip, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
     // ponytail: return a Response-like object so callers (.ok, .text()) work the same as undici fetch
-    return { ok: status < 400, status, text: () => Promise.resolve(body) };
+    const ret = { ok: status < 400, status, text: () => Promise.resolve(body) };
+    console.error(`[proxy-fetch] returning tunnel ret ok=${ret.ok} status=${ret.status}`);
+    return ret;
   } catch (proxyErr) {
     // ponytail: proxy tunnel failed — record failure to proxy IP, then fall back to direct.
     // Failures decay over time via _decayStats, and _pickProxy uses weighted random,
@@ -238,8 +245,11 @@ async function proxyFetch(url, opts = {}) {
         }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
       });
       await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0d }).catch(() => {});
-      return { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
+      const ret = { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
+      console.error(`[proxy-fetch] fallback direct ret ok=${ret.ok} status=${ret.status}`);
+      return ret;
     } catch (e) {
+      console.error(`[proxy-fetch] fallback direct also failed: ${e.message}`);
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
     }
