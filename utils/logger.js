@@ -9,7 +9,7 @@ Sentry.init({
   environment: process.env.NODE_ENV || 'development',
   enableLogs: true, // enable Sentry Log Stream (free, no quota)
   integrations: [
-    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info'] }), // warn/info/log → Log Stream (free)
+    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info', 'error'] }), // error/warn/info/log → Log Stream (free)
   ],
 });
 
