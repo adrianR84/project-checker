@@ -119,7 +119,10 @@ async function _downloadList(apiKey, country) {
 
 async function _ensurePool() {
   const cfg = await db.config.getWebshare();
-  if (!cfg?.enabled || !cfg?.token) return; // disabled
+  if (!cfg?.enabled || !cfg?.token) {
+    _pool = []; // clear pool when disabled
+    return;
+  }
   const stale = !_pool.length || (Date.now() - _lastFetchedAt) > REFRESH_MS;
   if (!stale) return;
   if (_refreshing) return _refreshing;
