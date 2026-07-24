@@ -217,7 +217,7 @@ async function proxyFetch(url, opts = {}) {
     proxyStatsByIp.set(ip, { failures: prev.failures, successes: prev.successes + 1, totalMs: prev.totalMs + (Date.now() - t0) });
     await db.config.upsertProxyStat({ host: ip, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
     // ponytail: return a Response-like object so callers (.ok, .text()) work the same as undici fetch
-    return { ok: true, status, text: () => Promise.resolve(body) };
+    return { ok: status < 400, status, text: () => Promise.resolve(body) };
   } catch (proxyErr) {
     // ponytail: proxy tunnel failed — record failure to proxy IP, then fall back to direct.
     // Failures decay over time via _decayStats, and _pickProxy uses weighted random,
