@@ -1,14 +1,7 @@
 // Express entry point
 require('dotenv/config');
 
-// Sentry must be loaded before other modules to instrument them
-const Sentry = require('@sentry/node');
-const { CaptureConsole } = require('@sentry/integrations');
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || 'development',
-  integrations: [new CaptureConsole({ levels: ['log', 'warn', 'error'] })],
-});
+
 
 
 const express = require('express');
@@ -17,8 +10,10 @@ const path = require('path');
 const fs = require('fs');
 const { toNodeHandler } = require('better-auth/node');
 const auth = require('./services/auth');
+const logger = require('./utils/logger');
 
 const app = express();
+app.locals.logger = logger;
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -100,11 +95,11 @@ async function start() {
   require('./services/scheduler').init();
 
   app.listen(PORT, () => {
-    console.log(`[${new Date().toISOString()}] Project Checker server listening on port ${PORT}`);
+    logger.info(`Project Checker server listening on port ${PORT}`);
   });
 }
 
 start().catch(err => {
-  console.error(`[${new Date().toISOString()}] Failed to start server:`, err);
+  logger.error(`Failed to start server:`, err);
   process.exit(1);
 });

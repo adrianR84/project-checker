@@ -207,7 +207,7 @@ async function init() {
   const { runMigrations } = require('./migrations');
   await runMigrations(database);
 
-  console.log(`[${now()}] Database initialized`);
+  //console.log(`[${now()}] Database initialized`);
   return dbProxy;
 }
 
