@@ -119,7 +119,6 @@ async function recordStatusChange(projectId, resourceType, eventType, value) {
 
 /** Persists a health-check result to check_logs. */
 async function logCheck(projectId, resourceType, resourceId, result) {
-  console.error(`[checker] logCheck project=${projectId} type=${resourceType} status=${result.status} http_status=${result.http_status} err=${result.error_message}`);
   try {
     await db.prepare(`
     INSERT INTO check_logs (project_id, resource_type, resource_id, status, http_status, response_time_ms, error_message, details, checked_at)
@@ -235,7 +234,6 @@ async function checkWebsite(url, projectId, contentCheck = true) {
       details: contentHash ? { content_hash: contentHash } : null,
     };
   } catch (err) {
-    console.error(`[checker] checkWebsite error: ${err.message}`);
     const response_time_ms = Date.now() - start;
     return { status: 'error', http_status: null, response_time_ms, error_message: err.message, details: null };
   }
@@ -530,7 +528,6 @@ async function checkTwitter(url, projectId, opts = {}) {
       details: finalDetails,
     };
   } catch (err) {
-    console.error(`[checker] checkTwitter error: ${err.message}`);
     const response_time_ms = Date.now() - start;
     return { status: 'error', http_status: null, response_time_ms, error_message: err.message };
   }
