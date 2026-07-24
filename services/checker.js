@@ -359,7 +359,14 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
       const res = await proxyFetch(fallbackRssUrl);
       const text = await res.text();
       feed = await rssParser.parseString(text);
-      lastErr = null;
+      // xcancel returns a fake item when account is not whitelisted — fall through to direct
+      const feedItems = Array.isArray(feed?.items) ? feed.items : [];
+      if (feedItems.length === 1 && feedItems[0]?.title?.includes('not yet whitelisted')) {
+        feed = null;
+        lastErr = new Error('xcancel not whitelisted');
+      } else {
+        lastErr = null;
+      }
     } catch (fallbackErr) {
       lastErr = fallbackErr;
     }
@@ -392,11 +399,6 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
     }
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
-  // xcancel returns a fake item when the account is not whitelisted — detect and treat as failure
-  if (items.length === 1 && items[0]?.title?.includes('not yet whitelisted')) {
-    console.error(`[${nowFormat()}] Twitter RSS blocked for @${handle} (${rssUrl}): xcancel requires whitelist, account not accessible`);
-    return { newPosts: 0, newPostIds: [] };
-  }
   if (!items.length) {
     console.error(`[${nowFormat()}] Twitter RSS returned no posts for @${handle} (${rssUrl})`);
     return { newPosts: 0, newPostIds: [] };
