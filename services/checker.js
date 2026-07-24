@@ -32,7 +32,7 @@ function defuddleParse(url) {
 }
 
 /** Returns the current ISO timestamp. */
-const now = () => new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+const now = () => new Date().toISOString();
 
 /**
  * Extracts stable meta tags from HTML to use as a content fingerprint.
