@@ -392,16 +392,15 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
     }
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
-  // Detect fake xcancel "not yet whitelisted" RSS response
-  const fakeFeed = items.some(item =>
-    (item.title || '').toLowerCase().includes('not yet whitelist') ||
-    (item.title || '').toLowerCase().includes('rss reader not')
-  );
-  if (fakeFeed) {
-    console.error(`[${nowFormat()}] Twitter RSS blocked for @${handle} (${rssUrl}): xcancel returned fake whitelist page`);
+  // xcancel returns a fake item when the account is not whitelisted — detect and treat as failure
+  if (items.length === 1 && items[0]?.title?.includes('not yet whitelisted')) {
+    console.error(`[${nowFormat()}] Twitter RSS blocked for @${handle} (${rssUrl}): xcancel requires whitelist, account not accessible`);
     return { newPosts: 0, newPostIds: [] };
   }
   if (!items.length) {
+    console.error(`[${nowFormat()}] Twitter RSS returned no posts for @${handle} (${rssUrl})`);
+    return { newPosts: 0, newPostIds: [] };
+  }
 
   // Pre-fetch existing post_ids so we can compute the diff (the db proxy doesn't expose run.changes)
   const existing = await db.prepare(
