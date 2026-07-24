@@ -1,9 +1,6 @@
 // Express entry point
 require('dotenv/config');
 
-
-
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -13,7 +10,7 @@ const auth = require('./services/auth');
 const logger = require('./utils/logger');
 
 const app = express();
-app.locals.logger = logger;
+// app.locals.logger = logger;
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());

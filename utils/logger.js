@@ -1,14 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-// Sentry must be loaded before other modules to instrument them
+
+// Sentry must be first to instrument modules
 const Sentry = require('@sentry/node');
-const { CaptureConsole } = require('@sentry/integrations');
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || 'development',
-  // CaptureConsole captures all console.* calls and sends them to Sentry
-  integrations: [new CaptureConsole({ levels: ['log', 'info', 'warn', 'error'] })],
+  enableLogs: true, // enable Sentry Log Stream (free, no quota)
+  integrations: [
+    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info'] }), // warn/info/log → Log Stream (free)
+  ],
 });
 
 // Log level thresholds: error=0, warn=1, info=2, log=3
@@ -31,9 +33,6 @@ const COLORS = {
 };
 const RESET = '\x1b[0m';
 
-// Map our levels to Sentry's level names
-const SENTRY_LEVEL = { error: 'error', warn: 'warning', info: 'info', log: 'debug' };
-
 // Detects the calling file and line by parsing the Error stack.
 // Stack index [4] skips: Error, callerFile(), log(), and the level wrapper (error/warn/info/log).
 const callerFile = () => {
@@ -51,7 +50,7 @@ const stringifyArg = (a) => {
   return String(a);
 };
 
-// Core log handler: filters by level, formats output, optionally writes to file, sends to Sentry
+// Core log handler: filters by level, formats output, writes to file, calls console.*
 const log = (level, tag, ...args) => {
   // Skip if LOG_LEVEL is more restrictive than this level
   if (LEVELS[level] > MIN_LEVEL) return;
@@ -64,26 +63,32 @@ const log = (level, tag, ...args) => {
   const file = callerFile();
   const displayMsg = rest.map(stringifyArg).join(' ');
 
-  const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}\n`;
-  process.stdout.write(formatted);
+  const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
+
+  // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
+  // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
+  if (level === 'error') {
+    console.error(formatted);
+    const errorObj = rest.find(a => a instanceof Error);
+    if (errorObj) {
+      Sentry.captureException(errorObj, { level: 'error' });
+    } else {
+      const err = new Error(displayMsg);
+      err.stack = `Error: ${displayMsg}\n    at ${file} (${file})\n`;
+      Sentry.captureException(err, { level: 'error' });
+    }
+  } else if (level === 'warn') {
+    console.warn(formatted);
+  } else if (level === 'info') {
+    console.info(formatted);
+  } else {
+    console.log(formatted);
+  }
 
   // Only append error-level logs to file
   if (FILE_LOG && level === 'error') {
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
-    fs.appendFileSync(ERROR_LOG, formatted);
-  }
-
-  // Send to Sentry: use captureException for Error objects, captureMessage for everything else
-  const sentryLevel = SENTRY_LEVEL[level];
-  const errorObj = rest.find(a => a instanceof Error);
-  if (level === 'error' && errorObj) {
-    Sentry.captureException(errorObj, { level: sentryLevel });
-  } else {
-    // Build a synthetic Error with a stack pointing to the actual caller,
-    // so captureException can show the correct file/line in Sentry
-    const err = new Error(displayMsg);
-    err.stack = `Error: ${displayMsg}\n    at ${file} (${file})\n`;
-    Sentry.captureException(err, { level: sentryLevel });
+    fs.appendFileSync(ERROR_LOG, formatted + '\n');
   }
 };
 
