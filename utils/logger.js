@@ -56,12 +56,15 @@ const log = (level, tag, ...args) => {
   // Skip if LOG_LEVEL is more restrictive than this level
   if (LEVELS[level] > MIN_LEVEL) return;
 
-  // If tag is not a string, it's the first argument (no tag was provided)
-  const rest = typeof tag === 'string' ? args : [tag, ...args];
+  // Detect whether a tag was provided:
+  // - tag is a string AND there are more args → tag is real
+  // - otherwise, tag is the first part of the message (no tag)
+  const hasTag = typeof tag === 'string' && args.length > 0;
+  const rest = hasTag ? args : [tag, ...args];
   const file = callerFile();
   const displayMsg = rest.map(stringifyArg).join(' ');
 
-  const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${tag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}\n`;
+  const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}\n`;
   process.stdout.write(formatted);
 
   // Only append error-level logs to file
