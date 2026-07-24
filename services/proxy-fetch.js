@@ -188,21 +188,23 @@ async function proxyFetch(url, opts = {}) {
   if (!_pool.length) {
     const t0 = Date.now();
     try {
-      const u = new URL(url);
-      const res = await new Promise((resolve, reject) => {
-        require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
-          console.error(`[proxy-fetch] direct cb statusCode=${res.statusCode} httpVersion=${res.httpVersion}`);
-          if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
-          let body = '';
-          res.on('data', chunk => body += chunk);
-          res.on('end', () => resolve({ ok: res.statusCode < 400, status: res.statusCode, body }));
-        }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
+      console.error(`[proxy-fetch] direct fetch url=${url}`);
+      const res = await fetch(url, {
+        headers: { 'User-Agent': ua },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
       });
-      console.error(`[proxy-fetch] direct ok res.statusCode=${res.statusCode} bodyLen=${res.body?.length}`);
-      await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0 }).catch(() => {});
-      const ret = { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
-      console.error(`[proxy-fetch] returning direct ret ok=${ret.ok} status=${ret.status}`);
-      return ret;
+      console.error(`[proxy-fetch] direct fetch got res.status=${res.status}`);
+      const body = await res.text();
+      console.error(`[proxy-fetch] direct fetch ok res.status=${res.status} bodyLen=${body.length}`);
+      await db.config.upsertProxyStat({ host: 'direct', ok: res.ok, responseMs: Date.now() - t0 }).catch(() => {});
+      return { ok: res.ok, status: res.status, text: () => Promise.resolve(body) };
+    } catch (e) {
+      console.error(`[proxy-fetch] direct fetch failed: ${e.message}`);
+      await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
+      throw e;
+    }
+  }
     } catch (e) {
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
       throw e;
@@ -236,20 +238,16 @@ async function proxyFetch(url, opts = {}) {
 
     const t0d = Date.now();
     try {
-      const u = new URL(url);
-      const res = await new Promise((resolve, reject) => {
-        require('https').get(u, { headers: { 'User-Agent': ua } }, res => {
-          console.error(`[proxy-fetch] fallback direct cb statusCode=${res.statusCode} httpVersion=${res.httpVersion}`);
-          if (!res.statusCode || res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode ?? 0}`));
-          let body = '';
-          res.on('data', chunk => body += chunk);
-          res.on('end', () => resolve({ ok: res.statusCode < 400, status: res.statusCode, body }));
-        }).on('error', reject).setTimeout(15000, () => reject(new Error('timeout')));
+      console.error(`[proxy-fetch] fallback direct fetch url=${url}`);
+      const res = await fetch(url, {
+        headers: { 'User-Agent': ua },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
       });
-      await db.config.upsertProxyStat({ host: 'direct', ok: true, responseMs: Date.now() - t0d }).catch(() => {});
-      const ret = { ok: res.statusCode < 400, status: res.statusCode, text: () => Promise.resolve(res.body) };
-      console.error(`[proxy-fetch] fallback direct ret ok=${ret.ok} status=${ret.status}`);
-      return ret;
+      const body = await res.text();
+      console.error(`[proxy-fetch] fallback direct ok res.status=${res.status} bodyLen=${body.length}`);
+      await db.config.upsertProxyStat({ host: 'direct', ok: res.ok, responseMs: Date.now() - t0d }).catch(() => {});
+      return { ok: res.ok, status: res.status, text: () => Promise.resolve(body) };
     } catch (e) {
       console.error(`[proxy-fetch] fallback direct also failed: ${e.message}`);
       await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
