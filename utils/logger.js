@@ -72,7 +72,7 @@ const log = (level, tag, ...args) => {
     ? errorMsg
     : (rest.length > 1 ? `${stringifyArg(rest[0])}` : errorMsg);
 
-  const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '')}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
+  const formatted = `[${new Date().toISOString().replace('T', ' ').replace('Z', '').slice(0, 19)}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
 
   // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
   // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
