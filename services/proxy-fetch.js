@@ -205,11 +205,6 @@ async function proxyFetch(url, opts = {}) {
       throw e;
     }
   }
-    } catch (e) {
-      await db.config.upsertProxyStat({ host: 'direct', ok: false, responseMs: 0 }).catch(() => {});
-      throw e;
-    }
-  }
 
   const proxy = _pickProxy();
   const { host } = proxy;
