@@ -330,19 +330,21 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   const rssUrl = `https://nitter.net/${encodeURIComponent(handle)}/rss`;
   const fallbackRssUrl = `https://xcancel.com/${encodeURIComponent(handle)}/rss`;
 
-  // ponytail: retry failed RSS fetches up to 3 times with a delay between attempts; only log after all retries exhaust.
+  // ponytail: retry failed RSS fetches up to 2 times with a delay between attempts; only log after all retries exhaust.
   // Each attempt calls proxyFetch() independently — picks may land on different proxy IPs (no sticky session).
-  // No per-attempt direct fallback — direct is only tried after all 3 proxy attempts have failed.
+  // No per-attempt direct fallback — direct is only tried after all 2 proxy attempts have failed.
   const MAX_RETRIES = 2;
   const RETRY_DELAY_MS = 2000;
   let feed;
   let lastErr;
+  let usedProxy = false;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const res = await proxyFetch(rssUrl);
       const text = await res.text();
       feed = await rssParser.parseString(text);
       lastErr = null;
+      usedProxy = true;
       break;
     } catch (err) {
       lastErr = err;
@@ -382,14 +384,18 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
         : directErr.message.includes('timeout')
         ? 'connection timed out — proxies likely blocked'
         : `nitter.net returned ${directErr.message}`;
+      const proxyNote = usedProxy ? `proxy×${MAX_RETRIES} + ` : '';
       console.error(
-        `[${nowFormat()}] Twitter RSS failed for @${handle}: proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`
+        `[${nowFormat()}] Twitter RSS failed for @${handle}: ${proxyNote}xcancel fallback + direct all failed. ${likelyCause}`
       );
       return { newPosts: 0, newPostIds: [] };
     }
   }
   const items = Array.isArray(feed?.items) ? feed.items : [];
-  if (!items.length) return { newPosts: 0, newPostIds: [] };
+  if (!items.length) {
+    console.error(`[${nowFormat()}] Twitter RSS returned no posts for @${handle}`);
+    return { newPosts: 0, newPostIds: [] };
+  }
 
   // Pre-fetch existing post_ids so we can compute the diff (the db proxy doesn't expose run.changes)
   const existing = await db.prepare(
