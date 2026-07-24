@@ -9,7 +9,7 @@ Sentry.init({
   environment: process.env.NODE_ENV || 'development',
   enableLogs: true, // enable Sentry Log Stream (free, no quota)
   integrations: [
-    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info'] }), // warn/info/log → Log Stream (free)
+    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'info', 'error'] }), // error/warn/info/log → Log Stream (free)
   ],
 });
 
@@ -65,32 +65,35 @@ const log = (level, tag, ...args) => {
   const rest = hasTag ? args : [tag, ...args];
   const file = callerFile();
 
-  // For non-error levels, show only the first arg (the message) in console — extra args go to Sentry only
-  // For error level, show all args so Error stacks/objects are visible in the terminal
-  // LOG_VERBOSE=1 disables this trimming for all levels
-  const errorObj = rest.find(a => a instanceof Error);
+  // Sentry always gets the full message (all args)
+  const fullMsg = rest.map(stringifyArg).join(' ');
+
+  // Console display: trim to first arg for non-error levels unless LOG_VERBOSE=1
   const displayArgs = (VERBOSE || level === 'error') ? rest : rest.slice(0, 1);
   const displayMsg = displayArgs.map(stringifyArg).join(' ');
 
-  const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
+  const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const formatted = `[${ts}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
 
   // Errors → Issues (quota applies) via captureException with synthetic stack for correct file/line
   // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
   if (level === 'error') {
     console.error(formatted);
+    const errorObj = rest.find(a => a instanceof Error);
     if (errorObj) {
       Sentry.captureException(errorObj, { level: 'error' });
     } else {
-      const err = new Error(displayMsg);
-      err.stack = `Error: ${displayMsg}\n    at ${file} (${file})\n`;
+      const err = new Error(fullMsg);
+      err.stack = `Error: ${fullMsg}\n   at ${file} (${file})\n`;
       Sentry.captureException(err, { level: 'error' });
     }
-  } else if (level === 'warn') {
-    console.warn(formatted);
-  } else if (level === 'info') {
-    console.info(formatted);
   } else {
-    console.log(formatted);
+    // Send full message to Sentry as a breadcrumb before the trimmed console output
+    //Sentry.addBreadcrumb(fullMsg, { level });
+    
+    if (level === 'warn') console.warn(formatted);
+    else if (level === 'info') console.info(formatted);
+    else console.log(formatted);
   }
 
   // Only append error-level logs to file
