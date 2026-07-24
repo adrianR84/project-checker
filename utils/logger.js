@@ -19,7 +19,7 @@ const LEVELS = { error: 0, warn: 1, info: 2, log: 3 };
 const MIN_LEVEL = LEVELS[process.env.LOG_LEVEL] ?? LEVELS.info;
 
 // FILE_LOG=1 enables appending error-level logs to logs/error.log
-const FILE_LOG = process.env.FILE_LOG === '1';
+const FILE_LOG = process.env.LOG_FILE === '1';
 
 // LOG_VERBOSE=1 shows all args for all levels (full detail); unset/0 trims non-error to first arg only
 const VERBOSE = process.env.LOG_VERBOSE === '1';
@@ -132,6 +132,6 @@ Usage examples:
   //   LOG_LEVEL=warn    — show errors + warnings
   //   LOG_LEVEL=info    — show errors + warnings + info (default)
   //   LOG_LEVEL=log     — show everything including debug
-  //   FILE_LOG=1        — append error-level logs to logs/error.log
+  //   LOG_FILE=1        — append error-level logs to logs/error.log
 //   LOG_VERBOSE=1     — show all args for all levels (default trims non-error to first arg)
 */
