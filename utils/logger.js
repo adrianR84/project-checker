@@ -21,6 +21,9 @@ const MIN_LEVEL = LEVELS[process.env.LOG_LEVEL] ?? LEVELS.info;
 // FILE_LOG=1 enables appending error-level logs to logs/error.log
 const FILE_LOG = process.env.FILE_LOG === '1';
 
+// LOG_VERBOSE=1 shows all args for all levels (full detail); unset/0 trims non-error to first arg only
+const VERBOSE = process.env.LOG_VERBOSE === '1';
+
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 const ERROR_LOG = path.join(LOG_DIR, 'error.log');
 
@@ -61,7 +64,13 @@ const log = (level, tag, ...args) => {
   const hasTag = typeof tag === 'string' && args.length > 0;
   const rest = hasTag ? args : [tag, ...args];
   const file = callerFile();
-  const displayMsg = rest.map(stringifyArg).join(' ');
+
+  // For non-error levels, show only the first arg (the message) in console — extra args go to Sentry only
+  // For error level, show all args so Error stacks/objects are visible in the terminal
+  // LOG_VERBOSE=1 disables this trimming for all levels
+  const errorObj = rest.find(a => a instanceof Error);
+  const displayArgs = (VERBOSE || level === 'error') ? rest : rest.slice(0, 1);
+  const displayMsg = displayArgs.map(stringifyArg).join(' ');
 
   const formatted = `[${new Date().toISOString()}] ${COLORS[level]}[${level.toUpperCase()}]${RESET}${hasTag ? ` [${tag}]` : ''}${file ? ` [${file}]` : ''} ${displayMsg}`;
 
@@ -69,7 +78,6 @@ const log = (level, tag, ...args) => {
   // Warn/info/log → Log Stream (free) via console.* + consoleLoggingIntegration
   if (level === 'error') {
     console.error(formatted);
-    const errorObj = rest.find(a => a instanceof Error);
     if (errorObj) {
       Sentry.captureException(errorObj, { level: 'error' });
     } else {
@@ -125,4 +133,5 @@ Usage examples:
   //   LOG_LEVEL=info    — show errors + warnings + info (default)
   //   LOG_LEVEL=log     — show everything including debug
   //   FILE_LOG=1        — append error-level logs to logs/error.log
+//   LOG_VERBOSE=1     — show all args for all levels (default trims non-error to first arg)
 */
