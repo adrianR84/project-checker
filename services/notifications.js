@@ -1,6 +1,7 @@
 // Notification dispatcher — sends Telegram and Pushbullet alerts when events are recorded.
 // ponytail: single file, no retry queue, fire-and-forget.
 const db = require('./db');
+const logger = require('../utils/logger');
 
 const now = () => new Date().toISOString();
 
@@ -18,12 +19,12 @@ async function sendTelegramMessage(botToken, chatId, text, replyMarkup) {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) {
-      console.error(`[${now()}] Telegram send failed: ${data.description || r.status}`);
+      logger.error('telegram', `send failed: ${data.description || r.status}`);
       return { ok: false, error: data.description || `HTTP ${r.status}` };
     }
     return { ok: true };
   } catch (err) {
-    console.error(`[${now()}] Telegram send error: ${err.message}`);
+    logger.error('telegram', `send error:`, err);
     return { ok: false, error: err.message };
   }
 }
@@ -44,12 +45,12 @@ async function pushPushbulletNote(accessToken, title, body) {
     });
     if (!r.ok) {
       const text = await r.text().catch(() => '');
-      console.error(`[${now()}] Pushbullet push failed: HTTP ${r.status} ${text.slice(0, 200)}`);
+      logger.error('pushbullet', `push failed: HTTP ${r.status} ${text.slice(0, 200)}`);
       return { ok: false, error: `HTTP ${r.status}` };
     }
     return { ok: true };
   } catch (err) {
-    console.error(`[${now()}] Pushbullet push error: ${err.message}`);
+    logger.error('pushbullet', `push error:`, err);
     return { ok: false, error: err.message };
   }
 }
@@ -160,11 +161,11 @@ async function sendAlert(event, projectName) {
       inline_keyboard: [[{ text: '✅ Confirm', callback_data: `confirm:${event.id}` }]]
     };
     const r = await sendTelegramMessage(tgCfg.bot_token, tgCfg.chat_id, html, replyMarkup);
-    if (!r.ok) console.error(`[${now()}] Alert Telegram failed: ${r.error}`);
+    if (!r.ok) logger.error('telegram', `Alert failed: ${r.error}`);
   }
   if (pbCfg?.enabled && pbCfg.access_token) {
     const r = await pushPushbulletNote(pbCfg.access_token, `Alert: ${event.event_type}`, plain);
-    if (!r.ok) console.error(`[${now()}] Alert Pushbullet failed: ${r.error}`);
+    if (!r.ok) logger.error('pushbullet', `Alert failed: ${r.error}`);
   }
 }
 

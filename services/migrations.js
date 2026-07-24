@@ -1,6 +1,7 @@
 // Database migrations — runs on every init, idempotent.
 /** Returns the current ISO timestamp. */
 const now = () => new Date().toISOString();
+const logger = require('../utils/logger');
 
 // ponytail: shared helper to check if a column exists in a table
 function hasColumn(db, table, col) {
@@ -15,7 +16,7 @@ function convert_check_logs_resource_id_to_integer(db) {
   const sql = String(row.sql);
   // Idempotency: skip if resource_id is already INTEGER
   if (/resource_id\s+INTEGER/i.test(sql)) return;
-  console.log(`[${now()}] Migration: converting check_logs.resource_id TEXT → INTEGER`);
+  logger.info('migrations', 'converting check_logs.resource_id TEXT → INTEGER');
   try {
     db.exec(`
       BEGIN TRANSACTION;
@@ -61,7 +62,7 @@ function convert_check_logs_resource_id_to_integer(db) {
       COMMIT;
     `);
   } catch (err) {
-    console.error(`[${now()}] convert_check_logs_resource_id_to_integer failed: ${err.message}`);
+    logger.error('migrations', 'convert_check_logs_resource_id_to_integer failed:', err);
   }
 }
 
@@ -70,7 +71,7 @@ function fix_check_logs_status_check(db) {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='check_logs'").get();
   if (!row) return;
   if (String(row.sql).indexOf("'deleted'") === -1 || String(row.sql).indexOf("'changed'") === -1) {
-    console.log(`[${now()}] Migration: fixing check_logs CHECK constraint`);
+    logger.info('migrations', 'fixing check_logs CHECK constraint');
     try {
       db.exec(`
         BEGIN TRANSACTION;
@@ -93,7 +94,7 @@ function fix_check_logs_status_check(db) {
         COMMIT;
       `);
     } catch (err) {
-      console.error(`[${now()}] fix_check_logs_status_check failed: ${err.message}`);
+      logger.error('migrations', 'fix_check_logs_status_check failed:', err);
     }
   }
 }
@@ -103,7 +104,7 @@ function fix_rsc_event_type_check(db) {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
   if (!row) return;
   if (String(row.sql).indexOf("'deleted'") === -1) {
-    console.log(`[${now()}] Migration: fixing event_logs CHECK constraint`);
+    logger.info('migrations', 'fixing event_logs CHECK constraint');
     try {
       db.exec(`
         BEGIN TRANSACTION;
@@ -122,7 +123,7 @@ function fix_rsc_event_type_check(db) {
         COMMIT;
       `);
     } catch (err) {
-      console.error(`[${now()}] fix_rsc_event_type_check failed: ${err.message}`);
+      logger.error('migrations', 'fix_rsc_event_type_check failed:', err);
     }
   }
 }
@@ -187,7 +188,7 @@ function fix_alert_logs_fk(db) {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_logs'").get();
   if (!row) return;
   if (String(row.sql).indexOf('resource_status_changes') === -1 && String(row.sql).indexOf('_el_price_old') === -1) return;
-  console.log(`[${now()}] Migration: fixing alert_logs FK`);
+  logger.info('migrations', 'fixing alert_logs FK');
   try {
     db.exec(`
       BEGIN TRANSACTION;
@@ -204,7 +205,7 @@ function fix_alert_logs_fk(db) {
       COMMIT;
     `);
   } catch (err) {
-    console.error(`[${now()}] fix_alert_logs_fk failed: ${err.message}`);
+    logger.error('migrations', 'fix_alert_logs_fk failed:', err);
   }
 }
 
@@ -214,14 +215,14 @@ function fix_alert_logs_index(db) {
   if (!row) return;
   const sql = String(row.sql);
   if (sql.indexOf('created_at') !== -1) return;
-  console.log(`[${now()}] Migration: fixing alert_logs index`);
+  logger.info('migrations', 'fixing alert_logs index');
   try {
     db.exec(`
       DROP INDEX IF EXISTS idx_alert_logs_status_change_id;
       CREATE INDEX IF NOT EXISTS idx_alert_logs_status_change_id ON alert_logs (status_change_id, created_at DESC);
     `);
   } catch (err) {
-    console.error(`[${now()}] fix_alert_logs_index failed: ${err.message}`);
+    logger.error('migrations', 'fix_alert_logs_index failed:', err);
   }
 }
 
@@ -231,7 +232,7 @@ function drop_redundant_alert_logs_cols(db) {
   if (!row) return;
   const sql = String(row.sql);
   if (sql.indexOf('project_id') === -1) return;
-  console.log(`[${now()}] Migration: dropping redundant columns from alert_logs`);
+  logger.info('migrations', 'dropping redundant columns from alert_logs');
   try {
     db.exec(`
       BEGIN TRANSACTION;
@@ -248,7 +249,7 @@ function drop_redundant_alert_logs_cols(db) {
       COMMIT;
     `);
   } catch (err) {
-    console.error(`[${now()}] drop_redundant_alert_logs_cols failed: ${err.message}`);
+    logger.error('migrations', 'drop_redundant_alert_logs_cols failed:', err);
   }
 }
 
@@ -258,7 +259,7 @@ function rename_rsc_to_event_logs(db) {
   if (!oldTable) return;
   const newTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='event_logs'").get();
   if (newTable) return; // event_logs already exists, migration was already done
-  console.log(`[${now()}] Migration: migrating resource_status_changes → event_logs`);
+  logger.info('migrations', 'migrating resource_status_changes → event_logs');
   try {
     db.exec(`
       BEGIN TRANSACTION;
@@ -268,7 +269,7 @@ function rename_rsc_to_event_logs(db) {
       COMMIT;
     `);
   } catch (err) {
-    console.error(`[${now()}] rename_rsc_to_event_logs failed: ${err.message}`);
+    logger.error('migrations', 'rename_rsc_to_event_logs failed:', err);
   }
 }
 
@@ -288,7 +289,7 @@ function add_website_content_check(db) {
   try {
     db.exec('ALTER TABLE projects ADD COLUMN website_content_check INTEGER NOT NULL DEFAULT 1');
   } catch (err) {
-    console.error(`[${now()}] add_website_content_check failed: ${err.message}`);
+    logger.error('migrations', 'add_website_content_check failed:', err);
   }
 }
 
@@ -298,7 +299,7 @@ function add_price_enabled(db) {
   try {
     db.exec('ALTER TABLE projects ADD COLUMN price_enabled INTEGER NOT NULL DEFAULT 1');
   } catch (err) {
-    console.error(`[${now()}] add_price_enabled failed: ${err.message}`);
+    logger.error('migrations', 'add_price_enabled failed:', err);
   }
 }
 
@@ -312,7 +313,7 @@ function drop_old_config_flat_cols(db) {
     try {
       db.exec(`ALTER TABLE config DROP COLUMN ${col}`);
     } catch (err) {
-      console.error(`[${now()}] drop_old_config_flat_cols (${col}) failed: ${err.message}`);
+      logger.error('migrations', `drop_old_config_flat_cols (${col}) failed:`, err);
     }
   }
 }
@@ -323,10 +324,10 @@ function add_token_and_enabled_columns(db) {
   if (!rows) return;
   const cols = rows.map(r => r.name);
   if (!cols.includes('token')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN token TEXT"); } catch (e) { console.error(`[${now()}] add_token_and_enabled_columns (token) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN token TEXT"); } catch (e) { logger.error('migrations', 'add_token_and_enabled_columns (token) failed:', e); }
   }
   if (!cols.includes('enabled')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"); } catch (e) { console.error(`[${now()}] add_token_and_enabled_columns (enabled) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"); } catch (e) { logger.error('migrations', 'add_token_and_enabled_columns (enabled) failed:', e); }
   }
 }
 
@@ -350,7 +351,7 @@ function add_twitter_posts_table(db) {
       )
     `);
   } catch (err) {
-    console.error(`[${now()}] add_twitter_posts_table failed: ${err.message}`);
+    logger.error('migrations', 'add_twitter_posts_table failed:', err);
   }
 }
 
@@ -409,7 +410,7 @@ function add_price_to_check_logs_resource_type(db) {
     try { db.exec("DROP TABLE IF EXISTS _cl_price_old"); } catch (_) {}
   }
   if (!row) return;
-  console.log(`[${now()}] Migration: adding 'price' to check_logs.resource_type CHECK`);
+  logger.info('migrations', "adding 'price' to check_logs.resource_type CHECK");
   try {
     db.exec(`
       ALTER TABLE check_logs RENAME TO _cl_price_old;
@@ -431,7 +432,7 @@ function add_price_to_check_logs_resource_type(db) {
       CREATE INDEX IF NOT EXISTS idx_check_logs_project_resource_date ON check_logs (project_id, resource_type, checked_at);
     `);
   } catch (err) {
-    console.error(`[${now()}] add_price_to_check_logs_resource_type failed: ${err.message}`);
+    logger.error('migrations', 'add_price_to_check_logs_resource_type failed:', err);
   }
 }
 
@@ -446,7 +447,7 @@ function add_price_to_event_logs_resource_type(db) {
     try { db.exec("DROP TABLE IF EXISTS _el_price_old"); } catch (_) {}
   }
   if (!row) return;
-  console.log(`[${now()}] Migration: adding 'price' to event_logs.resource_type CHECK`);
+  logger.info('migrations', "adding 'price' to event_logs.resource_type CHECK");
   try {
     db.exec(`
       ALTER TABLE event_logs RENAME TO _el_price_old;
@@ -466,7 +467,7 @@ function add_price_to_event_logs_resource_type(db) {
       CREATE INDEX IF NOT EXISTS idx_event_logs_alerting ON event_logs (resource_type, confirmed, created_at DESC);
     `);
   } catch (err) {
-    console.error(`[${now()}] add_price_to_event_logs_resource_type failed: ${err.message}`);
+    logger.error('migrations', 'add_price_to_event_logs_resource_type failed:', err);
   }
 }
 
@@ -479,12 +480,12 @@ function add_notification_config_cols(db) {
   try {
     db.exec("ALTER TABLE config ADD COLUMN telegram TEXT NOT NULL DEFAULT '{\"bot_token\":\"\",\"chat_id\":\"\",\"enabled\":false}'");
   } catch (err) {
-    console.error(`[${now()}] add_notification_config_cols (telegram) failed: ${err.message}`);
+    logger.error('migrations', 'add_notification_config_cols (telegram) failed:', err);
   }
   try {
     db.exec("ALTER TABLE config ADD COLUMN pushbullet TEXT NOT NULL DEFAULT '{\"access_token\":\"\",\"enabled\":false}'");
   } catch (err) {
-    console.error(`[${now()}] add_notification_config_cols (pushbullet) failed: ${err.message}`);
+    logger.error('migrations', 'add_notification_config_cols (pushbullet) failed:', err);
   }
 }
 
@@ -522,16 +523,16 @@ function compact_projects_url_cols(db) {
 
   // Step 1: add new JSON cols if missing
   if (!cols.includes('website')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN website TEXT"); } catch (e) { console.error(`[${now()}] compact (website) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN website TEXT"); } catch (e) { logger.error('migrations', 'compact (website) failed:', e); }
   }
   if (!cols.includes('github')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN github TEXT"); } catch (e) { console.error(`[${now()}] compact (github) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN github TEXT"); } catch (e) { logger.error('migrations', 'compact (github) failed:', e); }
   }
   if (!cols.includes('twitter')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN twitter TEXT"); } catch (e) { console.error(`[${now()}] compact (twitter) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN twitter TEXT"); } catch (e) { logger.error('migrations', 'compact (twitter) failed:', e); }
   }
   if (!cols.includes('telegram')) {
-    try { db.exec("ALTER TABLE projects ADD COLUMN telegram TEXT"); } catch (e) { console.error(`[${now()}] compact (telegram) failed: ${e.message}`); }
+    try { db.exec("ALTER TABLE projects ADD COLUMN telegram TEXT"); } catch (e) { logger.error('migrations', 'compact (telegram) failed:', e); }
   }
 
   // Step 2: copy flat data into JSON cols (idempotent — only runs if old cols still exist)
@@ -544,7 +545,7 @@ function compact_projects_url_cols(db) {
             ELSE NULL END
         WHERE website IS NULL AND website_url IS NOT NULL
       `);
-    } catch (e) { console.error(`[${now()}] compact (website data) failed: ${e.message}`); }
+    } catch (e) { logger.error('migrations', 'compact (website data) failed:', e); }
   }
   if (cols.includes('github_url')) {
     try {
@@ -555,7 +556,7 @@ function compact_projects_url_cols(db) {
             ELSE NULL END
         WHERE github IS NULL AND github_url IS NOT NULL
       `);
-    } catch (e) { console.error(`[${now()}] compact (github data) failed: ${e.message}`); }
+    } catch (e) { logger.error('migrations', 'compact (github data) failed:', e); }
   }
   if (cols.includes('twitter_url')) {
     try {
@@ -566,7 +567,7 @@ function compact_projects_url_cols(db) {
             ELSE NULL END
         WHERE twitter IS NULL AND twitter_url IS NOT NULL
       `);
-    } catch (e) { console.error(`[${now()}] compact (twitter data) failed: ${e.message}`); }
+    } catch (e) { logger.error('migrations', 'compact (twitter data) failed:', e); }
   }
   if (cols.includes('telegram_url')) {
     try {
@@ -577,7 +578,7 @@ function compact_projects_url_cols(db) {
             ELSE NULL END
         WHERE telegram IS NULL AND telegram_url IS NOT NULL
       `);
-    } catch (e) { console.error(`[${now()}] compact (telegram data) failed: ${e.message}`); }
+    } catch (e) { logger.error('migrations', 'compact (telegram data) failed:', e); }
   }
 
   // Step 3: drop old flat URL columns (wrapped in try/catch for SQLite < 3.35)
@@ -586,7 +587,7 @@ function compact_projects_url_cols(db) {
   for (const col of oldUrlCols) {
     if (currentCols.includes(col)) {
       try { db.exec(`ALTER TABLE projects DROP COLUMN ${col}`); } catch (e) {
-        console.error(`[${now()}] compact (drop ${col}) failed: ${e.message}`);
+        logger.error('migrations', `compact (drop ${col}) failed:`, e);
       }
     }
   }
@@ -596,7 +597,7 @@ function compact_projects_url_cols(db) {
   for (const col of extraCols) {
     if (currentCols2.includes(col)) {
       try { db.exec(`ALTER TABLE projects DROP COLUMN ${col}`); } catch (e) {
-        console.error(`[${now()}] compact (drop ${col}) failed: ${e.message}`);
+        logger.error('migrations', `compact (drop ${col}) failed:`, e);
       }
     }
   }
@@ -611,7 +612,7 @@ function compact_projects_url_cols(db) {
   if (hasPriceEnabled && !hasTokenEnabled) {
     // True rename: price_enabled exists, token_enabled does not
     // Use explicit column list — _proj_old may be missing columns added by later migrations
-    console.log(`[${now()}] Migration: renaming price_enabled → token_enabled`);
+    logger.info('migrations', 'renaming price_enabled → token_enabled');
     try {
       db.exec(`
         BEGIN TRANSACTION;
@@ -649,13 +650,13 @@ function compact_projects_url_cols(db) {
         COMMIT;
       `);
     } catch (e) {
-      console.error(`[${now()}] compact (rename price_enabled) failed: ${e.message}`);
+      logger.error('migrations', 'compact (rename price_enabled) failed:', e);
     }
   } else if (hasPriceEnabled && hasTokenEnabled) {
     // Both co-exist — drop the old price_enabled column
-    console.log(`[${now()}] Migration: dropping obsolete price_enabled column (token_enabled already present)`);
+    logger.info('migrations', 'dropping obsolete price_enabled column (token_enabled already present)');
     try { db.exec("ALTER TABLE projects DROP COLUMN price_enabled"); } catch (e) {
-      console.error(`[${now()}] compact (drop price_enabled) failed: ${e.message}`);
+      logger.error('migrations', 'compact (drop price_enabled) failed:', e);
     }
   }
 }
@@ -663,9 +664,9 @@ function compact_projects_url_cols(db) {
 /** Migration: adds activity_display column to projects (idempotent). */
 function add_projects_activity_display(db) {
   if (!hasColumn(db, 'projects', 'activity_display')) {
-    console.log(`[${now()}] Migration: adding activity_display to projects`);
+    logger.info('migrations', 'adding activity_display to projects');
     try { db.exec("ALTER TABLE projects ADD COLUMN activity_display INTEGER NOT NULL DEFAULT 1"); } catch (e) {
-      console.error(`[${now()}] add_projects_activity_display failed: ${e.message}`);
+      logger.error('migrations', 'add_projects_activity_display failed:', e);
     }
   }
 }
@@ -676,7 +677,7 @@ function drop_repos_repo_name_col(db) {
   const row = db.prepare("PRAGMA table_info(repos)").all();
   const cols = row.map(r => r.name);
   if (!cols.includes('repo_name')) return; // already removed
-  console.log(`[${now()}] Migration: dropping repo_name from repos`);
+  logger.info('migrations', 'dropping repo_name from repos');
   try {
     db.exec(`
       BEGIN TRANSACTION;
@@ -716,7 +717,7 @@ function drop_repos_repo_name_col(db) {
       COMMIT;
     `);
   } catch (err) {
-    console.error(`[${now()}] drop_repos_repo_name_col failed: ${err.message}`);
+    logger.error('migrations', 'drop_repos_repo_name_col failed:', err);
   }
 }
 
@@ -744,16 +745,16 @@ async function runMigrations(db) {
   // try { await add_token_and_enabled_columns(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   // try { await add_token_prices_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
   // try { await add_token_prices_alerts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_user_id_to_projects(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_user_id_to_config(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { compact_projects_url_cols(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { drop_repos_repo_name_col(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_projects_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_config_user_id_index(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_twitter_posts_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_projects_activity_display(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_webshare_config(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
-  try { add_proxy_stats_table(db); } catch (e) { console.error(`[${now()}] Migration error: ${e.message}`); }
+  try { add_user_id_to_projects(db); } catch (e) { logger.error('migrations', e); }
+  try { add_user_id_to_config(db); } catch (e) { logger.error('migrations', e); }
+  try { compact_projects_url_cols(db); } catch (e) { logger.error('migrations', e); }
+  try { drop_repos_repo_name_col(db); } catch (e) { logger.error('migrations', e); }
+  try { add_projects_user_id_index(db); } catch (e) { logger.error('migrations', e); }
+  try { add_config_user_id_index(db); } catch (e) { logger.error('migrations', e); }
+  try { add_twitter_posts_table(db); } catch (e) { logger.error('migrations', e); }
+  try { add_projects_activity_display(db); } catch (e) { logger.error('migrations', e); }
+  try { add_webshare_config(db); } catch (e) { logger.error('migrations', e); }
+  try { add_proxy_stats_table(db); } catch (e) { logger.error('migrations', e); }
 }
 
 function add_webshare_config(db) {

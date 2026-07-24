@@ -4,6 +4,7 @@ const { proxyFetch } = require('./proxy-fetch');
 const { createHash } = require('crypto');
 const { spawn } = require('child_process');
 const { JSDOM } = require('jsdom');
+const logger = require('../utils/logger');
 // ponytail: rss-parser uses Node's legacy https.get which nitter.net accepts;
 // built-in fetch / node-fetch-native both return empty bodies from nitter.
 const RssParser = require('rss-parser');
@@ -135,7 +136,7 @@ async function logCheck(projectId, resourceType, resourceId, result) {
     new Date().toISOString()
   );
   } catch (err) {
-    console.error(`[checker] logCheck DB error: ${err.message}`);
+    logger.error('checker', 'logCheck DB error:', err);
   }
 }
 
@@ -302,7 +303,7 @@ async function checkGithubRepo(fullName, projectId) {
           try {
             recordStatusChange(projectId, 'github', 'deleted', { full_name: fullName, sha: repo.latest_commit_sha });
           } catch (insertErr) {
-            console.error(`[${nowFormat()}] Failed to insert deletion event for ${fullName}: ${insertErr.message}`);
+            logger.error('checker', `Failed to insert deletion event for ${fullName}:`, insertErr);
           }
         }
         return { status: 'deleted', http_status: 404, response_time_ms: 0, error_message: null, details: null };
@@ -382,9 +383,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
         : directErr.message.includes('timeout')
         ? 'connection timed out — proxies likely blocked'
         : `nitter.net returned ${directErr.message}`;
-      console.error(
-        `[${nowFormat()}] Twitter RSS failed for @${handle} (${rssUrl}): proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`
-      );
+      logger.error('twitter', `RSS failed for @${handle} (${rssUrl}): proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`);
       return { newPosts: 0, newPostIds: [] };
     }
   }
@@ -497,7 +496,7 @@ async function checkTwitter(url, projectId, opts = {}) {
           });
         }
       } catch (err) {
-        console.error(`[${nowFormat()}] fetchAndStoreTwitterPosts failed for project ${projectId}: ${err.message}`);
+        logger.error('twitter', `fetchAndStoreTwitterPosts failed for project ${projectId}:`, err);
       }
     }
 

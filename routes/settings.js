@@ -1,6 +1,7 @@
 // Settings REST API (per-user config + trigger-all)
 const express = require('express');
 const db = require('../services/db');
+const logger = require('../utils/logger');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck } = require('../services/checker');
 
 const router = express.Router();
@@ -294,7 +295,7 @@ router.put('/', async (req, res) => {
     db.config.getPushbullet(req.userId),
     db.config.getPriceAlerts(req.userId)
   ]);
-  console.log(`[${now()}] Settings updated: ${JSON.stringify(updates)}`);
+  logger.info('settings', `Settings updated: ${JSON.stringify(updates)}`);
   res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts });
 });
 
@@ -347,14 +348,14 @@ async function runChecksForProject(project) {
 // POST /api/settings/trigger-all
 router.post('/trigger-all', async (req, res) => {
   const projects = await db.prepare('SELECT * FROM projects WHERE user_id = ?').all(req.userId);
-  console.log(`[${now()}] Triggering all checks for ${projects.length} projects`);
+  logger.info('settings', `Triggering all checks for ${projects.length} projects`);
   const allResults = [];
   for (const project of projects) {
     try {
       const r = await runChecksForProject(project);
       allResults.push({ project_id: project.id, name: project.name, results: r });
     } catch (err) {
-      console.error(`[${now()}] trigger-all failed for project ${project.id}: ${err.message}`);
+      logger.error('settings', `trigger-all failed for project ${project.id}:`, err);
       allResults.push({ project_id: project.id, name: project.name, error: err.message });
     }
   }
@@ -386,7 +387,7 @@ async function triggerResourceType(resourceType, userId) {
         }
       }
     } catch (err) {
-      console.error(`[${now()}] trigger(${resourceType}) failed for project ${project.id}: ${err.message}`);
+      logger.error('settings', `trigger(${resourceType}) failed for project ${project.id}:`, err);
       results.push({ project_id: project.id, name: project.name, error: err.message });
     }
   }
@@ -395,21 +396,21 @@ async function triggerResourceType(resourceType, userId) {
 
 // POST /api/settings/trigger-websites
 router.post('/trigger-websites', async (req, res) => {
-  console.log(`[${now()}] Manual trigger: websites`);
+  logger.info('settings', 'Manual trigger: websites');
   const results = await triggerResourceType('website', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });
 
 // POST /api/settings/trigger-github
 router.post('/trigger-github', async (req, res) => {
-  console.log(`[${now()}] Manual trigger: github`);
+  logger.info('settings', 'Manual trigger: github');
   const results = await triggerResourceType('github', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });
 
 // POST /api/settings/trigger-twitter
 router.post('/trigger-twitter', async (req, res) => {
-  console.log(`[${now()}] Manual trigger: twitter`);
+  logger.info('settings', 'Manual trigger: twitter');
   const results = await triggerResourceType('twitter', req.userId);
   res.json({ ok: true, triggered: results.length, results });
 });

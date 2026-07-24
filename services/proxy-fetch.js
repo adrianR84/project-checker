@@ -6,6 +6,7 @@
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const db = require('./db');
 const fs = require('fs');
+const logger = require('../utils/logger');
 const path = require('path');
 
 const POOL_PATH = path.join(__dirname, '..', 'data', 'proxies.json');
@@ -81,7 +82,7 @@ async function _loadStats() {
     }
     //console.error(`[proxy-fetch] loaded ${proxyStatsByIp.size} unique IPs from proxy stat rows`);
   } catch (e) {
-    console.error(`[proxy-fetch] failed to load proxy stats: ${e.message}`);
+    logger.error('proxy-fetch', `failed to load proxy stats:`, e);
   }
 }
 
@@ -131,7 +132,7 @@ async function _ensurePool() {
       //console.error(`[proxy-fetch] loaded ${pool.length} proxies`);
     })
     .catch(err => {
-      console.error(`[proxy-fetch] refresh failed: ${err.message}`);
+      logger.error('proxy-fetch', `refresh failed:`, err);
     })
     .finally(() => {
       _refreshing = null;
@@ -214,7 +215,7 @@ async function proxyFetch(url, opts = {}) {
     await db.config.upsertProxyStat({ host: ip, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
     return { ok: status < 400, status, text: () => Promise.resolve(body) };
   } catch (proxyErr) {
-    console.warn(`[proxy-fetch] proxy failed (${host}), retrying direct: ${proxyErr.message}`);
+    logger.warn('proxy-fetch', `proxy failed (${host}), retrying direct:`, proxyErr);
     await db.config.upsertProxyStat({ host: ip, ok: false, responseMs: 0 }).catch(() => {});
 
     const t0d = Date.now();

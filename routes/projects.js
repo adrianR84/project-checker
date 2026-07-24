@@ -1,6 +1,7 @@
 // Projects REST API
 const express = require('express');
 const db = require('../services/db');
+const logger = require('../utils/logger');
 const { fetchReposForOwner, fetchCommitHistory, fetchLatestTag } = require('../services/github');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange } = require('../services/checker');
 
@@ -175,7 +176,7 @@ router.post('/', async (req, res) => {
         await logCheck(projectId, 'twitter', null, r);
       }
     } catch (err) {
-      console.error(`[${now()}] post-create checks failed for project ${projectId}: ${err.message}`);
+      logger.error('projects', `post-create checks failed for project ${projectId}:`, err);
     }
   }
   // github repos are added separately via add-repos; skip here
@@ -262,7 +263,7 @@ router.put('/:id', async (req, res) => {
         };
       }
     } catch (err) {
-      console.error(`[${now()}] Dexscreener lookup failed: ${err.message}`);
+      logger.error('projects', `Dexscreener lookup failed:`, err);
     }
   }
 
@@ -358,7 +359,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
         await storeRepo(id, repoInfo, history, latestTag);
         if (exists) updated++; else added++;
       } catch (err) {
-        console.error(`[${now()}] refresh-repos: commit history failed for ${repoInfo.full_name}: ${err.message}`);
+        logger.error('projects', `refresh-repos: commit history failed for ${repoInfo.full_name}:`, err);
         const latestTag = await fetchLatestTag(repoInfo.full_name).catch(() => null);
         await storeRepo(id, repoInfo, {
           first_commit_date: null, latest_commit_date: null, latest_commit_sha: null,
@@ -369,7 +370,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
     }
     res.json({ ok: true, fetched: githubRepos.length, updated, added });
   } catch (err) {
-    console.error(`[${now()}] refresh-repos failed for project ${id}: ${err.message}`);
+    logger.error('projects', `refresh-repos failed for project ${id}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -393,7 +394,7 @@ router.post('/:id/add-repos', async (req, res) => {
         const r = await checkGithubRepo(repo.full_name, id);
         await logCheck(id, 'github', null, r);
       } catch (err) {
-        console.error(`[${now()}] initial github check failed for ${repo.full_name}: ${err.message}`);
+        logger.error('projects', `initial github check failed for ${repo.full_name}:`, err);
       }
     }
   }

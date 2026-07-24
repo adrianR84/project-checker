@@ -3,6 +3,7 @@ const { betterAuth } = require('better-auth');
 const { getMigrations } = require('better-auth/db/migration');
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const logger = require('../utils/logger');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'project-checker.db');
 
@@ -24,7 +25,7 @@ const auth = betterAuth({
 
 // Run Better Auth schema migrations at startup (idempotent)
 getMigrations({ database: sqlite, auth }).then(m => m.runMigrations()).catch(err => {
-  console.error('[better-auth] migration error:', err.message);
+  logger.error('better-auth', 'migration error:', err);
 });
 
 module.exports = auth;

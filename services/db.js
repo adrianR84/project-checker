@@ -1,6 +1,7 @@
 // node:sqlite — built-in file-based SQLite (Node.js 22.5+)
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const logger = require('../utils/logger');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'project-checker.db');
 
@@ -13,7 +14,7 @@ const now = () => new Date().toISOString();
 function openDatabase() {
   // ponytail: DatabaseSync constructor auto-opens the file and persists changes
   db = new DatabaseSync(DB_PATH, { enableForeignKeyConstraints: true });
-  console.log(`[${now()}] Database opened: ${DB_PATH}`);
+  logger.info('db', `Database opened: ${DB_PATH}`);
   return db;
 }
 
