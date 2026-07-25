@@ -2666,7 +2666,7 @@
 
               <div class="trigger-row" style="color:var(--app-warn)">
                 <label style="color:var(--app-warn);cursor:pointer">
-                  <input type="checkbox" v-model="form.system_pause" @change="saveSystemPauseSettings" />
+                  <input type="checkbox" v-model="form.system_pause" data-tooltip="Pauses all auto-checks for website, Twitter and GitHub until unchecked" @change="saveSystemPauseSettings" />
                   Pause all auto-checks
                 </label>
               </div>
