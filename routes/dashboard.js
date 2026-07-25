@@ -35,6 +35,7 @@
 // Dashboard REST API — aggregated view
 const express = require('express');
 const db = require('../services/db');
+require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
 const router = express.Router();
 
@@ -45,17 +46,24 @@ const router = express.Router();
  */
 function parseProjectRow(row) {
   if (!row) return row;
-  const pc = row.twitter ? (JSON.parse(row.twitter).pc ?? 1) : 1;
+  /** @type {import('../types').ProjectWebsite} */
+  const w = row.website  ? JSON.parse(row.website) : { url: null, cc: 1 };
+  /** @type {import('../types').ProjectGithub} */
+  const g = row.github   ? JSON.parse(row.github)  : { url: null };
+  /** @type {import('../types').ProjectTwitter} */
+  const t = row.twitter  ? JSON.parse(row.twitter) : { url: null, pc: 1 };
+  /** @type {import('../types').ProjectTelegram} */
+  const tg = row.telegram ? JSON.parse(row.telegram) : { url: null };
   return {
     ...row,
-    website_url:         row.website  ? JSON.parse(row.website).url  : null,
-    website_content_check: row.website ? (JSON.parse(row.website).cc ?? 1) : 1,
-    github_url:          row.github   ? JSON.parse(row.github).url  : null,
-    twitter_url:         row.twitter   ? JSON.parse(row.twitter).url : null,
-    twitter_enabled:     row.twitter_enabled,
-    twitter_posts_check: pc,
-    telegram_url:        row.telegram  ? JSON.parse(row.telegram).url : null,
-    price_enabled:       row.token_enabled,
+    website_url:           w.url,
+    website_content_check: w.cc ?? 1,
+    github_url:           g.url,
+    twitter_url:          t.url,
+    twitter_enabled:      row.twitter_enabled,
+    twitter_posts_check:  t.pc ?? 1,
+    telegram_url:         tg.url,
+    price_enabled:        row.token_enabled,
   };
 }
 

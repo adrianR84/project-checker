@@ -30,6 +30,7 @@
 // Check logs REST API
 const express = require('express');
 const db = require('../services/db');
+require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
 const router = express.Router();
 
@@ -40,11 +41,17 @@ const router = express.Router();
  */
 function expandProjectUrls(row) {
   if (!row) return row;
+  /** @type {import('../types').ProjectWebsite} */
+  const w = row.website  ? JSON.parse(row.website) : { url: null };
+  /** @type {import('../types').ProjectGithub} */
+  const g = row.github   ? JSON.parse(row.github)  : { url: null };
+  /** @type {import('../types').ProjectTwitter} */
+  const t = row.twitter  ? JSON.parse(row.twitter) : { url: null };
   return {
     ...row,
-    website_url:  row.website  ? JSON.parse(row.website).url  : null,
-    github_url:   row.github   ? JSON.parse(row.github).url  : null,
-    twitter_url:  row.twitter   ? JSON.parse(row.twitter).url : null,
+    website_url:  w.url,
+    github_url:   g.url,
+    twitter_url:  t.url,
   };
 }
 

@@ -35,6 +35,7 @@ const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChang
 const { fetchReposForOwner } = require('./github');
 const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY } = require('./notifications');
 const logger = require('../utils/logger');
+require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
 // ─── Price alert throttle helpers ───────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ async function runWebsiteTick() {
   scheduleLog(`[${now()}] Scheduler: website tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
+      /** @type {import('../types').ProjectWebsite} */
       const parsed = JSON.parse(p.website);
       const r = await checkWebsite(parsed.url, p.id, !!parsed.cc);
       await logCheck(p.id, 'website', null, r);
@@ -110,6 +112,7 @@ async function runTwitterTick() {
   scheduleLog(`[${now()}] Scheduler: twitter tick — ${projects.length} projects`);
   for (const p of projects) {
     try {
+      /** @type {import('../types').ProjectTwitter} */
       const parsed = JSON.parse(p.twitter);
       const r = await checkTwitter(parsed.url, p.id, { postsCheck: !!parsed.pc, handle: handleFromTwitterUrl(parsed.url) });
       await logCheck(p.id, 'twitter', null, r);
@@ -178,6 +181,12 @@ async function purgeAlertLogs() {
   const cutoff = new Date(Date.now() - settings.alert_log_retention_days * 86400_000).toISOString();
   await db.prepare('DELETE FROM alert_logs WHERE created_at < ?').run(cutoff);
   scheduleLog(`[${now()}] Scheduler: purged alert_logs older than ${settings.alert_log_retention_days} days`);
+}
+
+/** Checkpoints and truncates the WAL file. Daily at midnight. */
+async function purgeWal() {
+  db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  scheduleLog(`[${now()}] Scheduler: WAL checkpointed and truncated`);
 }
 
 /** Caps twitter_posts at twitter_posts_per_project (most recent N per project, oldest deleted). Daily at midnight. */
@@ -280,6 +289,7 @@ async function runTokenPriceTick() {
     const batch = projects.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (p) => {
       try {
+        /** @type {import('../types').ProjectToken} */
         const token = JSON.parse(p.token);
         if (!token.contract || !token.chain) return;
         const url = `https://api.dexscreener.com/token-pairs/v1/${token.chain}/${token.contract}`;
@@ -486,6 +496,7 @@ async function reschedule() {
     try { await purgeEventLogs(); } catch (err) { logger.error('scheduler', err); }
     try { await purgeAlertLogs(); } catch (err) { logger.error('scheduler', err); }
     try { await purgeTwitterPosts(); } catch (err) { logger.error('scheduler', err); }
+    try { await purgeWal(); } catch (err) { logger.error('scheduler', err); }
   });
   jobs.push(purgeJob);
   scheduleLog(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
@@ -523,4 +534,4 @@ function init() {
   scheduleLog(`[${now()}] Scheduler initialized`);
 }
 
-module.exports = { init, purgeCheckLogs, purgeEventLogs, purgeAlertLogs, purgeTwitterPosts };
+module.exports = { init, purgeCheckLogs, purgeEventLogs, purgeAlertLogs, purgeTwitterPosts, purgeWal };

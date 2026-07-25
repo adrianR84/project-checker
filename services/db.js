@@ -207,9 +207,6 @@ async function init() {
   // Run migrations
   const { runMigrations } = require('./migrations');
   await runMigrations(database);
-
-  //console.log(`[${now()}] Database initialized`);
-  return dbProxy;
 }
 
 /**
@@ -234,7 +231,7 @@ const dbProxy = {
     return {
       run(...params) {
         const result = db.prepare(sql).run(...bindParams(params));
-        db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+        db.exec('PRAGMA wal_checkpoint(PASSIVE)');
         return Promise.resolve({ lastInsertRowid: result.lastInsertRowid });
       },
       get(...params) {
