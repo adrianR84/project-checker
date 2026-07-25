@@ -50,9 +50,81 @@
     const BASE = '/api';
 
     /**
+     * Latest check result for a single resource. Shape is identical for website,
+     * github, and twitter; absent keys simply don't exist on the row.
+     * @typedef {object} ResourceStatus
+     * @property {string} status          - 'ok' | 'error' | 'changed' | 'disabled' | 'unavailable' | 'deleted' | 'pending'
+     * @property {string} [checked_at]    - ISO timestamp; null when never checked
+     * @property {number} [http_status]   - response status code (website only)
+     * @property {number} [response_time_ms]
+     * @property {string} [error_message]
+     * @property {string|object} [details] - opaque payload from the checker
+     */
+
+    /**
+     * A token tracked by the price-check pipeline. Strings may be null when missing.
+     * @typedef {object} Token
+     * @property {string|null} symbol
+     * @property {string|null} contract
+     * @property {string|null} chain
+     */
+
+    /**
+     * GitHub repo attached to a project. Stored as JSON in the DB; the API may
+     * return either the parsed object or a string depending on the endpoint.
+     * @typedef {object} Repo
+     * @property {number} id
+     * @property {string} full_name       - "owner/repo"
+     * @property {string} [repo_url]
+     * @property {string} [latest_tag]
+     * @property {string} [latest_commit_sha]
+     * @property {string} [latest_commit_message]
+     * @property {string} [latest_commit_date] - ISO timestamp
+     * @property {number} [stars_count]
+     */
+
+    /**
+     * The shape of a single row in the dashboard / projects list. The same row
+     * can serialize `token` as a JSON string or as an object depending on the endpoint.
+     * @typedef {object} Project
+     * @property {number} id
+     * @property {string} name
+     * @property {string|null} website_url
+     * @property {string|null} github_url
+     * @property {string|null} twitter_url
+     * @property {string|null} telegram_url
+     * @property {0|1} website_enabled
+     * @property {0|1} website_content_check
+     * @property {0|1} github_enabled
+     * @property {0|1} twitter_enabled
+     * @property {0|1} twitter_posts_check
+     * @property {0|1} telegram_enabled
+     * @property {0|1} enabled            - master switch (project_enabled in form)
+     * @property {0|1} activity_display
+     * @property {0|1} price_enabled
+     * @property {Token|object} token     - serialized as JSON string on some endpoints
+     * @property {Repo[]} [repos]
+     * @property {Repo[]} [deletedRepos]
+     * @property {ResourceStatus} [website_status]
+     * @property {ResourceStatus} [github_status]
+     * @property {ResourceStatus} [twitter_status]
+     * @property {string|null} [website_last_changed_at]
+     * @property {string|null} [github_last_changed_at]
+     * @property {string|null} [twitter_last_changed_at]
+     * @property {0|1} [has_unconfirmed]
+     */
+
+    /**
+     * @typedef {object} LogListResponse
+     * @property {Array<object>} logs
+     * @property {number} total
+     */
+
+    /**
      * Make an HTTP request to the Express API.
      * @param {string} path  - e.g. '/projects' or '/projects/5'
      * @param {object} opts  - fetch options: { method, headers, body, ... }
+     * @returns {Promise<any>} parsed JSON body
      */
     async function req(path, opts = {}) {
       const r = await fetch(BASE + path, {
@@ -76,41 +148,71 @@
 
     /** All API methods — one per backend endpoint */
     const api = {
+      /** @returns {Promise<Project[]>} projects with their latest status baked in */
       getDashboard:   ()       => req('/dashboard'),
+      /** @returns {Promise<Project[]>} */
       listProjects:   ()       => req('/projects'),
+      /** @returns {Promise<Project>} */
       getProject:     (id)     => req(`/projects/${id}`),
+      /** @returns {Promise<Project>} */
       createProject:  (d)      => req('/projects',            { method: 'POST',   body: JSON.stringify(d) }),
+      /** @returns {Promise<Project>} */
       updateProject:  (id, d)  => req(`/projects/${id}`,     { method: 'PUT',    body: JSON.stringify(d) }),
+      /** @returns {Promise<void>} */
       deleteProject:  (id)     => req(`/projects/${id}`,     { method: 'DELETE' }),
+      /** @returns {Promise<Repo[]>} */
       refreshRepos:   (id)     => req(`/projects/${id}/refresh-repos`, { method: 'POST' }),
+      /** @returns {Promise<Repo[]>} available org repos not yet linked */
       getOrgRepos:    (id)     => req(`/projects/${id}/org-repos`),
+      /** @returns {Promise<Repo[]>} */
       getProjectRepos:(id)     => req(`/projects/${id}`).then(r => r.repos),
+      /** @returns {Promise<void>} */
       addRepos:       (id, repos) => req(`/projects/${id}/add-repos`,   { method: 'POST', body: JSON.stringify({ repos }) }),
+      /** @returns {Promise<void>} */
       removeRepo:     (id, fullName) => req(`/projects/${id}/repos/${encodeURIComponent(fullName)}`, { method: 'DELETE' }),
+      /** @returns {Promise<void>} */
       checkWebsite:   (id)     => req(`/projects/${id}/check-website`,  { method: 'POST' }),
+      /** @returns {Promise<void>} */
       checkGithub:    (id)     => req(`/projects/${id}/check-github`,   { method: 'POST' }),
+      /** @returns {Promise<void>} */
       checkTwitter:   (id)     => req(`/projects/${id}/check-twitter`,  { method: 'POST' }),
+      /** @returns {Promise<LogListResponse>} */
       getCheckLogs:       (q = {}) => req('/check-logs?' + new URLSearchParams(q).toString()),
+      /** @returns {Promise<LogListResponse>} */
       getStatusChanges:   (q = {}) => req('/check-logs/status-changes?' + new URLSearchParams(q).toString()),
+      /** @returns {Promise<void>} */
       confirmStatusChange: (id, confirmed = 1) => req(`/check-logs/status-changes/${id}/confirm`, { method: 'PATCH', body: JSON.stringify({ confirmed: confirmed ? 1 : 0 }) }),
+      /** @returns {Promise<void>} */
       confirmAllStatusChanges: () => req('/check-logs/status-changes/confirm-all', { method: 'POST' }),
+      /** @returns {Promise<LogListResponse>} */
       getAlertLogs:       (q = {}) => req('/check-logs/alerts?' + new URLSearchParams(q).toString()),
+      /** @returns {Promise<Array<object>>} one row per project with a token */
       getTokenPrices:     ()       => req('/dashboard/token-prices'),
+      /** @returns {Promise<object>} config row */
       getSettings:    ()       => req('/settings'),
+      /** @returns {Promise<object>} updated config row */
       updateSettings: (d)      => req('/settings',           { method: 'PUT',    body: JSON.stringify(d) }),
       triggerAll:     ()       => req('/settings/trigger-all',   { method: 'POST' }),
       triggerWebsites: ()     => req('/settings/trigger-websites', { method: 'POST' }),
       triggerGithub:   ()     => req('/settings/trigger-github',  { method: 'POST' }),
       triggerTwitter:  ()     => req('/settings/trigger-twitter',  { method: 'POST' }),
+      /** @returns {Promise<void>} wipe projects/repos/logs (config preserved) */
       clearData:      ()       => req('/settings/clear-data',   { method: 'POST' }),
+      /** @returns {Promise<void>} */
       clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
+      /** @returns {Promise<void>} */
       clearAlertLogs: ()       => req('/settings/clear-alert-logs', { method: 'POST' }),
+      /** @returns {Promise<{api_token: string}>} */
       generateApiToken: ()      => req('/settings/generate-api-token', { method: 'POST' }),
 
       // Auth
+      /** @returns {Promise<void>} */
       signIn:      (creds)  => req('/auth/sign-in/email',    { method: 'POST', body: JSON.stringify(creds) }),
+      /** @returns {Promise<void>} */
       signUp:      (creds)  => req('/auth/sign-up/email',    { method: 'POST', body: JSON.stringify(creds) }),
+      /** @returns {Promise<void>} */
       signOut:     ()       => req('/auth/sign-out',          { method: 'POST' }),
+      /** @returns {Promise<{user: object|null}>} */
       getSession:  ()       => req('/auth/get-session'),
     };
 
@@ -507,19 +609,41 @@
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */
     const NITTER_BASE = computed(() => sharedSettings.value?.twitter_nitter_instance || 'https://nitter.space');
 
+    /**
+     * Resolve a Twitter/X handle to its Nitter mirror URL.
+     * @param {string} twitterUrl
+     * @returns {{url: string, newTab: boolean}|null}
+     */
+    function nitterInfo(twitterUrl) {
+      if (!twitterUrl) return null;
+      const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
+      if (!handle) return null;
+      const base = NITTER_BASE.value;
+      return { url: base + '/' + handle, newTab: base !== 'https://nitter.net' };
+    }
+
+    /**
+     * Twitter link click handler: normal click opens in iframe modal,
+     * Ctrl+click opens in a new tab. No-op if the URL isn't Twitter-shaped.
+     * @param {string} twitterUrl  - the project's twitter_url or log-derived twitter url
+     * @param {(url: string, title?: string, w?: string) => void} openIframe
+     * @param {MouseEvent} [evt]   - optional, so callers can honor Ctrl+click
+     */
+    function twitterClick(twitterUrl, openIframe, evt) {
+      if (evt?.ctrlKey || evt?.metaKey) return; // honor "open in new tab"
+      evt?.preventDefault?.();
+      const info = nitterInfo(twitterUrl);
+      if (!info) return;
+      if (info.newTab) window.open(info.url, '_blank');
+      else openIframe(info.url, 'Twitter');
+    }
+
     const statusChangeHelpers = {
       badgeClass(eventType) {
         if (eventType === 'tag_changed') return 'pending';
         if (eventType === 'changed') return 'changed';
         if (eventType === 'deleted') return 'error';
         return 'pending';
-      },
-      nitterInfo(twitterUrl) {
-        if (!twitterUrl) return null;
-        const handle = twitterUrl.replace('https://x.com', '').replace('https://twitter.com', '').replace(/^\/+/, '');
-        if (!handle) return null;
-        const base = NITTER_BASE.value;
-        return { url: base + '/' + handle, newTab: base !== 'https://nitter.net' };
       },
       resourceIcon(resourceType) {
         return `<span class="icon icon-${resourceType}"></span>`;
@@ -621,10 +745,7 @@
         twitterIframeUrl(log) {
           const u = this.scResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          const info = statusChangeHelpers.nitterInfo(u);
-          if (!info) return;
-          if (info.newTab) window.open(info.url, '_blank');
-          else this.openIframe(info.url, 'Twitter');
+          return twitterClick(u, this.openIframe, null);
         },
         async toggleConfirm(log, event) {
           if (log.confirmed) {
@@ -725,10 +846,7 @@
         twitterIframeUrl(log) {
           const u = this.alertResourceUrl(log);
           if (!u || log.resource_type !== 'twitter') return null;
-          const info = statusChangeHelpers.nitterInfo(u);
-          if (!info) return;
-          if (info.newTab) window.open(info.url, '_blank');
-          else this.openIframe(info.url, 'Twitter');
+          return twitterClick(u, this.openIframe, null);
         },
       },
     };
@@ -1155,7 +1273,7 @@
             <tbody>
               <tr v-if="project.twitter_url">
                 <td>
-                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter" @click="e => { if (e.ctrlKey) return; e.preventDefault(); const i = nitterInfo(project.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else openIframe(i.url, 'Twitter'); }">
+                  <a :href="project.twitter_url" target="_blank" rel="noopener" title="Open Twitter" @click="e => twitterClick(project.twitter_url, openIframe, e)">
                     <span class="icon icon-twitter"></span>
                   </a>
                 </td>
@@ -1316,10 +1434,10 @@
           busy.value = 'all';
           try {
             await Promise.all([
-              props.project.twitter_url  && window.api.checkTwitter(props.project.id),
-              props.project.website_url  && window.api.checkWebsite(props.project.id),
-              props.project.github_url   && window.api.checkGithub(props.project.id),
-            ].filter(Boolean));
+              props.project.twitter_url  && api.checkTwitter(props.project.id),
+              props.project.website_url  && api.checkWebsite(props.project.id),
+              props.project.github_url   && api.checkGithub(props.project.id),
+            ]);
             emit('refreshed');
           } catch (e) {
             alert(`Refresh all failed: ${e.message}`);
@@ -1345,12 +1463,11 @@
           statusClass,
           openProjectEdit,
           openIframe,
-          windowOpen: (url) => window.open(url, '_blank'),
           copyContract,
           // Expose api so the template's @click handlers can call api.checkWebsite(), etc.
           api: window.api,
           appSettings: sharedSettings,
-          nitterInfo: statusChangeHelpers.nitterInfo,
+          twitterClick,
         };
       },
     };
@@ -1564,7 +1681,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="cen">
-                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter" @click="e => { if (e.ctrlKey) return; e.preventDefault(); const i = nitterInfo(row.twitter_url); if (!i) return; if (i.newTab) windowOpen(i.url); else openIframe(i.url, 'Twitter'); }">
+                    <a v-if="row.twitter_url" :href="row.twitter_url" target="_blank" rel="noopener" title="Twitter" @click="e => twitterClick(row.twitter_url, openIframe, e)">
                       <span class="icon icon-twitter"></span>
                     </a>
                     <span v-else>—</span>
@@ -2022,9 +2139,8 @@
           pausePricesRefresh, resumePricesRefresh,
           pollingPaused, togglePolling, autoRefreshEnabled, togglePriceEnabled,
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
-          windowOpen: (url) => window.open(url, '_blank'),
           scrollToTop, scrollToLogs,
-          nitterInfo: statusChangeHelpers.nitterInfo,
+          twitterClick,
         };
       },
     };
@@ -2100,7 +2216,7 @@
                   <th class="type_cell" data-tooltip="Token info" data-placement="bottom">Token</th>
                   <th class="action_cell" data-tooltip="Token enabled" data-placement="bottom">TE</th>
                   <th class="action_cell" data-tooltip="Activity Display" data-placement="bottom">AD</th>
-                  <th class="col-actions" class="text-right">Actions</th>
+                  <th class="col-actions text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -3323,10 +3439,15 @@
     };
 
     /* ── Router ─────────────────────────────────────────────────────────────────
-       Simple hash-based SPA router.
-       Hash format: '' or '/' → ActivityPage, '/projects' → ProjectsPage,
-       '/settings' → SettingsPage.
-       Uses Vue's <component :is="..." /> to swap views.
+       Hash-based SPA router. Reads window.location.hash.slice(1) and maps to a
+       component; auth-gate redirects happen in hashRouter() below.
+
+       Route map (keep in sync with `routes` below):
+         '' or '/'          → ActivityPage    (dashboard, project cards, log tables)
+         '/projects'        → ProjectsPage    (full project CRUD, bulk ops, import/export)
+         '/settings'        → SettingsPage    (intervals, alerts, notifications, danger zone)
+         '/login'           → LoginPage       (email/password sign-in)
+         '/register'        → LoginPage       (email/password registration — same component)
     ───────────────────────────────────────────────────────────────────────── */
     const routes = {
       '/':          ActivityPage,
