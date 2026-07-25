@@ -148,10 +148,10 @@ router.post('/', async (req, res) => {
   const existing = await db.prepare(
     `SELECT id FROM projects WHERE ${dupConditions.join(' AND ')}`
   ).get(...dupParams);
+  const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   if (existing) return res.status(409).json({ error: 'Project with this combination of fields already exists' });
 
   const ts = now();
-  const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   const result = await db.prepare(`
     INSERT INTO projects (name, user_id, website, github, twitter, telegram,
       website_enabled, token, enabled, activity_display, token_enabled, created_at, updated_at)
