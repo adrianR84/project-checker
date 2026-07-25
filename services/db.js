@@ -99,7 +99,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       user_id TEXT NOT NULL DEFAULT '',
-      settings TEXT NOT NULL DEFAULT '{"log_retention_days":7,"event_log_retention_days":14,"alert_log_retention_days":14,"twitter_posts_per_project":50,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"api_token":null,"logs_per_page":20,"checks_on_new_project":1}',
+      settings TEXT NOT NULL DEFAULT '{"log_retention_days":7,"event_log_retention_days":14,"alert_log_retention_days":14,"twitter_posts_per_project":50,"ui_refresh_seconds":60,"compact_activity_display":0,"github_token":null,"api_token":null,"logs_per_page":20,"checks_on_new_project":1,"system_pause":0}',
       check_intervals TEXT NOT NULL DEFAULT '{"github":360,"website":1440,"twitter":1440}',
       alert_intervals TEXT NOT NULL DEFAULT '{"github":60,"website":60,"twitter":60}',
       alert_stops TEXT NOT NULL DEFAULT '{"github":1440,"website":1440,"twitter":1440}',

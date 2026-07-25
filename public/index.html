@@ -2664,6 +2664,13 @@
               <h3>Manual Checks</h3>
               <p class="muted">Run checks for each resource type across all projects.</p>
 
+              <div class="trigger-row" style="color:var(--app-warn)">
+                <label style="color:var(--app-warn);cursor:pointer">
+                  <input type="checkbox" v-model="form.system_pause" @change="saveSystemPauseSettings" />
+                  Pause all auto-checks
+                </label>
+              </div>
+
               <div class="trigger-row">
                 Websites
                 <button data-tooltip="Check all enabled websites now" :disabled="triggering === 'web'" @click="onTrigger('web', api.triggerWebsites)">
@@ -3027,6 +3034,7 @@
               webshare_enabled:        !!settings.value.webshare?.enabled,
               webshare_token:          settings.value.webshare?.token || '',
               webshare_country:        settings.value.webshare?.country || '',
+              system_pause:            !!settings.value.system_pause,
               price_alerts: (settings.value.price_alerts?.alerts || []).map(a => ({
                 price_for:    a.price_for ?? '6h',
                 price_change: a.price_change ?? 10,
@@ -3142,6 +3150,19 @@
               country: form.value.webshare_country,
             },
           });
+        }
+
+        /** Save system pause toggle — confirm before enabling */
+        async function saveSystemPauseSettings() {
+          if (form.value.system_pause) {
+            if (!confirm('Pause all auto-checks? Website, Twitter and GitHub auto-checks will be suspended until you uncheck this.')) {
+              form.value.system_pause = false;
+              return;
+            }
+          }
+          await saveSettings({ system_pause: form.value.system_pause ? 1 : 0 });
+          if (form.value.system_pause) showToast('Auto-checks paused.', 'warn', 4000);
+          else showToast('Auto-checks resumed.', 'ok', 3000);
         }
 
         /** Save Price Alerts */
@@ -3263,7 +3284,7 @@
         return {
           settings, form, loading, saving, triggering, clearing, clearingLogs, clearingAlerts,
           generatedApiToken, generatingToken,
-          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, openProxyStatsModal,
+          onSave, saveAppSettings, saveAlertSettings, saveCleanUpSettings, saveNotificationSettings, saveWebshareSettings, savePriceAlertsSettings, saveSystemPauseSettings, generateApiToken, onTrigger, onClear, onClearLogs, onClearAlerts, openProxyStatsModal,
           relativeTime,
           api: window.api,
         };

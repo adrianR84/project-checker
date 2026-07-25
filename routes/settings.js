@@ -41,6 +41,7 @@ router.get('/', async (req, res) => {
     api_token:                 settings.api_token    ? DUMMY_API_TOKEN    : '',
     logs_per_page:             settings.logs_per_page,
     checks_on_new_project:      settings.checks_on_new_project ?? 1,
+    system_pause:               settings.system_pause ?? 0,
     github_check_minutes:       check_intervals.github,
     website_check_minutes:      check_intervals.website,
     twitter_check_minutes:      check_intervals.twitter,
@@ -180,6 +181,11 @@ router.put('/', async (req, res) => {
     }
   }
 
+  if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'system_pause')) {
+    const v = req.body.system_pause;
+    updates.system_pause = (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0;
+  }
+
   if (Object.keys(updates).length === 0 && !req.body?.telegram && !req.body?.pushbullet && !req.body?.price_alerts && !req.body?.webshare) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
@@ -255,7 +261,7 @@ router.put('/', async (req, res) => {
       await db.prepare('UPDATE config SET check_intervals = ? WHERE user_id = ?').run(JSON.stringify(ci), req.userId);
     }
   }
-  if (updates.log_retention_days || updates.event_log_retention_days || updates.alert_log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined || updates.twitter_posts_per_project !== undefined || updates.twitter_nitter_instance !== undefined) {
+  if (updates.log_retention_days || updates.event_log_retention_days || updates.alert_log_retention_days || updates.ui_refresh_seconds || updates.compact_activity !== undefined || updates.github_token !== undefined || updates.logs_per_page !== undefined || updates.checks_on_new_project !== undefined || updates.twitter_posts_per_project !== undefined || updates.twitter_nitter_instance !== undefined || updates.system_pause !== undefined) {
     const s = await db.config.getSettings(req.userId);
     if (s) {
       if (updates.log_retention_days !== undefined) s.log_retention_days = updates.log_retention_days;
@@ -269,6 +275,7 @@ router.put('/', async (req, res) => {
       if (updates.checks_on_new_project !== undefined) s.checks_on_new_project = updates.checks_on_new_project;
       if (updates.twitter_posts_per_project !== undefined) s.twitter_posts_per_project = updates.twitter_posts_per_project;
       if (updates.twitter_nitter_instance !== undefined) s.twitter_nitter_instance = updates.twitter_nitter_instance;
+      if (updates.system_pause !== undefined) s.system_pause = updates.system_pause;
       await db.prepare('UPDATE config SET settings = ? WHERE user_id = ?').run(JSON.stringify(s), req.userId);
     }
   }

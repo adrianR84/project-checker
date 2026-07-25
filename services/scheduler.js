@@ -51,6 +51,8 @@ function everyNMinutes(n) {
 
 /** Runs website checks for all enabled projects, logs results to check_logs. */
 async function runWebsiteTick() {
+  const settings = await db.config.getSettings();
+  if (settings?.system_pause) { scheduleLog('[system_pause] website tick skipped'); return; }
   const projects = await db.prepare(`
     SELECT id, website FROM projects
     WHERE enabled = 1 AND website_enabled = 1 AND website IS NOT NULL AND website != ''
@@ -69,6 +71,8 @@ async function runWebsiteTick() {
 
 /** Runs Twitter checks for all enabled projects, logs results to check_logs. */
 async function runTwitterTick() {
+  const settings = await db.config.getSettings();
+  if (settings?.system_pause) { scheduleLog('[system_pause] twitter tick skipped'); return; }
   const projects = await db.prepare(`
     SELECT id, twitter FROM projects
     WHERE enabled = 1 AND twitter_enabled = 1 AND twitter IS NOT NULL AND twitter != ''
@@ -88,6 +92,8 @@ async function runTwitterTick() {
 /** Fetches GitHub repos for all enabled projects, detects deleted repos (marks status=deleted, records event_logs),
     checks remaining active repos and logs results to check_logs. */
 async function runCommitTick() {
+  const settings = await db.config.getSettings();
+  if (settings?.system_pause) { scheduleLog('[system_pause] commit tick skipped'); return; }
   const projects = await db.prepare(`SELECT id, github FROM projects WHERE enabled = 1 AND github_enabled = 1 AND github IS NOT NULL`).all();
   scheduleLog(`[${now()}] Scheduler: commit tick — ${projects.length} projects`);
   for (const p of projects) {
