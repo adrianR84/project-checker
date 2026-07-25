@@ -2,6 +2,12 @@
 // No auth: Telegram bot API provides its own auth. chat_id validation prevents foreign-bot injection.
 const db = require('../services/db');
 
+/**
+ * Telegram webhook handler — receives callback_query button presses from the bot.
+ * Validates chat_id to prevent foreign-bot injection, then marks events as confirmed.
+ * @param {object} req - Express request (Telegram update payload)
+ * @param {object} res - Express response
+ */
 module.exports = async function telegramWebhook(req, res) {
   const tgCfg = await db.config.getTelegram();
 

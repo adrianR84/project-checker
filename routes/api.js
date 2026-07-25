@@ -5,7 +5,13 @@ const db = require('../services/db');
 
 const router = express.Router();
 
-// Authorize: extract and validate Bearer token, attach userId to req.
+/**
+ * Express middleware: extract and validate Bearer token, attach userId to req.
+ * Sets req.userId on success, sends 401 on failure.
+ * @param {object} req - Express request
+ * @param {object} res - Express response
+ * @param {function} next - Express next
+ */
 async function requireApiToken(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {

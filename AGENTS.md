@@ -36,11 +36,13 @@ When creating a plan, delegate both research AND writing to subagents (e.g., a `
 
 If a plan is saved globally (e.g., to the global memory or vault), also save a copy locally under `.claude/PLANS/<slug>.md` so the project retains its own copy.
 
+Route map: `.claude/route-map.md` — all route → handler mappings. Always read this before adding or modifying any route. Keep it updated whenever a route is added, removed, or changed.
+
 ## Code
 Do not delete comments from code — they document intent, context, and reasoning. Removing comments, including ponytail-style inline comments (`// ponytail:`), is prohibited unless the original author explicitly requests it.
 
-### Vue Component Headers (`public/index.html`)
-Every component definition in `public/index.html` must have a header block listing its props, emits, and injects. After any edit that adds, removes, or renames a prop/emits/inject, update the header immediately. Format:
+### Component Headers (SPA/UI component files)
+Every UI component definition must have a header block listing its props, emits, and injects. After any edit that adds, removes, or renames a prop/emits/inject, update the header immediately. Format:
 
 ```
 /* ── <Name> component ─────────────────────────────────────────────────
@@ -51,7 +53,12 @@ Every component definition in `public/index.html` must have a header block listi
 ──────────────────────────────────────────────────────────────────────── */
 ```
 
-This applies to all components: `NavBar`, `RepoList`, `CheckLogList`, `StatusChangeList`, `AlertLogsList`, `ProjectForm`, `RepoManager`, `ProjectCard`, `LoginPage`, `RegisterPage`, `ActivityPage`, `ProjectsPage`, `SettingsPage`, `App`.
+### JSDoc for Cross-File Functions
+Every exported function that is called from another file must have a JSDoc block with:
+- `@param` — each parameter with type
+- `@returns` — return type (or "void" for no return)
+
+Private/internal helpers (not exported, not cross-file) are exempt.
 
 ## Database
 `CREATE TABLE IF NOT EXISTS` only creates tables on a fresh DB — it never updates existing schemas. All structural changes (columns, constraints, CHECK values) must be added as **both**:

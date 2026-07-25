@@ -1,4 +1,37 @@
-// Projects REST API
+/* ── projects.js ─────────────────────────────────────────────────────────────
+   Projects REST API
+
+   Route overview (all require session auth unless noted):
+     GET    /                            → Project[]          (list all)
+     POST   /                            → Project            (create)
+     GET    /:id                         → { Project, repos, latest_logs }
+     PUT    /:id                         → { Project, repos }  (update + optional repos sync)
+     DELETE /:id                         → { ok, deleted }
+     GET    /:id/org-repos              → GithubRepo[]       (fetch from GitHub org)
+     POST   /:id/refresh-repos           → { ok, fetched, updated, added }
+     POST   /:id/add-repos               → { ok, repos }
+     DELETE /:id/repos/*                 → { ok }
+     POST   /:id/check-website           → CHECK_RESULT
+     POST   /:id/check-github            → { ok, results: CHECK_RESULT[] }
+     POST   /:id/check-twitter           → CHECK_RESULT
+     GET    /:id/twitter-posts           → TwitterPost[]
+
+   Internal helpers (not routes):
+     parseProjectRow(row)        → Project  (expands JSON cols to flat fields)
+     loadProjectOr404(res,id,uid)→ Project|null (404s if missing)
+     storeRepo(projectId, repoInfo, history?, latestTag?) → void
+
+   Project shape (API):
+     { id, name, website_url, github_url, twitter_url, telegram_url,
+       website_enabled, github_enabled, twitter_enabled, telegram_enabled, token_enabled,
+       token, enabled, activity_display, website_content_check, twitter_posts_check,
+       website, github, twitter, telegram,  ← raw JSON cols (present in DB rows)
+       created_at, updated_at }
+
+   CHECK_RESULT shape (from services/checker.js):
+     { status, http_status, response_time_ms, error_message, details }
+     status: 'ok'|'error'|'changed'|'unavailable'|'disabled'|'deleted'
+────────────────────────────────────────────────────────────────────────── */
 const express = require('express');
 const db = require('../services/db');
 const logger = require('../utils/logger');
@@ -8,7 +41,11 @@ const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChang
 const router = express.Router();
 const now = () => new Date().toISOString();
 
-// Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+/**
+ * Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+ * @param {object|null} row - Raw project DB row
+ * @returns {object} Flattened project with website_url, github_url, twitter_url, etc.
+ */
 function parseProjectRow(row) {
   if (!row) return row;
   return {
@@ -25,7 +62,13 @@ function parseProjectRow(row) {
   };
 }
 
-// ponytail: shared helper — loads a project or sends 404 and returns null
+/**
+ * Loads a project by id for the given user, or sends 404 and returns null.
+ * @param {object} res - Express response object
+ * @param {number} id - Project ID
+ * @param {number} userId - User ID
+ * @returns {object|null} Parsed project row, or null if not found
+ */
 async function loadProjectOr404(res, id, userId) {
   const project = await db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(id, userId);
   if (!project) { res.status(404).json({ error: 'Project not found' }); return null; }
@@ -71,8 +114,13 @@ router.get('/:id', async (req, res) => {
   res.json({ ...parseProjectRow(project), repos, latest_logs: latestLogs });
 });
 
-// Helper: store repo with commit history — upsert without ON CONFLICT
-/** Upserts a repo row (insert or update by project_id + full_name). */
+/**
+ * Upserts a repo row (insert or update by project_id + full_name).
+ * @param {number} projectId
+ * @param {object} repoInfo - { full_name, repo_url, description, default_branch, pushed_at, stars_count, language }
+ * @param {object} [history={}] - { first_commit_date, latest_commit_date, total_commits, latest_commit_sha, latest_commit_message }
+ * @param {string|null} [latestTag=null]
+ */
 async function storeRepo(projectId, repoInfo, history = {}, latestTag = null) {
   const existing = await db.prepare('SELECT id FROM repos WHERE project_id = ? AND full_name = ?').get(projectId, repoInfo.full_name);
   const ts = now();

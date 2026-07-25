@@ -1,4 +1,34 @@
-// Health-check services: website, github, twitter
+/* ── checker.js ────────────────────────────────────────────────────────────
+   Health-check services: website, github, twitter
+   All check functions return a result object (see CHECK_RESULT below).
+   Status values (per DB CHECK constraint on check_logs.resource_type):
+     'ok'        — resource responded successfully
+     'error'     — request failed (network error, timeout, etc.)
+     'disabled'  — resource explicitly disabled (e.g. suspended account)
+     'unavailable' — no URL / target configured
+     'deleted'   — resource gone (HTTP 404 from GitHub)
+     'changed'   — content or state transition detected (fires event_logs entry)
+
+   Cross-file exports:
+     checkWebsite(url, projectId, contentCheck?) → CHECK_RESULT
+     checkGithubRepo(fullName, projectId)        → CHECK_RESULT
+     checkTwitter(url, projectId, opts?)         → CHECK_RESULT
+     logCheck(projectId, resourceType, resourceId, result) → void (logs to DB)
+     recordStatusChange(projectId, resourceType, eventType, value) → void (fires event_logs)
+     fetchAndStoreTwitterPosts(projectId, handle) → { newPosts, newPostIds }
+     handleFromTwitterUrl(url) → string
+
+   CHECK_RESULT shape:
+     { status, http_status, response_time_ms, error_message, details }
+     status:        string  — one of the values above
+     http_status:   number | null
+     response_time_ms: number
+     error_message: string | null
+     details:       object | null — shape varies by check type:
+       website: { content_hash: string }
+       github:  { changed, previous_sha, new_sha, tag_changed, old_tag, new_tag } (all optional)
+       twitter: { new_posts, post_ids } | { suspended_detected: true } | null
+────────────────────────────────────────────────────────────────────────── */
 const db = require('./db');
 const { proxyFetch } = require('./proxy-fetch');
 const { createHash } = require('crypto');
@@ -112,13 +142,26 @@ function extractStableMeta(html) {
 }
 
 /** Inserts a status-change event into event_logs for a project's resource. */
+/**
+ * Records a status-change event to event_logs.
+ * @param {number} projectId
+ * @param {'website'|'github'|'twitter'} resourceType
+ * @param {'changed'|'deleted'|'tag_changed'} eventType
+ * @param {object|string} value - Event detail payload
+ */
 async function recordStatusChange(projectId, resourceType, eventType, value) {
   await db.prepare(
     "INSERT INTO event_logs (project_id, resource_type, event_type, value, created_at) VALUES (?, ?, ?, ?, ?)"
   ).run(projectId, resourceType, eventType, typeof value === 'string' ? value : JSON.stringify(value), new Date().toISOString());
 }
 
-/** Persists a health-check result to check_logs. */
+/**
+ * Persists a health-check result to check_logs.
+ * @param {number} projectId
+ * @param {'website'|'github'|'twitter'} resourceType
+ * @param {number|null} resourceId - Repo ID for GitHub checks, null otherwise
+ * @param {{ status: string, http_status?: number, response_time_ms?: number, error_message?: string, details?: object }} result
+ */
 async function logCheck(projectId, resourceType, resourceId, result) {
   try {
     await db.prepare(`
@@ -157,8 +200,14 @@ async function fetchWithTimeout(url, ms, opts = {}) {
   }
 }
 
-// Check a website URL: GET + optional MD5 hash of body.
-/** Checks a website via GET, optionally hashing body to detect content changes. */
+/**
+ * Checks a website via GET, optionally hashing body to detect content changes.
+ * Records status-change events on HTTP status change or content hash change.
+ * @param {string|null} url
+ * @param {number|null} projectId
+ * @param {boolean} [contentCheck=true]
+ * @returns {{ status: 'ok'|'error'|'changed'|'unavailable', http_status: number|null, response_time_ms: number, error_message: string|null, details: object|null }}
+ */
 async function checkWebsite(url, projectId, contentCheck = true) {
   const start = Date.now();
   if (!url) return emptyUrlResult('No URL provided');
@@ -240,7 +289,12 @@ async function checkWebsite(url, projectId, contentCheck = true) {
   }
 }
 
-/** Checks a GitHub repo for new commits or tags and records status changes. */
+/**
+ * Checks a GitHub repo for new commits or tags and records status changes.
+ * @param {string} fullName - e.g. "owner/repo"
+ * @param {number} projectId
+ * @returns {{ status: 'ok'|'error'|'changed'|'deleted', http_status: number|null, response_time_ms: number, error_message: string|null, details: object|null }}
+ */
 async function checkGithubRepo(fullName, projectId) {
   const { fetchCommitHistory, fetchLatestTag } = require('./github');
   try {
@@ -439,7 +493,13 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
   return { newPosts: newPostIds.length, newPostIds };
 }
 
-/** Checks a Twitter/X URL via GET and records status changes on transitions. */
+/**
+ * Checks a Twitter/X URL via GET and records status changes on transitions.
+ * @param {string|null} url
+ * @param {number|null} projectId
+ * @param {{ postsCheck?: boolean }} [opts={}]
+ * @returns {{ status: 'ok'|'error'|'changed'|'unavailable', http_status: number|null, response_time_ms: number, error_message: string|null, details: object|null }}
+ */
 async function checkTwitter(url, projectId, opts = {}) {
   const start = Date.now();
   if (!url) return { ...emptyUrlResult('No URL provided'), details: null };

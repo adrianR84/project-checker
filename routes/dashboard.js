@@ -1,10 +1,48 @@
+/* ── dashboard.js ───────────────────────────────────────────────────────────
+   Dashboard REST API — aggregated view
+
+   Route overview (all require session auth):
+     GET /                          → DashboardProject[]
+     GET /token-prices              → TokenPriceRow[]
+
+   DashboardProject shape:
+     { id, name, enabled, activity_display, token, price_enabled,
+       website_enabled, website_content_check, github_enabled,
+       twitter_enabled, twitter_posts_check, telegram_enabled,
+       website_url, github_url, twitter_url, telegram_url,
+       created_at, updated_at,
+       website_status:  { status, http_status, checked_at } | null,
+       github_status:   { status, checked_at } | null,
+       twitter_status:  { status, http_status, checked_at } | null,
+       website_last_changed_at, github_last_changed_at, twitter_last_changed_at,
+       has_unconfirmed: boolean,
+       repos: Repo[],       ← active repos
+       deletedRepos: Repo[] ← deleted repos }
+
+   Repo shape (github repos only):
+     { full_name, repo_url, latest_commit_date, latest_commit_message,
+       latest_commit_sha, total_commits, stars_count, language, pushed_at, latest_tag }
+
+   TokenPriceRow shape:
+     { project_id, symbol, chain, contract, price_usd,
+       price_change_h1, price_change_h6, price_change_h24,
+       liquidity_usd, volume_h24, market_cap, pair_created_at, fetched_at,
+       project_name, price_enabled, website_url, github_url, twitter_url }
+
+   Internal helpers:
+     parseProjectRow(row) → flattened project with JSON cols expanded
+────────────────────────────────────────────────────────────────────────── */
 // Dashboard REST API — aggregated view
 const express = require('express');
 const db = require('../services/db');
 
 const router = express.Router();
 
-// Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+/**
+ * Parse a raw project row: expand JSON group cols back to flat names for API compatibility.
+ * @param {object|null} row - Raw project DB row
+ * @returns {object} Flattened project with website_url, github_url, twitter_url, etc.
+ */
 function parseProjectRow(row) {
   if (!row) return row;
   const pc = row.twitter ? (JSON.parse(row.twitter).pc ?? 1) : 1;

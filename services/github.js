@@ -1,3 +1,29 @@
+/* ── github.js ─────────────────────────────────────────────────────────────
+   GitHub API service — token is read from config DB (no env var needed).
+
+   Exports:
+     fetchReposForOwner(githubUrl) → Promise<Array<{
+       full_name, repo_url, description, default_branch,
+       stars_count, language, pushed_at
+     }>>
+     fetchCommitHistory(fullName) → Promise<{
+       first_commit_date, latest_commit_date, latest_commit_sha,
+       latest_commit_message, total_commits
+     }>
+     fetchLatestTag(fullName)     → Promise<string|null>
+
+   Internal helpers (not exported):
+     ghHeaders()            → Promise<Headers>  (includes Bearer token from DB if set)
+     parseOwner(url)       → string|null
+     ghFetch(url)          → Promise<any>      (throws on non-ok, 403 → RATE_LIMIT_MSG)
+     ghFetchWithMeta(url)  → Promise<{ data, link }>
+     getLastPage(linkHeader) → number|null
+
+   Errors thrown:
+     "Could not parse owner from GitHub URL: <url>"
+     "GitHub API <status>: ... for <url>"
+     RATE_LIMIT_MSG — when GitHub returns 403
+────────────────────────────────────────────────────────────────────────── */
 // GitHub API service — token is read from config DB (no env var needed)
 const GITHUB_API = 'https://api.github.com';
 const RATE_LIMIT_MSG = 'GitHub API 403: Rate limit exceeded. Provide a GitHub token in App Settings for 5000 req/hr.';

@@ -306,7 +306,11 @@ router.put('/', async (req, res) => {
   res.json({ ...cfg, settings, check_intervals, alert_intervals, alert_stops, telegram, pushbullet, price_alerts });
 });
 
-// Parse a raw project row: expand JSON group cols back to flat names.
+/**
+ * Parse a raw project row: expand JSON group cols back to flat names.
+ * @param {object|null} row - Raw project DB row
+ * @returns {object} Flattened project with website_url, github_url, twitter_url, etc.
+ */
 function parseProjectRow(row) {
   if (!row) return row;
   return {
@@ -322,8 +326,11 @@ function parseProjectRow(row) {
   };
 }
 
-// Run checks for a single project across enabled resources
-/** Runs all enabled checks for one project and logs results. */
+/**
+ * Runs all enabled checks for one project and logs results.
+ * @param {object} project - Parsed project row (via parseProjectRow)
+ * @returns {{ website: object|null, github: Array, twitter: object|null }}
+ */
 async function runChecksForProject(project) {
   project = parseProjectRow(project);
   const results = { website: null, github: [], twitter: null };
@@ -369,8 +376,12 @@ router.post('/trigger-all', async (req, res) => {
   res.json({ ok: true, triggered: allResults.length, results: allResults });
 });
 
-// Trigger a specific resource type across all projects
-/** Runs checks for a single resource type across all projects. */
+/**
+ * Runs checks for a single resource type across all projects owned by a user.
+ * @param {'website'|'github'|'twitter'} resourceType
+ * @param {number} userId
+ * @returns {Array<{project_id, name, result?, error?}>}
+ */
 async function triggerResourceType(resourceType, userId) {
   const projects = await db.prepare('SELECT * FROM projects WHERE user_id = ?').all(userId);
   const results = [];

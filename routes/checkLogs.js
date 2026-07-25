@@ -1,10 +1,43 @@
+/* ── checkLogs.js ───────────────────────────────────────────────────────────
+   Check logs REST API
+
+   Route overview (all require session auth):
+     GET    /                       → { logs: CheckLog[], total, limit, offset }
+     GET    /status-changes         → { logs: EventLog[], total, limit, offset }
+     PATCH  /status-changes/:id/confirm  → { ok, id, confirmed }
+     POST   /status-changes/confirm-all    → { ok }
+     GET    /alerts                 → { logs: AlertLog[], total, limit, offset }
+
+   Query params (all routes): project_id, resource_type, search, sort, dir, limit, offset
+
+   Sort whitelists (prevents SQL injection):
+     CHECK_LOGS_SORT:     { project_name, when }
+     STATUS_CHANGES_SORT: { project_name, when }
+     ALERT_LOGS_SORT:     { project_name, when }
+
+   Shapes:
+     CheckLog:  { id, project_id, resource_type, resource_id, status, http_status,
+                  response_time_ms, error_message, details, checked_at, project_name, full_name }
+     EventLog:  { id, project_id, resource_type, event_type, value, created_at,
+                  confirmed, project_name }
+     AlertLog:  { id, status_change_id, created_at, resource_type, event_type,
+                  change_value, project_name }
+
+   Internal helpers:
+     expandProjectUrls(row) → row with { website_url, github_url, twitter_url } added
+     orderClause(map, sort, dir) → safe ORDER BY string
+────────────────────────────────────────────────────────────────────────── */
 // Check logs REST API
 const express = require('express');
 const db = require('../services/db');
 
 const router = express.Router();
 
-// Expand JSON project cols to flat URL names for API compatibility.
+/**
+ * Expand JSON project cols (website, github, twitter) to flat URL names for API compatibility.
+ * @param {object|null} row
+ * @returns {object}
+ */
 function expandProjectUrls(row) {
   if (!row) return row;
   return {
@@ -15,10 +48,20 @@ function expandProjectUrls(row) {
   };
 }
 
-// ponytail: sort whitelists — accept only known column aliases, never raw user input
+// Sort whitelist — accept only known column aliases, never raw user input
+/** @type {Record<string, string>} */
 const CHECK_LOGS_SORT = { project_name: 'p.name', when: 'cl.checked_at' };
+/** @type {Record<string, string>} */
 const STATUS_CHANGES_SORT = { project_name: 'p.name', when: 'rsc.created_at' };
+/** @type {Record<string, string>} */
 const ALERT_LOGS_SORT = { project_name: 'p.name', when: 'al.created_at' };
+/**
+ * Build a safe ORDER BY clause from a whitelist map.
+ * @param {Record<string,string>} map - Sort key → column mapping
+ * @param {string} sort - Sort key (user input, validated against map)
+ * @param {string} dir - 'asc' or 'desc'
+ * @returns {string} e.g. "ORDER BY p.name DESC, id DESC"
+ */
 function orderClause(map, sort, dir) {
   const col = map[sort] || map.when;
   const d = dir === 'asc' ? 'ASC' : 'DESC';

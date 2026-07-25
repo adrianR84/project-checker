@@ -212,7 +212,11 @@ async function init() {
   return dbProxy;
 }
 
-// ponytail: coerce types SQLite can't bind — booleans → 0/1, objects/arrays → JSON
+/**
+ * Coerce types SQLite can't bind — booleans → 0/1, objects/arrays → JSON.
+ * @param {any[]} params
+ * @returns {any[]}
+ */
 function bindParams(params) {
   return params.map(v => {
     if (v === undefined || v === null) return null;

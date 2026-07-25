@@ -1,3 +1,33 @@
+/* ── scheduler.js ────────────────────────────────────────────────────────────
+   Cron-based scheduler for periodic checks.
+
+   Exports:
+     init()                              → void  (starts all jobs, call once at startup)
+     purgeCheckLogs()                    → void
+     purgeEventLogs()                    → void
+     purgeAlertLogs()                    → void
+     purgeTwitterPosts()                 → void
+
+   Cron jobs (all respect system_pause in settings):
+     runCommitTick()    — github check + deletion detection (intervals.github)
+     runWebsiteTick()  — website check (intervals.website)
+     runTwitterTick()  — twitter check (intervals.twitter)
+     runAlertTick()    — fires sendAlert() for unconfirmed events (1-min grid, interval-gated)
+     runPriceAlertTick()— evaluates price alerts per project (1-min grid, throttle-gated)
+     purge*() jobs      — daily at midnight
+
+   Non-cron:
+     runTokenPriceTick() — setInterval every TOKEN_CHECK_INTERVAL_MS (1 min), rate-limited batch of 5
+
+   config keys read:
+     system_pause         — skips all check ticks when true
+     check_intervals      — { github, website, twitter } in minutes
+     alert_intervals      — { github, website, twitter } in minutes
+     alert_stops          — { github, website, twitter } in minutes (auto-confirm after)
+     log_retention_days, event_log_retention_days, alert_log_retention_days
+     twitter_posts_per_project
+     price_alerts         — { alerts: [{ price_for, price_change, price_interval, enabled, telegram, pushbullet, log }] }
+────────────────────────────────────────────────────────────────────────── */
 // Cron-based scheduler for periodic checks
 const cron = require('node-cron');
 const db = require('./db');
@@ -476,6 +506,7 @@ async function reschedule() {
   scheduleLog(`[${now()}] Scheduler: token price tick → every ${TOKEN_CHECK_INTERVAL_MS / 1000}s`);
 }
 
+/** Initializes the scheduler: registers all cron jobs from config, starts token price interval. */
 function init() {
   if (initialized) {
     reschedule();

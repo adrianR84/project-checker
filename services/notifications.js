@@ -1,4 +1,35 @@
-// Notification dispatcher — sends Telegram and Pushbullet alerts when events are recorded.
+/* ── notifications.js ────────────────────────────────────────────────────────
+   Notification dispatcher — sends Telegram and Pushbullet alerts when events are recorded.
+   Fire-and-forget; never throws.
+
+   Cross-file exports:
+     sendAlert(event, projectName)           → void  (dispatches to all enabled channels)
+     sendTelegramMessage(botToken, chatId, text, replyMarkup?) → { ok, error }
+     pushPushbulletNote(accessToken, title, body)              → { ok, error }
+     formatAlert(event, projectName)         → string  (plain text, for Pushbullet)
+     formatAlertHtml(event, projectName)     → string  (HTML, for Telegram)
+     formatPriceAlert(...)                   → string  (plain text)
+     formatPriceAlertHtml(...)              → string  (HTML)
+     getTierIndex(priceChange, alerts)      → 0|1|2
+     INTENSITY                               → ['light','medium','strong']
+
+   event_logs row shape (what sendAlert receives):
+     { id, project_id, resource_type, event_type, value, created_at, confirmed }
+     resource_type:  'website'|'github'|'twitter'|'price'
+     event_type:     'changed'|'deleted'|'tag_changed'
+     value:          JSON string or object — shape per event_type:
+       github changed:    { full_name, sha }
+       github tag_changed:{ full_name, ot, nt }
+       github deleted:    { full_name, sha }
+       website changed:   { bh, ah, bhs, ahs }
+       twitter changed:   { new_posts, post_ids } | { bs, as, bhs, ahs }
+       twitter deleted:   { bhs, ahs }
+
+   price_alerts shape (from config.price_alerts):
+     { alerts: [{ price_for, price_change, price_interval, enabled, telegram, pushbullet, log }] }
+
+   Telegram alert includes an inline "✅ Confirm" button with callback_data: "confirm:<event.id>"
+────────────────────────────────────────────────────────────────────────── */
 // ponytail: single file, no retry queue, fire-and-forget.
 const db = require('./db');
 const logger = require('../utils/logger');
@@ -147,7 +178,12 @@ async function formatAlertHtml(event, projectName) {
 
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
-/** Sends an alert to all enabled channels. Never throws. */
+/**
+ * Sends an alert to all enabled channels (Telegram + Pushbullet). Never throws.
+ * @param {object} event - Event row from event_logs
+ * @param {string} projectName
+ * @returns {Promise<void>}
+ */
 async function sendAlert(event, projectName) {
   const [tgCfg, pbCfg] = await Promise.all([
     db.config.getTelegram(),
