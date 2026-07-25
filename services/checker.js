@@ -383,7 +383,7 @@ async function fetchAndStoreTwitterPosts(projectId, handle) {
         : directErr.message.includes('timeout')
         ? 'connection timed out — proxies likely blocked'
         : `nitter.net returned ${directErr.message}`;
-      logger.error('twitter', `RSS failed for @${handle} (${rssUrl}): proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`);
+      logger.warn('twitter', `RSS failed for @${handle} (${rssUrl}): proxy×${MAX_RETRIES} + xcancel fallback + direct all failed. ${likelyCause}`);
       return { newPosts: 0, newPostIds: [] };
     }
   }

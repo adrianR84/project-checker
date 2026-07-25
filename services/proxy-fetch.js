@@ -215,7 +215,7 @@ async function proxyFetch(url, opts = {}) {
     await db.config.upsertProxyStat({ host: ip, ok: true, responseMs: Date.now() - t0 }).catch(() => {});
     return { ok: status < 400, status, text: () => Promise.resolve(body) };
   } catch (proxyErr) {
-    logger.warn('proxy-fetch', `proxy failed (${host}), retrying direct:`, proxyErr);
+    //logger.warn('proxy-fetch', `proxy failed (${host}), retrying direct:`, proxyErr);
     await db.config.upsertProxyStat({ host: ip, ok: false, responseMs: 0 }).catch(() => {});
 
     const t0d = Date.now();

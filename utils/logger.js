@@ -109,7 +109,7 @@ const log = (level, tag, ...args) => {
 
 // Flush Sentry before exit so pending events aren't dropped on crash
 process.on('exit', () => Sentry.flush(3000));
-
+  
 module.exports = {
   error: (tag, ...a) => log('error', tag, ...a),
   warn:  (tag, ...a) => log('warn', tag, ...a),
