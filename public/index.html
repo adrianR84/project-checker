@@ -1696,9 +1696,11 @@
           pricesTimer = setInterval(loadPrices, pricesRefreshMs);
         }
         function pausePricesRefresh() {
+          console.log('prices table: mouse enter — pausing refresh');
           if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
         }
         function resumePricesRefresh() {
+          console.log('prices table: mouse leave — resuming refresh');
           if (activityTab.value !== 'prices') return;
           if (pricesTimer) return;
           startPricesTimer();
