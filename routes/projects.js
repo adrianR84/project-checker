@@ -135,6 +135,7 @@ router.post('/', async (req, res) => {
   const githubJson   = github_url   ? JSON.stringify({ url: github_url })  : null;
   const twitterJson  = twitter_url  ? JSON.stringify({ url: twitter_url, pc: twitterPc }) : null;
   const telegramJson = telegram_url  ? JSON.stringify({ url: telegram_url }) : null;
+  const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
 
   // Prevent duplicate: all provided fields must match (same user)
   const dupConditions = ['user_id = ?'];
@@ -148,7 +149,6 @@ router.post('/', async (req, res) => {
   const existing = await db.prepare(
     `SELECT id FROM projects WHERE ${dupConditions.join(' AND ')}`
   ).get(...dupParams);
-  const tokenJson = (token && (token.symbol || token.contract || token.chain)) ? JSON.stringify(token) : null;
   if (existing) return res.status(409).json({ error: 'Project with this combination of fields already exists' });
 
   const ts = now();
