@@ -316,8 +316,9 @@
 
     /* ── NavBar component ──────────────────────────────────────────────────────
        Sticky top bar with a brand mark and navigation tabs.
-       currentRoute is a ref that updates whenever the hash changes,
-       causing Vue to re-evaluate the :class binding on each tab.
+       Props:   none
+       Emits:   none
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const NavBar = {
       template: `
@@ -401,7 +402,9 @@
 
     /* ── RepoList component ────────────────────────────────────────────────────
        Renders a list of GitHub repositories attached to a project.
-       Props: repos (array from project.repos)
+       Props:   repos (Array<{id, full_name, repo_url, latest_tag, latest_commit_sha, latest_commit_message, latest_commit_date}>)
+       Emits:   none
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const RepoList = {
       props: ['repos'],
@@ -450,8 +453,10 @@
 
     /* ── CheckLogList component ───────────────────────────────────────────────
        Renders a table of recent check log entries.
-       Props: logs, showProject, page, total, limit
-       Emits: change-page
+       Props:   logs (Array), showProject (bool), page (number), total (number),
+                limit (number), sort (string), dir ('asc'|'desc')
+       Emits:   changePage (page: number), sort (col: string)
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const CheckLogList = {
       props: ['logs', 'showProject', 'page', 'total', 'limit', 'sort', 'dir'],
@@ -551,8 +556,10 @@
 
     /* ── StatusChangeList component ────────────────────────────────────────────
        Renders event_logs entries.
-       Props: logs, showProject, page, total, limit
-       Emits: changePage, refresh
+       Props:   logs (Array), showProject (bool), page (number), total (number),
+                limit (number), sort (string), dir ('asc'|'desc')
+       Emits:   changePage (page: number), refresh (void), sort (col: string)
+       Injects: openIframe
     ───────────────────────────────────────────────────────────────────────── */
     const StatusChangeList = {
       props: ['logs', 'showProject', 'page', 'total', 'limit', 'sort', 'dir'],
@@ -659,8 +666,10 @@
 
     /* ── AlertLogsList component ──────────────────────────────────────────────
        Renders alert_logs entries.
-       Props: logs, page, total, limit
-       Emits: change-page
+       Props:   logs (Array), page (number), total (number), limit (number),
+                sort (string), dir ('asc'|'desc')
+       Emits:   changePage (page: number), sort (col: string)
+       Injects: openIframe
     ───────────────────────────────────────────────────────────────────────── */
     const AlertLogsList = {
       props: ['logs', 'page', 'total', 'limit', 'sort', 'dir'],
@@ -726,10 +735,10 @@
 
     /* ── ProjectForm component ─────────────────────────────────────────────────
        Modal form for creating or editing a project.
-       Props:   initial (project object — null for create)
+       Props:   initial (object|null — project data for edit, null for create),
                 busy    (bool — disable submit while saving)
-       Emits:   submit  (validated project data)
-                cancel  (user clicked Cancel)
+       Emits:   submit (object — validated project payload), cancel (void)
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectForm = {
       props: ['initial', 'busy'],
@@ -942,9 +951,10 @@
     };
 
     /* ── RepoManager component ─────────────────────────────────────────────────
-       Add/remove repos for a project. Lives inside ProjectCard.
-       Props: projectId, githubUrl
-       Emits: repos-updated
+       Add/remove repos for a project. Lives inside a modal.
+       Props:   projectId (number), githubUrl (string), projectName (string)
+       Emits:   repos-updated (void)
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const RepoManager = {
       props: ['projectId', 'githubUrl', 'projectName'],
@@ -1101,7 +1111,9 @@
     /* ── ProjectCard component ─────────────────────────────────────────────────
        A single project summary shown on the Activity page.
        Displays current status for website / GitHub / Twitter and a repo list.
-       Emits 'refreshed' after any manual check completes so the parent can reload.
+       Props:   project (object — full project with status objects), prices (Array)
+       Emits:   refreshed (void — after any manual check completes)
+       Injects: openIframe
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectCard = {
       props: ['project', 'prices'],
@@ -1343,7 +1355,12 @@
       },
     };
 
-    /* ── Login page ─────────────────────────────────────────────────────────── */
+    /* ── LoginPage component ───────────────────────────────────────────────────
+       Email/password sign-in form.
+       Props:   none
+       Emits:   none
+       Injects: none
+    ───────────────────────────────────────────────────────────────────────── */
     const LoginPage = {
       template: `
         <div class="auth-page">
@@ -1382,7 +1399,12 @@
       },
     };
 
-    /* ── Register page ────────────────────────────────────────────────────── */
+    /* ── RegisterPage component ────────────────────────────────────────────────
+       Email/password registration form.
+       Props:   none
+       Emits:   none
+       Injects: none
+    ───────────────────────────────────────────────────────────────────────── */
     const RegisterPage = {
       template: `
         <div class="auth-page">
@@ -1424,9 +1446,12 @@
       },
     };
 
-    /* ── Activity page ─────────────────────────────────────────────────────────
+    /* ── ActivityPage component ─────────────────────────────────────────────────
        Shows all projects (via dashboard API) and an optional recent log table.
        The dashboard endpoint returns projects with their latest status baked in.
+       Props:   none
+       Emits:   none
+       Injects: openIframe
     ───────────────────────────────────────────────────────────────────────── */
     const ActivityPage = {
       components: { ProjectCard, CheckLogList, StatusChangeList, AlertLogsList },
@@ -2004,8 +2029,11 @@
       },
     };
 
-    /* ── Projects page ─────────────────────────────────────────────────────────
+    /* ── ProjectsPage component ─────────────────────────────────────────────────
        Table list of all projects with Create / Edit / Delete / JSON Import.
+       Props:   none
+       Emits:   none
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectsPage = {
       components: { ProjectForm, RepoManager },
@@ -2535,12 +2563,15 @@
       },
     };
 
-    /* ── Settings page ─────────────────────────────────────────────────────────
+    /* ── SettingsPage component ─────────────────────────────────────────────────
        Check interval configuration and manual trigger buttons.
        - Loads current config from GET /api/settings
        - Saves updates via PUT /api/settings
        - Trigger buttons call POST /api/settings/trigger-all
        - Clear Data empties projects/repos/logs tables but keeps config
+       Props:   none
+       Emits:   none
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const SettingsPage = {
       template: `
@@ -3319,8 +3350,12 @@
       return { render() { return routes[route] || routes['/']; } };
     }
 
-    /* ── Root App component ────────────────────────────────────────────────────
+    /* ── App component (root) ──────────────────────────────────────────────────
        Composes NavBar + the current page view, with a fade transition between views.
+       Provides: openIframe, modalHtml
+       Props:   none
+       Emits:   none
+       Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const App = {
       components: { NavBar },
