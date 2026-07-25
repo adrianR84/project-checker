@@ -1,13 +1,16 @@
 // Express entry point
 require('dotenv/config');
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { toNodeHandler } = require('better-auth/node');
 const auth = require('./services/auth');
+const logger = require('./utils/logger');
 
 const app = express();
+// app.locals.logger = logger;
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -89,11 +92,11 @@ async function start() {
   require('./services/scheduler').init();
 
   app.listen(PORT, () => {
-    console.log(`[${new Date().toISOString()}] Project Checker server listening on port ${PORT}`);
+    logger.info(`Project Checker server listening on port ${PORT}`);
   });
 }
 
 start().catch(err => {
-  console.error(`[${new Date().toISOString()}] Failed to start server:`, err);
+  logger.error(`Failed to start server:`, err);
   process.exit(1);
 });

@@ -4,6 +4,7 @@ const db = require('./db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange, handleFromTwitterUrl } = require('./checker');
 const { fetchReposForOwner } = require('./github');
 const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY } = require('./notifications');
+const logger = require('../utils/logger');
 
 // ─── Price alert throttle helpers ───────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ async function runWebsiteTick() {
       const r = await checkWebsite(parsed.url, p.id, !!parsed.cc);
       await logCheck(p.id, 'website', null, r);
     } catch (err) {
-      console.error(`[${now()}] website check failed for project ${p.id}: ${err.message}`);
+      logger.error('scheduler', `website check failed for project ${p.id}:`, err);
     }
   }
 }
@@ -210,9 +211,9 @@ async function runAlertTick() {
           LEFT JOIN projects p ON p.id = rsc.project_id
           WHERE rsc.id = ?
         `).get(row.id);
-        if (ev) sendAlert(ev, ev.project_name).catch(err => console.error(`[${now()}] sendAlert failed: ${err.message}`));
+        if (ev) sendAlert(ev, ev.project_name).catch(err => logger.error('scheduler', 'sendAlert failed:', err));
       } catch (err) {
-        console.error(`[${now()}] alert notification dispatch failed: ${err.message}`);
+        logger.error('scheduler', `alert notification dispatch failed:`, err);
       }
     }
 
@@ -260,7 +261,7 @@ async function runTokenPriceTick() {
         const data = await res.json();
         await upsertTokenPrice(p.id, token, data);
       } catch (err) {
-        console.error(`[${now()}] token price fetch failed for project ${p.id}: ${err.message}`);
+        logger.error('scheduler', `token price fetch failed for project ${p.id}:`, err);
       }
     }));
   }
@@ -363,7 +364,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
         return { ok: false, error: err.message };
       }
     })();
-    if (!r.ok) console.error(`[${now()}] Price Alert Telegram failed: ${r.error}`);
+    if (!r.ok) logger.error('scheduler', `Price Alert Telegram failed: ${r.error}`);
   }
 
   if (pbCfg?.enabled && pbCfg.access_token && winning.alert.pushbullet) {
@@ -380,7 +381,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
         return { ok: false, error: err.message };
       }
     })();
-    if (!r.ok) console.error(`[${now()}] Price Alert Pushbullet failed: ${r.error}`);
+    if (!r.ok) logger.error('scheduler', `Price Alert Pushbullet failed: ${r.error}`);
   }
 
   //console.log(`[${now()}] Price alert FIRED: ${projectName} [$${priceRow.price_usd}] [${direction.toUpperCase()}-${tier.toUpperCase()}]: (${winning.val >= 0 ? '+' : ''}${winning.val.toFixed(2)}%)`);
@@ -396,7 +397,7 @@ async function runPriceAlertTick() {
   //scheduleLog(`[${now()}] Scheduler: price alert tick — ${projects.length} projects`);
   for (const p of projects) {
     await evaluatePriceAlerts(p.id, p.name).catch(err =>
-      console.error(`[${now()}] evaluatePriceAlerts failed for project ${p.id}: ${err.message}`)
+      logger.error('scheduler', `evaluatePriceAlerts failed for project ${p.id}:`, err)
     );
   }
 }
@@ -406,7 +407,7 @@ async function runPriceAlertTick() {
 async function reschedule() {
   const intervals = await db.config.getCheckIntervals();
   if (!intervals) {
-    console.warn(`[${now()}] Scheduler: no config row found, skipping schedule`);
+    logger.warn('scheduler', `no config row found, skipping schedule`);
     return;
   }
 
@@ -423,21 +424,21 @@ async function reschedule() {
   clearJobs();
 
   if (cron.validate(commitExpr)) {
-    const j = cron.schedule(commitExpr, () => { runCommitTick().catch(err => console.error(err)); });
+    const j = cron.schedule(commitExpr, () => { runCommitTick().catch(err => logger.error('scheduler', err)); });
     jobs.push(j);
   }
   lastCommitExpr = commitExpr;
   scheduleLog(`[${now()}] Scheduler: commit job → "${commitExpr}" (every ${intervals.github}min)`);
 
   if (cron.validate(websiteExpr)) {
-    const j = cron.schedule(websiteExpr, () => { runWebsiteTick().catch(err => console.error(err)); });
+    const j = cron.schedule(websiteExpr, () => { runWebsiteTick().catch(err => logger.error('scheduler', err)); });
     jobs.push(j);
   }
   lastWebsiteExpr = websiteExpr;
   scheduleLog(`[${now()}] Scheduler: website job → "${websiteExpr}" (every ${intervals.website}min)`);
 
   if (cron.validate(twitterExpr)) {
-    const j = cron.schedule(twitterExpr, () => { runTwitterTick().catch(err => console.error(err)); });
+    const j = cron.schedule(twitterExpr, () => { runTwitterTick().catch(err => logger.error('scheduler', err)); });
     jobs.push(j);
   }
   lastTwitterExpr = twitterExpr;
@@ -445,27 +446,27 @@ async function reschedule() {
 
   const purgeExpr = '0 0 * * *';
   const purgeJob = cron.schedule(purgeExpr, async () => {
-    try { await purgeCheckLogs(); } catch (err) { console.error(err); }
-    try { await purgeEventLogs(); } catch (err) { console.error(err); }
-    try { await purgeAlertLogs(); } catch (err) { console.error(err); }
-    try { await purgeTwitterPosts(); } catch (err) { console.error(err); }
+    try { await purgeCheckLogs(); } catch (err) { logger.error('scheduler', err); }
+    try { await purgeEventLogs(); } catch (err) { logger.error('scheduler', err); }
+    try { await purgeAlertLogs(); } catch (err) { logger.error('scheduler', err); }
+    try { await purgeTwitterPosts(); } catch (err) { logger.error('scheduler', err); }
   });
   jobs.push(purgeJob);
   scheduleLog(`[${now()}] Scheduler: log purge job → "${purgeExpr}" (daily at midnight)`);
 
   // Alert tick: every minute (1-min grid, throttled by config interval inside runAlertTick)
-  const alertJob = cron.schedule('* * * * *', () => { runAlertTick().catch(err => console.error(err)); });
+  const alertJob = cron.schedule('* * * * *', () => { runAlertTick().catch(err => logger.error('scheduler', err)); });
   jobs.push(alertJob);
   scheduleLog(`[${now()}] Scheduler: alert tick job → "* * * * *" (1-min grid)`);
 
   // Price alert tick: every minute (1-min grid, throttled per-(project, threshold) inside evaluatePriceAlerts)
-  const priceAlertJob = cron.schedule('* * * * *', () => { runPriceAlertTick().catch(err => console.error(err)); });
+  const priceAlertJob = cron.schedule('* * * * *', () => { runPriceAlertTick().catch(err => logger.error('scheduler', err)); });
   jobs.push(priceAlertJob);
   scheduleLog(`[${now()}] Scheduler: price alert tick job → "* * * * *" (1-min grid)`);
 
   // Token price tick: every TOKEN_CHECK_INTERVAL_MS ms via setInterval (not cron, for rate-limit control)
   clearInterval(tokenPriceInterval);
-  tokenPriceInterval = setInterval(() => { runTokenPriceTick().catch(err => console.error(err)); }, TOKEN_CHECK_INTERVAL_MS);
+  tokenPriceInterval = setInterval(() => { runTokenPriceTick().catch(err => logger.error('scheduler', err)); }, TOKEN_CHECK_INTERVAL_MS);
   scheduleLog(`[${now()}] Scheduler: token price tick → every ${TOKEN_CHECK_INTERVAL_MS / 1000}s`);
 }
 
@@ -476,7 +477,7 @@ function init() {
   }
   initialized = true;
   reschedule();
-  runTokenPriceTick().catch(err => console.error(`[${now()}] initial token price tick failed: ${err.message}`));
+  runTokenPriceTick().catch(err => logger.error('scheduler', `initial token price tick failed:`, err));
 
   setInterval(() => {
     reschedule();
