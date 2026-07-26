@@ -31,11 +31,15 @@ grep -i "cannot read property" .devlogger/browser.log
 tail -f .devlogger/browser.log
 ```
 
-## Planning
+## Plans
+
+Write plans to `<project>/.claude/PLANS/<slug>.md` — descriptive, kebab-case names (e.g. `add-proxy-provider.md`, `cache-redesign.md`). Path is relative to the current project root.
+
 When creating a plan, delegate both research AND writing to subagents (e.g., a `Plan` agent or parallel agents). Research relevant subsystems first, then write the plan itself — do not draft plans inline in the main conversation.
 
 If a plan is saved globally (e.g., to the global memory or vault), also save a copy locally under `.claude/PLANS/<slug>.md` so the project retains its own copy.
 
+## Route Map
 Route map: `.claude/route-map.md` — all route → handler mappings. Always read this before adding or modifying any route. Keep it updated whenever a route is added, removed, or changed.
 
 ## Code
