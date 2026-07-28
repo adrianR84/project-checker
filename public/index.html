@@ -1007,7 +1007,8 @@
 
         async function lookupToken() {
           const contract = f.value.token_contract?.trim();
-          if (!contract || f.value.token_symbol?.trim() || f.value.token_chain?.trim()) return;
+          // Skip if contract is missing, or if symbol AND chain are both already filled
+          if (!contract || (f.value.token_symbol?.trim() && f.value.token_chain?.trim())) return;
           tokenLookupBusy.value = true;
           try {
             const chain = f.value.token_chain?.trim() || 'solana';
@@ -1433,11 +1434,12 @@
         async function refreshAll() {
           busy.value = 'all';
           try {
-            await Promise.all([
-              props.project.twitter_url  && api.checkTwitter(props.project.id),
-              props.project.website_url  && api.checkWebsite(props.project.id),
-              props.project.github_url   && api.checkGithub(props.project.id),
-            ]);
+            const checks = [
+              props.project.twitter_url  && (() => api.checkTwitter(props.project.id)),
+              props.project.website_url  && (() => api.checkWebsite(props.project.id)),
+              props.project.github_url   && (() => api.checkGithub(props.project.id)),
+            ].filter(Boolean);
+            await Promise.all(checks.map(fn => fn()));
             emit('refreshed');
           } catch (e) {
             alert(`Refresh all failed: ${e.message}`);
@@ -1551,7 +1553,7 @@
             await window.api.signUp({ name: name.value, email: email.value, password: password.value });
             await window.api.signIn({ email: email.value, password: password.value });
             const sess = await window.api.getSession();
-            currentUser.value = sess.user;
+            currentUser.value = sess?.user ?? null;
             window.location.hash = '#/';
           } catch (e) {
             err.value = e.message;

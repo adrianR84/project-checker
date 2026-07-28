@@ -20,10 +20,12 @@ async function requireApiToken(req, res, next) {
   const token = auth.slice(7);
   if (!token) return res.status(401).json({ error: 'Missing token' });
 
-  // Scan all config rows for a matching api_token
-  const rows = await db.prepare('SELECT user_id, settings FROM config').all();
+  // ponytail: narrow the scan — LIKE filters at SQL layer so we only parse JSON for candidates
+  // Escape chars that have special meaning in LIKE patterns
+  const likePattern = `%${token.replace(/[%_\\]/g, '\\$&')}%`;
+  const rows = await db.prepare('SELECT user_id, settings FROM config WHERE settings LIKE ? ESCAPE ?').all(likePattern, '\\');
   const match = rows.find(r => {
-    try { const s = JSON.parse(r.settings); return s.api_token === token; } catch { return false; }
+    try { const s = JSON.parse(r.settings); return s?.api_token === token; } catch { return false; }
   });
   if (!match) return res.status(401).json({ error: 'Invalid API token' });
   req.userId = match.user_id;

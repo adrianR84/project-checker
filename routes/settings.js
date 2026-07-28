@@ -246,7 +246,9 @@ router.put('/', async (req, res) => {
     const incoming = req.body.webshare;
     const merged = {
       enabled:  !!(incoming.enabled),
-      token:   typeof incoming.token === 'string' && incoming.token !== '' && incoming.token !== DUMMY_WEBSHARE_TOKEN ? incoming.token : (cur?.token ?? null),
+      token:   (!cur || !cur.token)
+        ? (typeof incoming.token === 'string' && incoming.token !== '' && incoming.token !== DUMMY_WEBSHARE_TOKEN ? incoming.token : null)
+        : (incoming.token !== DUMMY_WEBSHARE_TOKEN ? incoming.token : cur.token),
       country: typeof incoming.country === 'string' ? incoming.country.trim() : (cur?.country ?? ''),
     };
     await db.config.saveWebshare(req.userId, merged);
