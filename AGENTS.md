@@ -64,6 +64,10 @@ Every exported function that is called from another file must have a JSDoc block
 
 Private/internal helpers (not exported, not cross-file) are exempt.
 
+## Versioning
+On every git commit: run `npm version patch` first (commits the version bump).
+On every git push: run `npm version minor` first (commits the version bump).
+
 ## Database
 `CREATE TABLE IF NOT EXISTS` only creates tables on a fresh DB — it never updates existing schemas. All structural changes (columns, constraints, CHECK values) must be added as **both**:
 1. A migration in `services/migrations.js` (idempotent, runs on every init)
