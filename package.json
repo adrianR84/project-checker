@@ -1,6 +1,6 @@
 {
   "name": "project-checker-server",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Backend for Project Checker app",
   "main": "index.js",
   "pnpm": {},
