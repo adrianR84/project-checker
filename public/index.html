@@ -384,28 +384,22 @@
       return repo || '—';
     }
 
-    /** Return the URL for a log entry's resource (website, twitter, or github repo) */
+    /** Return the URL for a log entry's resource — uses resource_url field, with twitter post_ids and github full_name fallbacks from value */
     function resourceUrl(log, jsonField = null) {
-      if (log.resource_type === 'website' && log.website_url) return log.website_url;
       if (log.resource_type === 'twitter') {
         if (jsonField && log[jsonField]) {
-          try {
-            const v = JSON.parse(log[jsonField]);
-            if (v.post_ids?.length) return `https://twitter.com/i/status/${v.post_ids[0]}`;
-          } catch (_) {}
+          try { const v = JSON.parse(log[jsonField]); if (v.post_ids?.length) return `https://twitter.com/i/status/${v.post_ids[0]}`; } catch (_) {}
         }
-        if (log.twitter_url) return log.twitter_url;
+        return log.resource_url || null;
       }
       if (log.resource_type === 'github') {
-        const raw = jsonField ? log[jsonField] : log.full_name;
-        if (!raw) return null;
-        if (jsonField) {
-          try { const v = JSON.parse(raw); if (v.full_name) return 'https://github.com/' + v.full_name; } catch (_) {}
-        } else {
-          return 'https://github.com/' + raw;
+        if (jsonField && log[jsonField]) {
+          try { const v = JSON.parse(log[jsonField]); if (v.full_name) return 'https://github.com/' + v.full_name; } catch (_) {}
+          return 'https://github.com/' + log[jsonField];
         }
+        return log.resource_url || null;
       }
-      return null;
+      return log.resource_url || null;
     }
 
     /** Map a raw status string → CSS class name for the badge */
@@ -581,7 +575,7 @@
             <tbody>
               <tr v-for="log in logs" :key="log.id">
                 <td>{{ trimName(log.project_name) || log.project_id }}</td>
-                <td v-html="resourceIcon(log.resource_type)"></td>
+                <td><a v-if="checkLogResourceUrl(log)" :href="checkLogResourceUrl(log)" target="_blank" rel="noopener" v-html="resourceIcon(log.resource_type)"></a><span v-else v-html="resourceIcon(log.resource_type)"></span></td>
                 <td>
                   <span :class="['badge', statusClass(log.status)]">{{ log.status }}</span>
                 </td>
@@ -603,7 +597,15 @@
         totalPages() { return Math.ceil(this.total / this.limit) || 1; }
       },
 
-      methods: { relativeTime, absoluteTime, statusClass, logDetail, trimName, resourceIcon: (t) => `<span class="icon icon-${t}"></span>` },
+      methods: {
+        relativeTime, absoluteTime, statusClass, logDetail, trimName,
+        resourceIcon: (t) => `<span class="icon icon-${t}"></span>`,
+        checkLogResourceUrl: (log) => {
+          if (log.resource_type === 'twitter') return log.resource_url || null;
+          if (log.resource_type === 'github')  return log.full_name ? 'https://github.com/' + log.full_name : (log.resource_url || null);
+          return log.resource_url || null;
+        },
+      },
     };
 
     /* ── Shared formatting helpers for StatusChangeList and AlertLogsList ─────── */

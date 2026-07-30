@@ -83,9 +83,11 @@ router.get('/', async (req, res) => {
   const rows = await db.prepare(`
     SELECT cl.*, p.name AS project_name,
       r.full_name,
-      JSON_EXTRACT(p.website, '$.url') AS website_url,
-      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
-      JSON_EXTRACT(p.github, '$.url') AS github_url
+      CASE cl.resource_type
+        WHEN 'website' THEN JSON_EXTRACT(p.website, '$.url')
+        WHEN 'twitter' THEN JSON_EXTRACT(p.twitter, '$.url')
+        WHEN 'github'  THEN JSON_EXTRACT(p.github, '$.url')
+      END AS resource_url
     FROM check_logs cl
     LEFT JOIN projects p ON p.id = cl.project_id
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
@@ -127,9 +129,11 @@ router.get('/status-changes', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT rsc.*, p.name AS project_name,
-      JSON_EXTRACT(p.website, '$.url') AS website_url,
-      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
-      JSON_EXTRACT(p.github, '$.url') AS github_url
+      CASE rsc.resource_type
+        WHEN 'website' THEN JSON_EXTRACT(p.website, '$.url')
+        WHEN 'twitter' THEN JSON_EXTRACT(p.twitter, '$.url')
+        WHEN 'github'  THEN JSON_EXTRACT(p.github, '$.url')
+      END AS resource_url
     FROM event_logs rsc
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
@@ -190,9 +194,11 @@ router.get('/alerts', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value,
-      JSON_EXTRACT(p.website, '$.url') AS website_url,
-      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
-      JSON_EXTRACT(p.github, '$.url') AS github_url
+      CASE rsc.resource_type
+        WHEN 'website' THEN JSON_EXTRACT(p.website, '$.url')
+        WHEN 'twitter' THEN JSON_EXTRACT(p.twitter, '$.url')
+        WHEN 'github'  THEN JSON_EXTRACT(p.github, '$.url')
+      END AS resource_url
     FROM alert_logs al
     LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id
     LEFT JOIN projects p ON p.id = rsc.project_id
