@@ -24,7 +24,6 @@
                   change_value, project_name }
 
    Internal helpers:
-     expandProjectUrls(row) → row with { website_url, github_url, twitter_url } added
      orderClause(map, sort, dir) → safe ORDER BY string
 ────────────────────────────────────────────────────────────────────────── */
 // Check logs REST API
@@ -33,27 +32,6 @@ const db = require('../services/db');
 require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
 const router = express.Router();
-
-/**
- * Expand JSON project cols (website, github, twitter) to flat URL names for API compatibility.
- * @param {object|null} row
- * @returns {object}
- */
-function expandProjectUrls(row) {
-  if (!row) return row;
-  /** @type {import('../types').ProjectWebsite} */
-  const w = row.website  ? JSON.parse(row.website) : { url: null };
-  /** @type {import('../types').ProjectGithub} */
-  const g = row.github   ? JSON.parse(row.github)  : { url: null };
-  /** @type {import('../types').ProjectTwitter} */
-  const t = row.twitter  ? JSON.parse(row.twitter) : { url: null };
-  return {
-    ...row,
-    website_url:  w.url,
-    github_url:   g.url,
-    twitter_url:  t.url,
-  };
-}
 
 // Sort whitelist — accept only known column aliases, never raw user input
 /** @type {Record<string, string>} */
@@ -105,7 +83,9 @@ router.get('/', async (req, res) => {
   const rows = await db.prepare(`
     SELECT cl.*, p.name AS project_name,
       r.full_name,
-      p.website, p.twitter, p.github
+      JSON_EXTRACT(p.website, '$.url') AS website_url,
+      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
+      JSON_EXTRACT(p.github, '$.url') AS github_url
     FROM check_logs cl
     LEFT JOIN projects p ON p.id = cl.project_id
     LEFT JOIN repos r ON r.id = cl.resource_id AND cl.resource_type = 'github'
@@ -115,7 +95,7 @@ router.get('/', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM check_logs cl LEFT JOIN projects p ON p.id = cl.project_id ${where}`).get(...params);
-  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
+  res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
 // GET /api/check-logs/status-changes — event_logs entries
@@ -147,7 +127,9 @@ router.get('/status-changes', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT rsc.*, p.name AS project_name,
-      p.website, p.twitter, p.github
+      JSON_EXTRACT(p.website, '$.url') AS website_url,
+      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
+      JSON_EXTRACT(p.github, '$.url') AS github_url
     FROM event_logs rsc
     LEFT JOIN projects p ON p.id = rsc.project_id
     ${where}
@@ -156,7 +138,7 @@ router.get('/status-changes', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM event_logs rsc LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
-  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
+  res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
 // PATCH /api/check-logs/status-changes/:id/confirm  body: { confirmed: 0|1 }
@@ -208,7 +190,9 @@ router.get('/alerts', async (req, res) => {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.prepare(`
     SELECT al.*, p.name AS project_name, rsc.resource_type, rsc.event_type, rsc.value AS change_value,
-      p.website, p.twitter, p.github
+      JSON_EXTRACT(p.website, '$.url') AS website_url,
+      JSON_EXTRACT(p.twitter, '$.url') AS twitter_url,
+      JSON_EXTRACT(p.github, '$.url') AS github_url
     FROM alert_logs al
     LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id
     LEFT JOIN projects p ON p.id = rsc.project_id
@@ -218,7 +202,7 @@ router.get('/alerts', async (req, res) => {
   `).all(...params, limit, offset);
 
   const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM alert_logs al LEFT JOIN event_logs rsc ON rsc.id = al.status_change_id LEFT JOIN projects p ON p.id = rsc.project_id ${where}`).get(...params);
-  res.json({ logs: rows.map(expandProjectUrls), total: totalRow.c, limit, offset });
+  res.json({ logs: rows, total: totalRow.c, limit, offset });
 });
 
 module.exports = router;
