@@ -97,7 +97,7 @@ table tbody tr:hover td { background: color-mix(in srgb, var(--app-surface) 85%,
 table.compact.sticky tbody tr:hover > td:nth-child(1),
 table.compact.sticky tbody tr:hover > td:nth-child(2) { background: color-mix(in srgb, var(--app-surface) 85%, var(--app-primary)); }
 
-table.compact { width: 100%; table-layout: fixed; font-size: 0.85rem; margin-bottom:0px; }
+table.compact { width: 100%; table-layout: auto; font-size: 0.85rem; margin-bottom:0px; }
 table.compact th, table.compact td { padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 table.compact th[data-tooltip] { overflow: visible; }
 table.compact td:has([data-tooltip]) { overflow: visible; }
@@ -128,7 +128,7 @@ table.compact tbody > tr > td:nth-child(10),   /* twitter enabled */
 table.compact tbody > tr > td:nth-child(12) ,  /* token enabled */
 table.compact tbody > tr > td:nth-child(13)   /* activity display enabled */
   { border-right: 2px solid var(--app-border); }
-table.compact .col-actions { max-width: 200px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
+table.compact .col-actions { width: 210px; display: flex; gap: 4px; overflow: visible; justify-content: flex-end; }
 
 table.compact th.sortable { cursor: pointer; user-select: none; }
 table.compact th.sortable:hover { color: var(--app-primary); }
@@ -172,7 +172,7 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 .mr15 {margin-right: 15px;}
 
 
-.page { max-width: 1200px; padding: 28px 0px; overflow-x: visible; margin:0 auto; }
+.page { max-width: 1200px; padding: 28px 0px; overflow-x: hidden; margin:0 auto; }
 
 .logs-section { margin-top: 1rem; overflow-x: visible; }
 
