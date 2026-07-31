@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
     SELECT id, name, enabled, activity_display, token, token_enabled,
            website, github, twitter, telegram,
            website_enabled, github_enabled, twitter_enabled, telegram_enabled,
-           created_at, updated_at
+           created_at, updated_at, extra_info
     FROM projects
     WHERE enabled = 1 AND activity_display = 1 AND user_id = ?
     ORDER BY id
@@ -149,6 +149,7 @@ router.get('/', async (req, res) => {
       telegram_url: p.telegram_url || null,
       created_at: p.created_at,
       updated_at: p.updated_at,
+      extra_info: p.extra_info ?? null,
       website_status: websiteCheck || null,
       github_status:  githubCheck  || null,
       twitter_status: twitterCheck || null,

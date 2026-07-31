@@ -1225,6 +1225,55 @@
       },
     };
 
+    /* ── ExtraInfoReadOnly component ───────────────────────────────────────
+       Read-only display of extra_info (links/texts/files) for a project.
+       Props:   project (object with .extra_info)
+    ───────────────────────────────────────────────────────────────────── */
+    const ExtraInfoReadOnly = {
+      props: ['project'],
+      setup(props) {
+        const info = computed(() => {
+          const ei = props.project.extra_info;
+          if (!ei) return null;
+          return typeof ei === 'string' ? JSON.parse(ei) : ei;
+        });
+        return { info };
+      },
+      template: `
+        <div>
+          <template v-if="info && (info.links?.length || info.texts?.length || info.files?.length)">
+            <div v-if="info.links?.length" class="form-group">
+              <strong>Links</strong>
+              <ul style="margin:4px 0 0 0;padding-left:1.2rem">
+                <li v-for="(link, i) in info.links" :key="'l'+i">
+                  <a :href="link.url" target="_blank" rel="noopener">{{ link.label || link.url }}</a>
+                  <span v-if="link.note" class="muted"> — {{ link.note }}</span>
+                </li>
+              </ul>
+            </div>
+            <div v-if="info.texts?.length" class="form-group" style="margin-top:10px">
+              <strong>Fields</strong>
+              <dl style="margin:4px 0 0 0">
+                <div v-for="(txt, i) in info.texts" :key="'t'+i" style="display:flex;gap:8px;margin-bottom:4px">
+                  <dt class="muted" style="min-width:80px;flex:0 0 auto">{{ txt.key }}:</dt>
+                  <dd style="margin:0">{{ txt.value }}</dd>
+                </div>
+              </dl>
+            </div>
+            <div v-if="info.files?.length" class="form-group" style="margin-top:10px">
+              <strong>Files</strong>
+              <ul style="margin:4px 0 0 0;padding-left:1.2rem">
+                <li v-for="(fl, i) in info.files" :key="'f'+i">
+                  {{ fl.name }}<span v-if="fl.note" class="muted"> — {{ fl.note }}</span>
+                </li>
+              </ul>
+            </div>
+          </template>
+          <div v-else class="muted" style="padding:1rem 0">No extra info set.</div>
+        </div>
+      `,
+    };
+
     /* ── ProjectCard component ─────────────────────────────────────────────────
        A single project summary shown on the Activity page.
        Displays current status for website / GitHub / Twitter and a repo list.
@@ -1235,16 +1284,23 @@
     const ProjectCard = {
       props: ['project', 'prices'],
       emits: ['refreshed'],
-      components: { RepoList },
+      components: { RepoList, ExtraInfoReadOnly },
 
       template: `
         <div class="project-card">
 
-          <!-- Card header: project name only -->
+          <!-- Card header: project name + extra info toggle -->
           <div class="head">
-            <h2 class="name" @click="openProjectEdit">
+            <div class="name" @click="openProjectEdit">
               {{ project.name }}
-            </h2>
+            </div>
+            <span
+              v-if="project.extra_info"
+              class="icon icon-folder-plus"
+              style=""
+              data-tooltip="Extra Info"
+              @click.stop="openExtraInfo(project, true)"
+            ></span>
           </div>
 
           <!-- Status badges row: Twitter, Website, GitHub -->
@@ -1473,6 +1529,15 @@
           });
         }
 
+        function openExtraInfo(p, readOnly = true) {
+          openModal({
+            title: `Extra Info — ${p.name}`,
+            width: '500px',
+            closable: true,
+            render: () => h(ExtraInfoReadOnly, { project: p }),
+          });
+        }
+
         return {
           busy,
           website, github, twitter,
@@ -1481,6 +1546,7 @@
           runCheck,
           fmtPct, fmtShortNum,
           refreshAll,
+          openExtraInfo,
           relativeTime,
           statusClass,
           openProjectEdit,
@@ -2421,7 +2487,7 @@
           eiFiles.value  = info?.files  ? info.files.slice()  : [];
           openModal({
             title: `Extra Info — ${p.name}`,
-            width: '640px',
+            width: '900px',
             render: () => h(ExtraInfoBody, {
               extraInfoProject, links: eiLinks, texts: eiTexts, files: eiFiles, saving: eiSaving, uploadError: eiUploadError,
               onSave:        eiSave,
