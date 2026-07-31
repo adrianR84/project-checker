@@ -519,43 +519,6 @@ router.post('/:id/check-github', async (req, res) => {
   res.json({ ok: true, results });
 });
 
-// POST /api/projects/:id/extra-info/upload — save a file and return its metadata
-const multer = require('multer');
-const { randomBytes } = require('crypto');
-const path = require('path');
-const fs = require('fs');
-
-const EXTRA_INFO_DIR = path.join(__dirname, '..', 'data', 'extra-info');
-const upload = multer({ storage: multer.diskStorage({
-  destination: (req, file, cb) => {
-    const projectDir = path.join(EXTRA_INFO_DIR, String(req.params.id));
-    fs.mkdirSync(projectDir, { recursive: true });
-    cb(null, projectDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-    cb(null, `${randomBytes(8).toString('hex')}_${base}${ext}`);
-  }
-}) });
-
-router.post('/:id/extra-info/upload', (req, res, next) => {
-  // Auth check
-  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const id = parseInt(req.params.id, 10);
-  upload.single('file')(req, res, (err) => {
-    if (err) {
-      logger.error('upload', err);
-      return res.status(400).json({ error: 'Upload failed. Check file size and format.' });
-    }
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    res.json({
-      name: req.file.originalname,
-      path: req.file.path,
-      note: req.body.note || '',
-    });
-  });
-});
 
 // POST /api/projects/:id/check-twitter
 router.post('/:id/check-twitter', async (req, res) => {
@@ -584,5 +547,67 @@ router.get('/:id/twitter-posts', async (req, res) => {
   res.json(posts);
 });
 
+
+// POST /api/projects/:id/extra-info/upload — save a file and return its metadata
+const multer = require('multer');
+const { randomBytes } = require('crypto');
+const path = require('path');
+const fs = require('fs');
+
+const EXTRA_INFO_DIR = path.join(__dirname, '..', 'data', 'extra-info');
+const upload = multer({
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Only PDF and image files are allowed'));
+    }
+    cb(null, true);
+  },
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const projectDir = path.join(EXTRA_INFO_DIR, String(req.params.id));
+      fs.mkdirSync(projectDir, { recursive: true });
+      cb(null, projectDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      cb(null, `${randomBytes(8).toString('hex')}_${base}${ext}`);
+    }
+  })
+});
+
+router.post('/:id/extra-info/upload', (req, res, next) => {
+  // Auth check
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const id = parseInt(req.params.id, 10);
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      logger.error('upload', err);
+      return res.status(400).json({ error: 'Upload failed. Check file size and format.' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    res.json({
+      name: req.file.originalname,
+      note: req.body.note || '',
+    });
+  });
+});
+
+// GET /api/projects/:id/extra-info/files/:name — serve an uploaded PDF or image
+router.get('/:id/extra-info/files/:name', (req, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const id = parseInt(req.params.id, 10);
+  const dir = path.join(EXTRA_INFO_DIR, String(id));
+  // Find file in dir whose suffix matches the requested name
+  const files = fs.readdirSync(dir);
+  const file = files.find(f => f.endsWith(req.params.name));
+  if (!file) return res.status(404).json({ error: 'File not found' });
+  const filePath = path.join(dir, file);
+  res.sendFile(filePath, (err) => {
+    if (err) res.status(404).json({ error: 'File not found' });
+  });
+});
 
 module.exports = router;

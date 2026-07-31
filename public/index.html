@@ -1264,7 +1264,7 @@
               <strong>Files</strong>
               <ul style="margin:4px 0 0 0;padding-left:1.2rem">
                 <li v-for="(fl, i) in info.files" :key="'f'+i">
-                  {{ fl.name }}<span v-if="fl.note" class="muted"> — {{ fl.note }}</span>
+                  <a :href="'/api/projects/' + project.id + '/extra-info/files/' + encodeURIComponent(fl.name)" target="_blank" rel="noopener">{{ fl.name }}</a><span v-if="fl.note" class="muted"> — {{ fl.note }}</span>
                 </li>
               </ul>
             </div>
@@ -1297,7 +1297,7 @@
             <span
               v-if="project.extra_info"
               class="icon icon-folder-plus"
-              style=""
+              style="cursor:pointer"
               data-tooltip="Extra Info"
               @click.stop="openExtraInfo(project, true)"
             ></span>
@@ -2327,11 +2327,11 @@
           <div class="form-group" style="margin-top:12px">
             <div class="form-row-header">
               <strong>Files</strong>
-              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="$emit('pick-file')">+ Upload File</button>
+              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="clickFileInput">+ Upload File</button>
             </div>
             <input ref="fileInputEl" type="file" style="display:none" @change="$emit('upload', $event)" />
             <div v-for="(fl, i) in files" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
-              <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</span>
+              <a :href="'/api/projects/' + extraInfoProject.id + '/extra-info/files/' + encodeURIComponent(fl.name)" target="_blank" rel="noopener" style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</a>
               <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
               <button type="button" class="secondary" style="padding:2px 6px" @click="files.splice(i,1)">×</button>
             </div>
@@ -2477,8 +2477,6 @@
         const eiSaving = ref(false);
         const eiUploadError = ref('');
         const eiFileNote = ref('');
-        const eiFileInput = ref(null);
-
         function openExtraInfo(p) {
           extraInfoProject.value = p;
           const info = p.extra_info ? (typeof p.extra_info === 'string' ? JSON.parse(p.extra_info) : p.extra_info) : null;
@@ -2492,7 +2490,7 @@
               extraInfoProject, links: eiLinks, texts: eiTexts, files: eiFiles, saving: eiSaving, uploadError: eiUploadError,
               onSave:        eiSave,
               onCancel:      () => { closeModal(); extraInfoProject.value = null; },
-              onPickFile:    () => eiFileInput.value?.click(),
+              onPickFile:    () => {},  // ExtraInfoBody handles its own file input via ref
               onUpload:      eiUploadFile,
             }),
           });
@@ -3712,20 +3710,8 @@
       return { render() { return routes[route] || routes['/']; } };
     }
 
-    /* ── App component (root) ──────────────────────────────────────────────────
-       Composes NavBar + the current page view, with a fade transition between views.
-       Provides: openIframe
-       Props:   none
-       Emits:   none
-       Injects: none
-    ───────────────────────────────────────────────────────────────────────── */
-    /* ── AppModal component ─────────────────────────────────────────────
-       Shared modal shell. Renders whatever the active render function returns.
-       Backdrop click + Esc close unless `closable: false` was passed to openModal.
-       Props:   none (consumes provided openModal state)
-       Emits:   none
-       Injects: openModal, closeModal
-    ───────────────────────────────────────────────────────────────────── */
+
+
     /* ── ProxyStatsTable component ──────────────────────────────────────
        Renders proxy performance stats without any v-html / innerHTML.
        Props:   stats (array), loading (boolean)
@@ -3759,6 +3745,13 @@
       `,
     };
 
+    /* ── AppModal component ─────────────────────────────────────────────
+       Shared modal shell. Renders whatever the active render function returns.
+       Backdrop click + Esc close unless `closable: false` was passed to openModal.
+       Props:   none (consumes provided openModal state)
+       Emits:   none
+       Injects: openModal, closeModal
+    ───────────────────────────────────────────────────────────────────── */
     const AppModal = {
       setup() {
         const { active, title, width, closable, render, closeModal } = inject('appModal');
@@ -3778,6 +3771,15 @@
         </div>
       `,
     };
+
+    
+    /* ── App component (root) ──────────────────────────────────────────────────
+       Composes NavBar + the current page view, with a fade transition between views.
+       Provides: openIframe
+       Props:   none
+       Emits:   none
+       Injects: none
+    ───────────────────────────────────────────────────────────────────────── */
 
     const App = {
       components: { NavBar, AppModal },
