@@ -387,7 +387,8 @@ router.get('/:id/org-repos', async (req, res) => {
     const repos = await fetchReposForOwner(project.github_url);
     res.json(repos);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logger.error('projects', `fetch-repos failed for ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to fetch repositories.' });
   }
 });
 
@@ -438,7 +439,7 @@ router.post('/:id/refresh-repos', async (req, res) => {
     res.json({ ok: true, fetched: githubRepos.length, updated, added });
   } catch (err) {
     logger.error('projects', `refresh-repos failed for project ${id}:`, err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to refresh repositories.' });
   }
 });
 
@@ -543,7 +544,10 @@ router.post('/:id/extra-info/upload', (req, res, next) => {
   if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   const id = parseInt(req.params.id, 10);
   upload.single('file')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      logger.error('upload', err);
+      return res.status(400).json({ error: 'Upload failed. Check file size and format.' });
+    }
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     res.json({
       name: req.file.originalname,

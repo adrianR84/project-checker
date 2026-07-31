@@ -663,10 +663,10 @@
           }
           if (eventType === 'changed' && resourceType === 'twitter') {
             const hs = (v.bhs || v.ahs) ? `${v.bhs ?? ''} → ${v.ahs ?? ''}` : '';
-            const bs = v.bs && v.as ? (v.as === 'error' ? '<span style="color:#e55">removed</span>' : `${v.bs} → ${v.as}`) : '';
+            const bs = v.bs && v.as ? (v.as === 'error' ? 'removed' : `${v.bs} → ${v.as}`) : '';
             return [hs, bs].filter(Boolean).join(' · ');
           }
-          if (eventType === 'deleted' && resourceType === 'github') return `${rn} · <span style="color:#e55">deleted</span>`;
+          if (eventType === 'deleted' && resourceType === 'github') return `${rn} · deleted`;
           return value;
         } catch (_) { return value; }
       },
@@ -712,7 +712,7 @@
                   </span>
                 </td>
                 <td class="muted">{{ absoluteTime(log.created_at) }}</td>
-                <td class="hide-sm" v-html="formatChangeValue(log.event_type, log.resource_type, log.value)"></td>
+                <td class="hide-sm">{{ formatChangeValue(log.event_type, log.resource_type, log.value) }}</td>
                 <td class="text-center">
                   <input type="checkbox" :checked="!!log.confirmed" @change="toggleConfirm(log, $event)" />
                 </td>
@@ -816,7 +816,7 @@
                   </span>
                 </td>
                 <td class="muted">{{ absoluteTime(log.created_at) }}</td>
-                <td v-html="formatChangeValue(log.event_type, log.resource_type, log.change_value)"></td>
+                <td>{{ formatChangeValue(log.event_type, log.resource_type, log.change_value) }}</td>
               </tr>
             </tbody>
           </table>
