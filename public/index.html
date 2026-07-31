@@ -935,7 +935,7 @@
             <textarea
               v-model="jsonEditText"
               rows="8"
-              placeholder='{"name":"New Name","website":"https://new-site.com","symbol":"JTVO","contractAddress":"...","chainId":"solana"}'
+              placeholder='{"name":"New Name","website":"https://new-site.com"}'
             ></textarea>
             <span v-if="jsonEditError" class="error-msg">{{ jsonEditError }}</span>
           </div>
@@ -1042,6 +1042,7 @@
               if (o.chainId !== undefined) f.value.token_chain   = o.chainId;
               if (o.enabled !== undefined)  f.value.project_enabled = !!o.enabled;
               if (o.price_enabled !== undefined) f.value.price_enabled = !!o.price_enabled;
+              if (o.extra_info !== undefined) f.value._extra_info = o.extra_info;
             } catch (e) {
               jsonEditError.value = 'Invalid JSON: ' + e.message;
               return;
@@ -1064,6 +1065,7 @@
             github_enabled: p.github_enabled, twitter_enabled: p.twitter_enabled, telegram_enabled: p.telegram_enabled,
             twitter_posts_check: p.twitter_posts_check,
             token, enabled: p.project_enabled ? 1 : 0, activity_display: p.activity_display ? 1 : 0, price_enabled: p.price_enabled ? 1 : 0,
+            ...(p._extra_info ? { extra_info: p._extra_info } : {}),
           });
         }
 
@@ -2240,6 +2242,7 @@
                   <td><span :class="['badge', p.activity_display ? 'ok' : 'error']">{{ p.activity_display ? '✓' : '✗' }}</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
+                    <button class="secondary" data-tooltip="Extra Info" @click="openExtraInfo(p)">ℹ</button>
                     <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>
                     <button class="secondary" data-tooltip="Delete" @click="onDelete(p)">🗑</button>
                   </td>
@@ -2288,7 +2291,7 @@
                 <textarea
                   v-model="importText"
                   rows="10"
-                  placeholder='[{"name":"Example","website":"https://example.com","github":"https://github.com/example","symbol":"JTVO","contractAddress":"...","chainId":"solana","enabled":true}]'
+                  placeholder='[{"name":"Example","website":"https://example.com","github":"https://github.com/example","symbol":"JTVO","contractAddress":"...","chainId":"solana","enabled":true,"extra_info":{"links":[{"label":"Docs","url":"https://..."}]}}]'
                 ></textarea>
               </div>
 
@@ -2323,6 +2326,60 @@
             </div>
           </div>
 
+          <!-- ExtraInfoModal -->
+          <div class="modal" :class="{ active: isActive('extrainfo') }" style="max-width:640px" @click.self="modalClosable && closeModal()">
+            <header class="modal-header">
+              <h3 style="margin:0;font-size:1.1rem;">Extra Info — {{ extraInfoProject?.name }}</h3>
+              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); extraInfoProject = null">×</button>
+            </header>
+            <div class="modal-body">
+              <template v-if="extraInfoProject">
+                <!-- Links section -->
+                <div class="form-group">
+                  <div class="form-row-header"><strong>Links</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiLinks.push({label:'',url:'',note:''})">+ Add Link</button></div>
+                  <div v-for="(link, i) in eiLinks" :key="'l'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+                    <input v-model="link.label" placeholder="Label (e.g. Docs)" style="flex:1" />
+                    <input v-model="link.url" placeholder="https://..." style="flex:2" />
+                    <input v-model="link.note" placeholder="Note (optional)" style="flex:1" />
+                    <button type="button" class="secondary" style="padding:2px 6px" @click="eiLinks.splice(i,1)">×</button>
+                  </div>
+                  <div v-if="eiLinks.length === 0" style="color:var(--muted-color);font-size:0.85rem">No links yet.</div>
+                </div>
+                <!-- Texts section -->
+                <div class="form-group" style="margin-top:12px">
+                  <div class="form-row-header"><strong>Text Fields</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiTexts.push({key:'',value:''})">+ Add Field</button></div>
+                  <div v-for="(txt, i) in eiTexts" :key="'t'+i" style="margin-bottom:8px">
+                    <div style="display:flex;gap:4px;margin-bottom:2px;align-items:center">
+                      <input v-model="txt.key" placeholder="Field name (e.g. Notes)" style="flex:1" />
+                      <button type="button" class="secondary" style="padding:2px 6px" @click="eiTexts.splice(i,1)">×</button>
+                    </div>
+                    <textarea v-model="txt.value" placeholder="Value..." rows="2" style="width:100%;resize:vertical"></textarea>
+                  </div>
+                  <div v-if="eiTexts.length === 0" style="color:var(--muted-color);font-size:0.85rem">No text fields yet.</div>
+                </div>
+                <!-- Files section -->
+                <div class="form-group" style="margin-top:12px">
+                  <div class="form-row-header"><strong>Files</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiFileNote=''; $refs.eiFileInput.click()">+ Upload File</button></div>
+                  <input ref="eiFileInput" type="file" style="display:none" @change="eiUploadFile" />
+                  <div v-for="(fl, i) in eiFiles" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+                    <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</span>
+                    <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
+                    <button type="button" class="secondary" style="padding:2px 6px" @click="eiFiles.splice(i,1)">×</button>
+                  </div>
+                  <div v-if="eiFiles.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
+                  <div v-if="eiUploadError" class="error-msg" style="font-size:0.85rem">{{ eiUploadError }}</div>
+                </div>
+              </template>
+            </div>
+            <div class="modal-actions">
+              <button @click="closeModal(); extraInfoProject = null">Cancel</button>
+              <button class="primary" :disabled="eiSaving" @click="eiSave">
+                <span v-if="eiSaving" class="spinner"></span>
+                <span v-else>Save</span>
+              </button>
+            </div>
+          </div>
+
         </div>
       `,
 
@@ -2354,6 +2411,83 @@
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
         const manageProject = ref(null); // project for RepoManager modal
+        const extraInfoProject = ref(null); // project for ExtraInfoModal
+        const eiLinks  = ref([]);
+        const eiTexts  = ref([]);
+        const eiFiles  = ref([]);
+        const eiSaving = ref(false);
+        const eiUploadError = ref('');
+        const eiFileNote = ref('');
+        const eiFileInput = ref(null);
+
+        function openExtraInfo(p) {
+          extraInfoProject.value = p;
+          const info = p.extra_info ? (typeof p.extra_info === 'string' ? JSON.parse(p.extra_info) : p.extra_info) : null;
+          eiLinks.value  = info?.links  ? info.links.slice()  : [];
+          eiTexts.value  = info?.texts  ? info.texts.slice()  : [];
+          eiFiles.value  = info?.files  ? info.files.slice()  : [];
+          eiLinks.value  = info.links  ? info.links.slice()  : [];
+          eiTexts.value  = info.texts  ? info.texts.slice()  : [];
+          eiFiles.value  = info.files  ? info.files.slice()  : [];
+          openModal('extrainfo', '640px', true);
+        }
+
+        async function eiUploadFile(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          eiUploadError.value = '';
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('note', eiFileNote.value || '');
+          try {
+            const res = await fetch(`/api/projects/${extraInfoProject.value.id}/extra-info/upload`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${sessionStorage.getItem('api_token') || ''}` },
+              body: formData,
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+            const meta = await res.json();
+            eiFiles.value.push(meta);
+          } catch (err) {
+            eiUploadError.value = err.message;
+          }
+          eiFileNote.value = '';
+          e.target.value = '';
+        }
+
+        async function eiSave() {
+          eiSaving.value = true;
+          eiUploadError.value = '';
+          try {
+            const isValidUrl = (s) => s && typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
+            const isObject = (v) => v && typeof v === 'object';
+            // Sanitize: strip links with no/empty URL, normalize url to null if not a real URL
+            const links = eiLinks.value
+              .filter(l => isValidUrl(l.url) || (l.label && l.url))
+              .map(l => ({
+                label: String(l.label || '').trim() || null,
+                url:   isValidUrl(l.url) ? l.url.trim() : (l.label ? null : ''),
+                note:  String(l.note || '').trim() || null,
+              }));
+            const texts = eiTexts.value
+              .filter(t => t.key || t.value)
+              .map(t => ({
+                key:   String(t.key || '').trim() || null,
+                value: String(t.value || '').trim() || null,
+              }));
+            const payload = {
+              extra_info: { links, texts, files: eiFiles.value.filter(f => f.name && f.path) },
+            };
+            await api.updateProject(extraInfoProject.value.id, payload);
+            closeModal();
+            extraInfoProject.value = null;
+            await load();
+          } catch (err) {
+            eiUploadError.value = err.message;
+          } finally {
+            eiSaving.value = false;
+          }
+        }
         const lastGithubImport = ref(null); // import-created project needing repo setup
         const projFilter = ref('');
         const selected = ref([]); // ids of selected projects for bulk ops
@@ -2588,6 +2722,10 @@
               if (Array.isArray(item.repos) && item.repos.length) {
                 await api.addRepos(created.id, item.repos);
               }
+              // Restore extra_info if present
+              if (item.extra_info) {
+                await api.updateProject(created.id, { extra_info: item.extra_info });
+              }
               ok++;
               if (item.github) lastGithubImport.value = created;
             } catch (e) {
@@ -2634,6 +2772,7 @@
               twitter_posts_check: p.twitter_posts_check ? 1 : 0,
               telegram_enabled: p.telegram_enabled ? 1 : 0,
               price_enabled:   p.price_enabled   ? 1 : 0,
+              extra_info:      p.extra_info      || null,
               repos,
             };
           }));
@@ -2673,12 +2812,15 @@
           importText, importing, manageProject, lastGithubImport,
           activeModal, modalWidth, modalClosable, isActive,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos, openModal, closeModal,
+          openCreate, openEdit, openManageRepos, openExtraInfo, openModal, closeModal,
           onFormSubmit, onDelete, onImport, onFile, exportProjects,
           urlLabel, tok, projectIconLink, trimName,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkGithubEnable, onBulkGithubDisable, onBulkDelete,
           load,
           api: window.api,
+          // ExtraInfoModal
+          extraInfoProject, eiLinks, eiTexts, eiFiles, eiSaving, eiUploadError, eiFileNote, eiFileInput,
+          eiUploadFile, eiSave,
         };
       },
     };

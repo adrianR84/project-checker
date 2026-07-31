@@ -90,7 +90,7 @@ const UNAVAILABLE = (msg) => ({ status: 'unavailable', http_status: null, respon
 // GET /api/projects — list all projects
 router.get('/', async (req, res) => {
   const rows = await db.prepare(`
-    SELECT id, name, website, github, twitter, telegram,
+    SELECT id, name, website, github, twitter, telegram, extra_info,
            website_enabled, github_enabled, twitter_enabled, telegram_enabled,
            token, token_enabled, enabled, activity_display,
            created_at, updated_at
@@ -252,7 +252,7 @@ router.put('/:id', async (req, res) => {
   const allowed = ['name', 'website_url', 'github_url', 'twitter_url', 'telegram_url',
                    'website_enabled', 'website_content_check', 'github_enabled', 'twitter_enabled', 'telegram_enabled',
                    'twitter_posts_check',
-                   'token', 'enabled', 'price_enabled', 'activity_display'];
+                   'token', 'enabled', 'price_enabled', 'activity_display', 'extra_info'];
   const updates = {};
   for (const key of allowed) {
     if (req.body && Object.prototype.hasOwnProperty.call(req.body, key)) {
@@ -303,6 +303,16 @@ router.put('/:id', async (req, res) => {
   if ('price_enabled' in updates) {
     updates.token_enabled = updates.price_enabled;
     delete updates.price_enabled;
+  }
+  // Shallow-merge extra_info: deserialize existing, merge incoming keys, re-serialize
+  if ('extra_info' in updates && typeof updates.extra_info === 'object') {
+    const prev = existing.extra_info ? JSON.parse(existing.extra_info) : null;
+    const incoming = updates.extra_info;
+    updates.extra_info = JSON.stringify({
+      links:   Array.isArray(incoming.links) ? incoming.links : [],
+      texts:   Array.isArray(incoming.texts) ? incoming.texts : [],
+      files:   Array.isArray(incoming.files) ? incoming.files : [],
+    });
   }
 
   // Auto-fill token symbol/chain from DexScreener if contract is provided but symbol or chain is missing
@@ -506,6 +516,41 @@ router.post('/:id/check-github', async (req, res) => {
     results.push({ repo: repo.full_name, ...result });
   }
   res.json({ ok: true, results });
+});
+
+// POST /api/projects/:id/extra-info/upload — save a file and return its metadata
+const multer = require('multer');
+const { randomBytes } = require('crypto');
+const path = require('path');
+const fs = require('fs');
+
+const EXTRA_INFO_DIR = path.join(__dirname, '..', 'data', 'extra-info');
+const upload = multer({ storage: multer.diskStorage({
+  destination: (req, file, cb) => {
+    const projectDir = path.join(EXTRA_INFO_DIR, String(req.params.id));
+    fs.mkdirSync(projectDir, { recursive: true });
+    cb(null, projectDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `${randomBytes(8).toString('hex')}_${base}${ext}`);
+  }
+}) });
+
+router.post('/:id/extra-info/upload', (req, res, next) => {
+  // Auth check
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const id = parseInt(req.params.id, 10);
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    res.json({
+      name: req.file.originalname,
+      path: req.file.path,
+      note: req.body.note || '',
+    });
+  });
 });
 
 // POST /api/projects/:id/check-twitter

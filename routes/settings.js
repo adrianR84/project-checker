@@ -334,6 +334,7 @@ function parseProjectRow(row) {
     twitter_posts_check:  t.pc ?? 1,
     telegram_url:         tg.url,
     price_enabled:        row.token_enabled,
+    extra_info:           row.extra_info,
   };
 }
 

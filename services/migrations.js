@@ -755,6 +755,7 @@ async function runMigrations(db) {
   try { add_projects_activity_display(db); } catch (e) { logger.error('migrations', e); }
   try { add_webshare_config(db); } catch (e) { logger.error('migrations', e); }
   try { add_proxy_stats_table(db); } catch (e) { logger.error('migrations', e); }
+  try { add_extra_info_column(db); } catch (e) { logger.error('migrations', e); }
 }
 
 function add_webshare_config(db) {
@@ -775,6 +776,16 @@ function add_proxy_stats_table(db) {
       last_fail_at TEXT
     )
   `);
+}
+
+/** Migration: adds extra_info column to projects if missing. */
+function add_extra_info_column(db) {
+  if (hasColumn(db, 'projects', 'extra_info')) return;
+  try {
+    db.exec("ALTER TABLE projects ADD COLUMN extra_info TEXT");
+  } catch (err) {
+    logger.error('migrations', 'add_extra_info_column failed:', err);
+  }
 }
 
 module.exports = { runMigrations };
