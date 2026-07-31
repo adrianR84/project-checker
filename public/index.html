@@ -231,9 +231,6 @@
     window.showToast = showToast;
     window.closeIframe = () => document.querySelector('.modal-backdrop')?.click();
 
-    // Expose modalHtml so child components can call it without inject
-    window.modalHtml = null; // set after App setup
-
     /* ── Shared helpers ─────────────────────────────────────────────────────────
        Used directly in templates via Vue's template expression evaluation.
     ───────────────────────────────────────────────────────────────────────── */
@@ -1863,11 +1860,9 @@
           pricesTimer = setInterval(loadPrices, pricesRefreshMs);
         }
         function pausePricesRefresh() {
-          console.log('prices table: mouse enter — pausing refresh');
           if (pricesTimer) { clearInterval(pricesTimer); pricesTimer = null; }
         }
         function resumePricesRefresh() {
-          console.log('prices table: mouse leave — resuming refresh');
           if (activityTab.value !== 'prices') return;
           if (pricesTimer) return;
           startPricesTimer();
@@ -3260,6 +3255,7 @@
 
       setup() {
         const settings    = ref(null);
+        const openModal   = inject('openModal');
         const form        = ref({
           github_interval_minutes:   360,
           website_interval_minutes:  1440,
@@ -3541,28 +3537,28 @@
         /** Open proxy stats in the modal */
         async function openProxyStatsModal() {
           loadingStats.value = true;
+          let stats = [];
           try {
-            const stats = await fetch('/api/settings/proxy-stats').then(r => r.json());
-            const rows = stats.map(s => `<tr><td><code>${s.host}</code></td><td>${s.successes}</td><td class="${s.failures > 0 ? 'error' : ''}">${s.failures}</td><td>${s.total_response_ms && s.successes ? Math.round(s.total_response_ms / s.successes) : '—'}</td><td class="muted">${s.last_used_at ? new Date(s.last_used_at).toLocaleTimeString() : '—'}</td></tr>`).join('');
-            const html = `
-              <table style="width:100%;font-size:.9rem">
-                <thead><tr style="text-align:left"><th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th></tr></thead>
-                <tbody>${rows || '<tr><td colspan="5" class="muted">No stats yet — run a check to see proxy performance.</td></tr>'}</tbody>
-              </table>
-              <div style="margin-top:1rem;display:flex;gap:.5rem">
-                <button onclick="window._reloadProxyStats()">Refresh</button>
-                <button class="secondary" onclick="window._clearProxyStats()">Clear</button>
-              </div>`;
-            modalHtml(html, 'Proxy Stats', false);
-            window._reloadProxyStats = openProxyStatsModal;
-            window._clearProxyStats = async () => {
-              if (!confirm('Clear all proxy stats? This cannot be undone.')) return;
-              await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
-              window.closeIframe();
-              showToast('Proxy stats cleared', 'info', 2000);
-            };
-          } catch (e) { showToast(e.message, 'error'); }
+            stats = await fetch('/api/settings/proxy-stats').then(r => r.json());
+          } catch (e) { showToast(e.message, 'error'); loadingStats.value = false; return; }
           finally { loadingStats.value = false; }
+
+          openModal({
+            title: 'Proxy Stats',
+            width: '700px',
+            closable: true,
+            render: () => h(ProxyStatsTable, {
+              stats,
+              loading: loadingStats.value,
+              onReload: openProxyStatsModal,
+              onClear: async () => {
+                if (!confirm('Clear all proxy stats? This cannot be undone.')) return;
+                await fetch('/api/settings/proxy-stats', { method: 'DELETE' });
+                openProxyStatsModal();
+                showToast('Proxy stats cleared', 'info', 2000);
+              },
+            }),
+          });
         }
 
         /** Clear check logs only, keep projects and repos */
@@ -3652,7 +3648,7 @@
 
     /* ── App component (root) ──────────────────────────────────────────────────
        Composes NavBar + the current page view, with a fade transition between views.
-       Provides: openIframe, modalHtml
+       Provides: openIframe
        Props:   none
        Emits:   none
        Injects: none
@@ -3664,6 +3660,39 @@
        Emits:   none
        Injects: openModal, closeModal
     ───────────────────────────────────────────────────────────────────── */
+    /* ── ProxyStatsTable component ──────────────────────────────────────
+       Renders proxy performance stats without any v-html / innerHTML.
+       Props:   stats (array), loading (boolean)
+       Emits:   reload, clear
+    ───────────────────────────────────────────────────────────────────── */
+    const ProxyStatsTable = {
+      props: ['stats', 'loading'],
+      emits: ['reload', 'clear'],
+      template: `
+        <div>
+          <table style="width:100%;font-size:.9rem">
+            <thead><tr style="text-align:left"><th>Host</th><th>Success</th><th>Fail</th><th>Avg ms</th><th>Last Used</th></tr></thead>
+            <tbody>
+              <tr v-if="!stats || stats.length === 0">
+                <td colspan="5" class="muted">No stats yet — run a check to see proxy performance.</td>
+              </tr>
+              <tr v-for="s in stats" :key="s.host">
+                <td><code>{{ s.host }}</code></td>
+                <td>{{ s.successes }}</td>
+                <td :class="{ error: s.failures > 0 }">{{ s.failures }}</td>
+                <td>{{ s.successes ? Math.round((s.total_response_ms || 0) / s.successes) : '—' }}</td>
+                <td class="muted">{{ s.last_used_at ? new Date(s.last_used_at).toLocaleTimeString() : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:1rem;display:flex;gap:.5rem">
+            <button @click="$emit('reload')" :disabled="loading">Refresh</button>
+            <button class="secondary" @click="$emit('clear')">Clear</button>
+          </div>
+        </div>
+      `,
+    };
+
     const AppModal = {
       setup() {
         const { active, title, width, closable, render, closeModal } = inject('appModal');
@@ -3694,7 +3723,6 @@
         const iframeActive  = ref(false);
         const iframeWidth   = ref('');
         const iframeClosable = ref(false);
-        const iframeHtml    = ref(''); // raw HTML for modal body (no iframe)
         const currentView   = ref(hashRouter().render());
 
         // Shared AppModal state — openModal({ title, width, closable, render })
@@ -3733,23 +3761,15 @@
           iframeLoading.value = true;
           iframeWidth.value = w;
           iframeClosable.value = closable;
-          iframeHtml.value = '';
           iframeActive.value = true;
         }
         function closeIframe() {
           iframeActive.value = false;
           iframeUrl.value = '';
-          iframeHtml.value = '';
-        }
-        function modalHtml(html, title = '', closable = false) {
-          iframeTitle.value = title;
-          iframeClosable.value = closable;
-          iframeHtml.value = html;
-          iframeActive.value = true;
+          iframeTitle.value = '';
         }
 
         provide('openIframe', openIframe);
-        provide('modalHtml', modalHtml);
 
         function onEsc(e) {
           if (e.key === 'Escape') {
@@ -3760,7 +3780,6 @@
         }
 
         onMounted(() => {
-          window.modalHtml = modalHtml;
           window.addEventListener('hashchange', () => {
             currentView.value = hashRouter().render();
           });
@@ -3771,7 +3790,7 @@
         });
 
         return {
-          iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, iframeHtml, closeIframe, currentView,
+          iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, closeIframe, currentView,
           appModalActive, appModalTitle, appModalWidth, appModalClosable, appModalRender,
         };
       },
@@ -3792,9 +3811,8 @@
               <h3 style="margin:0;">{{ iframeTitle }}</h3>
               <button type="button" class="modal-close-btn" aria-label="Close" @click="closeIframe">×</button>
             </header>
-            <div class="modal-body" :style="iframeHtml ? 'padding:1rem;overflow:auto;' : 'padding:0; display:flex; flex-direction:column;'">
-              <div v-if="iframeHtml" v-html="iframeHtml"></div>
-              <div v-else class="iframe-wrap" style="flex:1; min-height:0;">
+            <div class="modal-body" :style="iframeUrl ? 'padding:0; display:flex; flex-direction:column;' : 'padding:1rem;overflow:auto;'">
+              <div v-if="iframeUrl" class="iframe-wrap" style="flex:1; min-height:0;">
                 <div v-if="iframeLoading" class="center-loader"><span>Loading…</span></div>
                 <iframe v-show="!iframeLoading" :src="iframeUrl" @load="iframeLoading = false" />
               </div>
