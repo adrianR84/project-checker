@@ -2382,10 +2382,10 @@
                   <td><span :class="['badge', p.token_enabled ? 'ok' : 'error']">{{ p.token_enabled ? '✓' : '✗' }}</span></td>
                   <td><span :class="['badge', p.activity_display ? 'ok' : 'error']">{{ p.activity_display ? '✓' : '✗' }}</span></td>
                   <td class="col-actions">
-                    <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)">⚙</button>
-                    <button class="secondary" data-tooltip="Extra Info" @click="openExtraInfo(p)">ℹ</button>
-                    <button class="secondary" data-tooltip="Edit"   @click="openEdit(p)">✎</button>
-                    <button class="secondary" data-tooltip="Delete" @click="onDelete(p)">🗑</button>
+                    <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)"><span class="icon icon-settings"></span></button>
+                    <button class="secondary" data-tooltip="Extra Info" @click="openExtraInfo(p)"><span class="icon icon-folder-plus"></span></button>
+                    <button class="secondary" data-tooltip="Edit" @click="openEdit(p)"><span class="icon icon-edit"></span></button>
+                    <button class="secondary" data-tooltip="Delete" @click="onDelete(p)"><span class="icon icon-trash-2"></span></button>
                   </td>
                 </tr>
               </tbody>
