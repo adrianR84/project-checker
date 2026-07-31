@@ -31,7 +31,7 @@
     ───────────────────────────────────────────────────────────────────────── */
 
     // Pull only what we need from the global Vue object
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition, provide, inject } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, Transition, provide, inject, h } = Vue;
 
     // Shared reactive settings — single source of truth for all components
     const sharedSettings = ref(null);
@@ -39,9 +39,6 @@
     /** Current authenticated user — null when logged out */
     const currentUser = ref(null);
     window.currentUser = currentUser;
-
-    /** Shared ref for edit navigation: set by ProjectCard, watched by ProjectsPage */
-    const editBus = ref(null);
 
     /* ── API layer ───────────────────────────────────────────────────────────────
        Thin wrapper around fetch(). All calls go to /api/* on the same host.
@@ -1404,6 +1401,8 @@
       setup(props, { emit }) {
         const busy = ref(null);
         const openIframe = inject('openIframe');
+        const openModal  = inject('openModal');
+        const closeModal = inject('closeModal');
 
         // project.*_status objects come from the dashboard API (latest check result per resource)
         const website = computed(() => props.project.website_status || {});
@@ -1453,8 +1452,28 @@
         }
 
         function openProjectEdit() {
-          editBus.value = props.project;
-          setTimeout(() => { window.location.hash = '#/projects'; });
+          const submitting = ref(false);
+          async function onSubmit(payload) {
+            submitting.value = true;
+            try {
+              await api.updateProject(props.project.id, payload);
+              closeModal();
+              emit('refreshed');
+            } catch (e) {
+              alert(`Save failed: ${e.message}`);
+            } finally {
+              submitting.value = false;
+            }
+          }
+          openModal({
+            title: `Edit Project — ${props.project.name}`,
+            render: () => h(ProjectForm, {
+              initial: props.project,
+              busy: submitting.value,
+              onSubmit,
+              onCancel: closeModal,
+            }),
+          });
         }
 
         return {
@@ -2151,14 +2170,136 @@
       },
     };
 
+    /* ── ImportBody component ─────────────────────────────────────────────────
+       JSON import panel — lives inside the AppModal shell.
+       State (importText, importing) lives in ProjectsPage; passed as props.
+       Props:   importText (ref<string>), importing (ref<bool>)
+       Emits:   import (void), file (event), cancel (void)
+       Injects: none
+    ───────────────────────────────────────────────────────────────────────── */
+    const ImportBody = {
+      props: ['importText', 'importing'],
+      emits: ['import', 'file', 'cancel'],
+      setup(props) {
+        // Re-export refs from setup so Vue auto-unwraps them in the template.
+        // Without this, the template sees the Ref object (truthy), so the
+        // spinner stays on and !importText.trim() throws.
+        return { importText: props.importText, importing: props.importing };
+      },
+      template: `
+        <p class="muted">
+          Paste JSON (object or array). Each item needs <code>name</code>;
+          other fields optional.
+        </p>
+        <div class="form-group">
+          <input type="file" accept="application/json,.json" @change="$emit('file', $event)" />
+        </div>
+        <div class="form-group">
+          <textarea
+            v-model="importText"
+            rows="10"
+            placeholder='[{"name":"Example","website":"https://example.com","github":"https://github.com/example","symbol":"JTVO","contractAddress":"...","chainId":"solana","enabled":true,"extra_info":{"links":[{"label":"Docs","url":"https://..."}]}}]'
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button @click="$emit('cancel')">Cancel</button>
+          <button class="primary" :disabled="importing || !importText.trim()" @click="$emit('import')">
+            <span v-if="importing" class="spinner"></span>
+            <span v-else>Import</span>
+          </button>
+        </div>
+      `,
+    };
+
+    /* ── ExtraInfoBody component ─────────────────────────────────────────────
+       Extra info editor (links/texts/files) — lives inside the AppModal shell.
+       State lives in ProjectsPage; passed as refs (mutations propagate back).
+       Props:   extraInfoProject (ref<object|null>), links/texts/files/saving/uploadError (refs)
+       Emits:   save (void), cancel (void), pick-file (void), upload (event)
+       Injects: none
+    ───────────────────────────────────────────────────────────────────────── */
+    const ExtraInfoBody = {
+      props: ['extraInfoProject', 'links', 'texts', 'files', 'saving', 'uploadError'],
+      emits: ['save', 'cancel', 'pick-file', 'upload'],
+      setup(props) {
+        // Re-export refs from setup so Vue auto-unwraps them in the template.
+        return {
+          extraInfoProject: props.extraInfoProject,
+          links: props.links, texts: props.texts, files: props.files,
+          saving: props.saving, uploadError: props.uploadError,
+        };
+      },
+      template: `
+        <div v-if="extraInfoProject">
+          <!-- Links section -->
+          <div class="form-group">
+            <div class="form-row-header">
+              <strong>Links</strong>
+              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="links.push({label:'',url:'',note:''})">+ Add Link</button>
+            </div>
+            <div v-for="(link, i) in links" :key="'l'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+              <input v-model="link.label" placeholder="Label (e.g. Docs)" style="flex:1" />
+              <input v-model="link.url"   placeholder="https://..."       style="flex:2" />
+              <input v-model="link.note"  placeholder="Note (optional)"   style="flex:1" />
+              <button type="button" class="secondary" style="padding:2px 6px" @click="links.splice(i,1)">×</button>
+            </div>
+            <div v-if="links.length === 0" style="color:var(--muted-color);font-size:0.85rem">No links yet.</div>
+          </div>
+
+          <!-- Texts section -->
+          <div class="form-group" style="margin-top:12px">
+            <div class="form-row-header">
+              <strong>Text Fields</strong>
+              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="texts.push({key:'',value:''})">+ Add Field</button>
+            </div>
+            <div v-for="(txt, i) in texts" :key="'t'+i" style="margin-bottom:8px">
+              <div style="display:flex;gap:4px;margin-bottom:2px;align-items:center">
+                <input v-model="txt.key" placeholder="Field name (e.g. Notes)" style="flex:1" />
+                <button type="button" class="secondary" style="padding:2px 6px" @click="texts.splice(i,1)">×</button>
+              </div>
+              <textarea v-model="txt.value" placeholder="Value..." rows="2" style="width:100%;resize:vertical"></textarea>
+            </div>
+            <div v-if="texts.length === 0" style="color:var(--muted-color);font-size:0.85rem">No text fields yet.</div>
+          </div>
+
+          <!-- Files section -->
+          <div class="form-group" style="margin-top:12px">
+            <div class="form-row-header">
+              <strong>Files</strong>
+              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="$emit('pick-file')">+ Upload File</button>
+            </div>
+            <input ref="fileInputEl" type="file" style="display:none" @change="$emit('upload', $event)" />
+            <div v-for="(fl, i) in files" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+              <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</span>
+              <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
+              <button type="button" class="secondary" style="padding:2px 6px" @click="files.splice(i,1)">×</button>
+            </div>
+            <div v-if="files.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
+            <div v-if="uploadError" class="error-msg" style="font-size:0.85rem">{{ uploadError }}</div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button @click="$emit('cancel')">Cancel</button>
+          <button class="primary" :disabled="saving" @click="$emit('save')">
+            <span v-if="saving" class="spinner"></span>
+            <span v-else>Save</span>
+          </button>
+        </div>
+      `,
+      methods: {
+        clickFileInput() { this.$refs.fileInputEl?.click(); },
+      },
+    };
+
     /* ── ProjectsPage component ─────────────────────────────────────────────────
        Table list of all projects with Create / Edit / Delete / JSON Import.
        Props:   none
        Emits:   none
-       Injects: none
+       Injects: openModal, closeModal
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectsPage = {
-      components: { ProjectForm, RepoManager },
+      components: { ProjectForm, RepoManager, ImportBody, ExtraInfoBody },
 
       template: `
         <div class="page">
@@ -2191,7 +2332,7 @@
               <button class="secondary mr10 ml10" data-tooltip="Delete all selected" @click="onBulkDelete">🗑</button>
             </template>
             <button data-tooltip="Export all projects as JSON" @click="exportProjects">Export</button>
-            <button data-tooltip="Import projects from JSON" @click="openModal('import')">Import</button>
+            <button data-tooltip="Import projects from JSON" @click="openImport">Import</button>
             <button class="primary ml5" data-tooltip="Add a new project" @click="openCreate">Add</button>
           </div>
 
@@ -2251,135 +2392,6 @@
             </table>
           </div>
 
-          <div class="modal-backdrop" :class="{ active: activeModal !== null }" @click="modalClosable && closeModal()"></div>
-
-          <!-- Create / Edit modal -->
-          <div class="modal" :class="{ active: isActive('form') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
-            <header class="modal-header">
-              <h3 style="margin:0;font-size:1.1rem;">{{ editing ? 'Edit Project' : 'New Project' }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
-            </header>
-            <div class="modal-body">
-              <ProjectForm
-                :initial="editing"
-                :busy="submitting"
-                @submit="onFormSubmit"
-                @cancel="closeModal"
-              />
-            </div>
-          </div>
-
-          <!-- JSON import modal -->
-          <div class="modal" :class="{ active: isActive('import') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
-            <header class="modal-header">
-              <h3 style="margin:0;">Import Projects from JSON</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
-            </header>
-            <div class="modal-body">
-              <p class="muted">
-                Paste JSON (object or array). Each item needs <code>name</code>;
-                other fields optional.
-              </p>
-
-              <!-- File picker -->
-              <div class="form-group">
-                <input type="file" accept="application/json,.json" @change="onFile" />
-              </div>
-
-              <!-- Raw textarea -->
-              <div class="form-group">
-                <textarea
-                  v-model="importText"
-                  rows="10"
-                  placeholder='[{"name":"Example","website":"https://example.com","github":"https://github.com/example","symbol":"JTVO","contractAddress":"...","chainId":"solana","enabled":true,"extra_info":{"links":[{"label":"Docs","url":"https://..."}]}}]'
-                ></textarea>
-              </div>
-
-              <div class="modal-actions">
-                <button @click="closeModal">Cancel</button>
-                <button
-                  class="primary"
-                  :disabled="importing || !importText.trim()"
-                  @click="onImport"
-                >
-                  <span v-if="importing" class="spinner"></span>
-                  <span v-else>Import</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- RepoManager modal -->
-          <div class="modal" :class="{ active: isActive('repos') }" :style="modalWidth ? { 'max-width': modalWidth } : {}" @click.self="modalClosable && closeModal()">
-            <header class="modal-header">
-              <h3 style="margin:0;font-size:1.1rem;">Manage Repos — {{ manageProject?.name }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); manageProject = null">×</button>
-            </header>
-            <div class="modal-body">
-              <RepoManager
-                v-if="manageProject"
-                :projectId="manageProject.id"
-                :githubUrl="manageProject.github_url"
-                :projectName="manageProject.name"
-                @repos-updated="closeModal(); manageProject = null"
-              />
-            </div>
-          </div>
-
-          <!-- ExtraInfoModal -->
-          <div class="modal" :class="{ active: isActive('extrainfo') }" style="max-width:640px" @click.self="modalClosable && closeModal()">
-            <header class="modal-header">
-              <h3 style="margin:0;font-size:1.1rem;">Extra Info — {{ extraInfoProject?.name }}</h3>
-              <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal(); extraInfoProject = null">×</button>
-            </header>
-            <div class="modal-body">
-              <template v-if="extraInfoProject">
-                <!-- Links section -->
-                <div class="form-group">
-                  <div class="form-row-header"><strong>Links</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiLinks.push({label:'',url:'',note:''})">+ Add Link</button></div>
-                  <div v-for="(link, i) in eiLinks" :key="'l'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
-                    <input v-model="link.label" placeholder="Label (e.g. Docs)" style="flex:1" />
-                    <input v-model="link.url" placeholder="https://..." style="flex:2" />
-                    <input v-model="link.note" placeholder="Note (optional)" style="flex:1" />
-                    <button type="button" class="secondary" style="padding:2px 6px" @click="eiLinks.splice(i,1)">×</button>
-                  </div>
-                  <div v-if="eiLinks.length === 0" style="color:var(--muted-color);font-size:0.85rem">No links yet.</div>
-                </div>
-                <!-- Texts section -->
-                <div class="form-group" style="margin-top:12px">
-                  <div class="form-row-header"><strong>Text Fields</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiTexts.push({key:'',value:''})">+ Add Field</button></div>
-                  <div v-for="(txt, i) in eiTexts" :key="'t'+i" style="margin-bottom:8px">
-                    <div style="display:flex;gap:4px;margin-bottom:2px;align-items:center">
-                      <input v-model="txt.key" placeholder="Field name (e.g. Notes)" style="flex:1" />
-                      <button type="button" class="secondary" style="padding:2px 6px" @click="eiTexts.splice(i,1)">×</button>
-                    </div>
-                    <textarea v-model="txt.value" placeholder="Value..." rows="2" style="width:100%;resize:vertical"></textarea>
-                  </div>
-                  <div v-if="eiTexts.length === 0" style="color:var(--muted-color);font-size:0.85rem">No text fields yet.</div>
-                </div>
-                <!-- Files section -->
-                <div class="form-group" style="margin-top:12px">
-                  <div class="form-row-header"><strong>Files</strong><button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiFileNote=''; $refs.eiFileInput.click()">+ Upload File</button></div>
-                  <input ref="eiFileInput" type="file" style="display:none" @change="eiUploadFile" />
-                  <div v-for="(fl, i) in eiFiles" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
-                    <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</span>
-                    <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
-                    <button type="button" class="secondary" style="padding:2px 6px" @click="eiFiles.splice(i,1)">×</button>
-                  </div>
-                  <div v-if="eiFiles.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
-                  <div v-if="eiUploadError" class="error-msg" style="font-size:0.85rem">{{ eiUploadError }}</div>
-                </div>
-              </template>
-            </div>
-            <div class="modal-actions">
-              <button @click="closeModal(); extraInfoProject = null">Cancel</button>
-              <button class="primary" :disabled="eiSaving" @click="eiSave">
-                <span v-if="eiSaving" class="spinner"></span>
-                <span v-else>Save</span>
-              </button>
-            </div>
-          </div>
-
         </div>
       `,
 
@@ -2390,23 +2402,9 @@
         const editing   = ref(null);    // project being edited (null = create)
         const submitting = ref(false);
 
-        function useModal() {
-          const activeModal = ref(null);
-          const modalWidth = ref('');
-          const modalClosable = ref(true);
-          function openModal(name, w, closable = false) {
-            activeModal.value = name;
-            modalWidth.value = w || '';
-            modalClosable.value = closable;
-          }
-          function closeModal()    { activeModal.value = null; }
-          function isActive(name)  { return activeModal.value === name; }
-          return { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive };
-        }
-        const { activeModal, modalWidth, modalClosable, openModal, closeModal, isActive } = useModal();
-        function onEscClose() { closeModal(); }
-        onMounted(() => document.addEventListener('modal:close', onEscClose));
-        onUnmounted(() => document.removeEventListener('modal:close', onEscClose));
+        // Shared modal — provided from App. Any descendant can inject openModal/closeModal.
+        const openModal  = inject('openModal');
+        const closeModal = inject('closeModal');
 
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
@@ -2426,10 +2424,17 @@
           eiLinks.value  = info?.links  ? info.links.slice()  : [];
           eiTexts.value  = info?.texts  ? info.texts.slice()  : [];
           eiFiles.value  = info?.files  ? info.files.slice()  : [];
-          eiLinks.value  = info.links  ? info.links.slice()  : [];
-          eiTexts.value  = info.texts  ? info.texts.slice()  : [];
-          eiFiles.value  = info.files  ? info.files.slice()  : [];
-          openModal('extrainfo', '640px', true);
+          openModal({
+            title: `Extra Info — ${p.name}`,
+            width: '640px',
+            render: () => h(ExtraInfoBody, {
+              extraInfoProject, links: eiLinks, texts: eiTexts, files: eiFiles, saving: eiSaving, uploadError: eiUploadError,
+              onSave:        eiSave,
+              onCancel:      () => { closeModal(); extraInfoProject.value = null; },
+              onPickFile:    () => eiFileInput.value?.click(),
+              onUpload:      eiUploadFile,
+            }),
+          });
         }
 
         async function eiUploadFile(e) {
@@ -2517,16 +2522,45 @@
 
         function openCreate(w) {
           editing.value = null;
-          openModal('form', w);
+          openModal({
+            title: 'New Project',
+            width: w || '',
+            render: () => h(ProjectForm, { initial: null, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal }),
+          });
         }
         function openEdit(p, w) {
           editing.value = p;
-          editBus.value = null;
-          openModal('form', w);
+          openModal({
+            title: 'Edit Project',
+            width: w || '',
+            render: () => h(ProjectForm, { initial: p, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal }),
+          });
         }
         function openManageRepos(p, w) {
           manageProject.value = p;
-          openModal('repos', w);
+          openModal({
+            title: `Manage Repos — ${p.name}`,
+            width: w || '',
+            render: () => h(RepoManager, {
+              projectId: p.id,
+              githubUrl: p.github_url,
+              projectName: p.name,
+              'onRepos-updated': () => { closeModal(); manageProject.value = null; },
+            }),
+          });
+        }
+        function openImport() {
+          importText.value = '';
+          openModal({
+            title: 'Import Projects from JSON',
+            width: '',
+            render: () => h(ImportBody, {
+              importText, importing,
+              onImport: onImport,
+              onFile:   onFile,
+              onCancel: closeModal,
+            }),
+          });
         }
 
         /** Create or update a project, then reload the list */
@@ -2795,8 +2829,8 @@
 
         onMounted(load);
 
-        // Watch editBus so we catch edits triggered from other pages (e.g. card click on Activity)
-        onMounted(() => { watch(editBus, (p) => { if (p) openEdit(p); }, { immediate: true }); });
+        // Edits triggered from other pages go through openModal directly in ProjectCard;
+        // no cross-page bus needed.
 
         function tok(p) {
           return p.token ? (typeof p.token === 'string' ? JSON.parse(p.token) : p.token) : {};
@@ -2807,20 +2841,19 @@
           return typeof v === 'string' ? JSON.parse(v) : v;
         }
 
+        // ── Modal bodies (ImportBody, ExtraInfoBody) are template-based
+        // components defined at module scope. ProjectsPage just renders them
+        // via openModal({ render: () => h(Body, props) }).
+
         return {
-          projects, filteredProjects, loading, error, editing, submitting,
-          importText, importing, manageProject, lastGithubImport,
-          activeModal, modalWidth, modalClosable, isActive,
+          projects, filteredProjects, loading, error,
           projFilter, selected,
-          openCreate, openEdit, openManageRepos, openExtraInfo, openModal, closeModal,
-          onFormSubmit, onDelete, onImport, onFile, exportProjects,
+          openCreate, openEdit, openManageRepos, openExtraInfo, openImport,
+          onDelete, exportProjects,
           urlLabel, tok, projectIconLink, trimName,
           toggleSelect, toggleSelectAll, onBulkEnable, onBulkDisable, onBulkTwitterEnable, onBulkTwitterDisable, onBulkWebsiteEnable, onBulkWebsiteDisable, onBulkGithubEnable, onBulkGithubDisable, onBulkDelete,
           load,
           api: window.api,
-          // ExtraInfoModal
-          extraInfoProject, eiLinks, eiTexts, eiFiles, eiSaving, eiUploadError, eiFileNote, eiFileInput,
-          eiUploadFile, eiSave,
         };
       },
     };
@@ -3624,8 +3657,34 @@
        Emits:   none
        Injects: none
     ───────────────────────────────────────────────────────────────────────── */
+    /* ── AppModal component ─────────────────────────────────────────────
+       Shared modal shell. Renders whatever the active render function returns.
+       Backdrop click + Esc close unless `closable: false` was passed to openModal.
+       Props:   none (consumes provided openModal state)
+       Emits:   none
+       Injects: openModal, closeModal
+    ───────────────────────────────────────────────────────────────────── */
+    const AppModal = {
+      setup() {
+        const { active, title, width, closable, render, closeModal } = inject('appModal');
+        return { active, title, width, closable, render, closeModal };
+      },
+      template: `
+        <div class="modal-backdrop" :class="{ active: active }" @click="closable && closeModal()"></div>
+        <div class="modal" :class="{ active: active }" :style="width ? { 'max-width': width } : {}" @click.self="closable && closeModal()">
+          <header class="modal-header">
+            <h3 style="margin:0;font-size:1.1rem;">{{ title }}</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" @click="closeModal">×</button>
+          </header>
+          <div class="modal-body">
+            <component :is="render && render()" v-if="render" />
+          </div>
+        </div>
+      `,
+    };
+
     const App = {
-      components: { NavBar },
+      components: { NavBar, AppModal },
 
       setup() {
         const iframeUrl     = ref('');
@@ -3636,6 +3695,36 @@
         const iframeClosable = ref(false);
         const iframeHtml    = ref(''); // raw HTML for modal body (no iframe)
         const currentView   = ref(hashRouter().render());
+
+        // Shared AppModal state — openModal({ title, width, closable, render })
+        const appModalActive   = ref(false);
+        const appModalTitle    = ref('');
+        const appModalWidth    = ref('');
+        const appModalClosable = ref(true);
+        const appModalRender   = ref(null);
+
+        function openModal({ title = '', width = '', closable = true, render } = {}) {
+          appModalTitle.value    = title;
+          appModalWidth.value    = width;
+          appModalClosable.value = closable;
+          appModalRender.value   = render || null;
+          appModalActive.value   = true;
+        }
+        function closeAppModal() {
+          appModalActive.value = false;
+          appModalRender.value = null;
+        }
+
+        provide('appModal', {
+          active:   appModalActive,
+          title:    appModalTitle,
+          width:    appModalWidth,
+          closable: appModalClosable,
+          render:   appModalRender,
+          closeModal: closeAppModal,
+        });
+        provide('openModal',  openModal);
+        provide('closeModal', closeAppModal);
 
         function openIframe(url, title = '', w = '', closable = false) {
           iframeUrl.value = url;
@@ -3663,7 +3752,8 @@
 
         function onEsc(e) {
           if (e.key === 'Escape') {
-            if (iframeActive.value) iframeActive.value = false;
+            if (appModalActive.value) { closeAppModal(); return; }
+            if (iframeActive.value)  { iframeActive.value = false; return; }
             document.dispatchEvent(new CustomEvent('modal:close'));
           }
         }
@@ -3679,7 +3769,10 @@
           document.removeEventListener('keydown', onEsc);
         });
 
-        return { iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, iframeHtml, closeIframe, currentView };
+        return {
+          iframeUrl, iframeTitle, iframeLoading, iframeActive, iframeWidth, iframeClosable, iframeHtml, closeIframe, currentView,
+          appModalActive, appModalTitle, appModalWidth, appModalClosable, appModalRender,
+        };
       },
 
       template: `
@@ -3688,6 +3781,8 @@
           <transition name="fade" mode="out-in">
             <component :is="currentView" />
           </transition>
+
+          <AppModal />
 
           <div class="modal-backdrop" :class="{ active: iframeActive }" @click="iframeClosable && closeIframe()"></div>
 
