@@ -554,7 +554,7 @@ const { randomBytes } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
-const EXTRA_INFO_DIR = path.join(__dirname, '..', 'data', 'extra-info');
+const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
 const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
@@ -566,7 +566,7 @@ const upload = multer({
   },
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const projectDir = path.join(EXTRA_INFO_DIR, String(req.params.id));
+      const projectDir = path.join(UPLOADS_DIR, String(req.params.id));
       fs.mkdirSync(projectDir, { recursive: true });
       cb(null, projectDir);
     },
@@ -599,9 +599,13 @@ router.post('/:id/extra-info/upload', (req, res, next) => {
 router.get('/:id/extra-info/files/:name', (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   const id = parseInt(req.params.id, 10);
-  const dir = path.join(EXTRA_INFO_DIR, String(id));
-  // Find file in dir whose suffix matches the requested name
-  const files = fs.readdirSync(dir);
+  const dir = path.join(UPLOADS_DIR, String(id));
+  let files;
+  try {
+    files = fs.readdirSync(dir);
+  } catch {
+    return res.status(404).json({ error: 'File not found' });
+  }
   const file = files.find(f => f.endsWith(req.params.name));
   if (!file) return res.status(404).json({ error: 'File not found' });
   const filePath = path.join(dir, file);
