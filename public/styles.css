@@ -35,7 +35,7 @@
 
 /* ── Smaller buttons ───────────────────────────────────────────────────── */
 button, .btn {
-  padding: 4px 10px;
+  padding: 2px 6px;
   font-size: 0.8125rem;
 }
 
@@ -172,7 +172,7 @@ html, body, main { max-width: 100%; margin: 0; padding: 0; }
 .mr15 {margin-right: 15px;}
 
 
-.page { max-width: 1200px; padding: 28px 0px; overflow-x: hidden; margin:0 auto; }
+.page { max-width: 1200px; padding: 28px 0px; overflow-x: visible; margin:0 auto; }
 
 .logs-section { margin-top: 1rem; overflow-x: visible; }
 
@@ -595,8 +595,8 @@ nav.navbar a[aria-current="page"] {
 
 .icon {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   background: no-repeat center;
   background-size: contain;
   flex-shrink: 0;
