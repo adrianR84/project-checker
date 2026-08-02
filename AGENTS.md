@@ -5,12 +5,6 @@
 ## Styling
 Before creating or styling HTML elements, check [Pico CSS docs via Context7](https://picocss.com/docs) to use Pico's native classes and patterns first.
 
-## Common Tasks
-- `pnpm install` — install deps
-- `pnpm start` — run server
-- `pnpm dev` — run with live reload
-- `pnpm dev:log` — run dev server with output also saved to `logs/output.log` (last execution only)
-
 ## Logs
 Dev server output is captured in `logs/output.log`. When user asks to check/read logs, read that file.
 
