@@ -307,7 +307,7 @@ async function runTokenPriceTick() {
         const data = await res.json();
         await upsertTokenPrice(p.id, token, data);
       } catch (err) {
-        logger.error('scheduler', `token price fetch failed for project ${p.id}:`, err);
+        logger.warn('scheduler', `token price fetch failed for project ${p.id}:`, err);
       }
     }));
   }
