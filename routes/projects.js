@@ -37,6 +37,7 @@ const db = require('../services/db');
 const logger = require('../utils/logger');
 const { fetchReposForOwner, fetchCommitHistory, fetchLatestTag } = require('../services/github');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange } = require('../services/checker');
+const { SNOOZE_KEYS } = require('../services/notifications');
 require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
 const router = express.Router();
@@ -99,6 +100,11 @@ router.get('/', async (req, res) => {
     ORDER BY id DESC
   `).all(req.userId);
   res.json(rows.map(parseProjectRow));
+});
+
+// GET /api/projects/snooze-options — returns the canonical snooze duration keys
+router.get('/snooze-options', (req, res) => {
+  res.json(SNOOZE_KEYS);
 });
 
 // GET /api/projects/:id — single project with repos + latest check_logs

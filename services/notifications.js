@@ -257,8 +257,19 @@ function formatPriceAlertHtml(projectName, price, priceChange, direction, tier, 
   return `${ANCHOR[direction + '-' + tier]} ${dirEmoji} <b>${projectName}</b> [${priceStr}] [${dirLabel}-${tier}]: (<b>${sign}${priceChange.toFixed(2)}%</b>)`;
 }
 
+/** Snooze durations — single source of truth, used by both website UI and Telegram. */
+const SNOOZE_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
+
+/** Parse a snooze duration string into milliseconds. */
+function parseDuration(d) {
+  const map = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 };
+  const mins = map[d];
+  return mins ? mins * 60_000 : null;
+}
+
 module.exports = {
   sendAlert, formatAlert, formatAlertHtml,
   sendTelegramMessage, pushPushbulletNote,
-  formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY
+  formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY,
+  SNOOZE_KEYS, parseDuration
 };

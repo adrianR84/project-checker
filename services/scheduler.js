@@ -33,7 +33,7 @@ const cron = require('node-cron');
 const db = require('./db');
 const { checkWebsite, checkGithubRepo, checkTwitter, logCheck, recordStatusChange, handleFromTwitterUrl } = require('./checker');
 const { fetchReposForOwner } = require('./github');
-const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY } = require('./notifications');
+const { sendAlert, formatPriceAlert, formatPriceAlertHtml, getTierIndex, INTENSITY, SNOOZE_KEYS } = require('./notifications');
 const logger = require('../utils/logger');
 require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, has no runtime effect
 
@@ -396,6 +396,11 @@ async function evaluatePriceAlerts(projectId, projectName) {
   const plain = formatPriceAlert(projectName, priceRow.price_usd, winning.val, direction, tier);
   const html = formatPriceAlertHtml(projectName, priceRow.price_usd, winning.val, direction, tier, priceRow.chain, priceRow.contract);
 
+  const replyMarkup = {
+    inline_keyboard: [
+      SNOOZE_KEYS.map(d => ({ text: `[${d}]`, callback_data: `snooze_price:${projectId}:${d}` }))
+    ]
+  };
   if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id && winning.alert.telegram) {
     const r = await (async () => {
       const url = `https://api.telegram.org/bot${tgCfg.bot_token}/sendMessage`;
@@ -403,7 +408,7 @@ async function evaluatePriceAlerts(projectId, projectName) {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: tgCfg.chat_id, text: html, parse_mode: 'HTML', disable_web_page_preview: true })
+          body: JSON.stringify({ chat_id: tgCfg.chat_id, text: html, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` };

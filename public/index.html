@@ -1854,14 +1854,7 @@
         const pricesLoading = ref(false);
         const pricesMaximized = ref(false);
         const snoozeMenuFor = ref(null); // project_id of open snooze popover
-        const snoozeOptions = [
-          { label: '30m', value: '30m' },
-          { label: '45m', value: '45m' },
-          { label: '1h',  value: '1h'  },
-          { label: '2h',  value: '2h'  },
-          { label: '4h',  value: '4h'  },
-          { label: '24h', value: '24h' },
-        ];
+        const snoozeOptions = ref([]); // loaded from /api/projects/snooze-options
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
@@ -1977,6 +1970,10 @@
         async function loadPrices() {
           pricesLoading.value = true;
           try {
+            if (!snoozeOptions.value.length) {
+              const keys = await req('/projects/snooze-options');
+              snoozeOptions.value = keys.map(k => ({ label: k, value: k }));
+            }
             let fresh = await api.getTokenPrices();
             if (priceSort.value.col) {
               const col = priceSort.value.col, desc = priceSort.value.desc;
