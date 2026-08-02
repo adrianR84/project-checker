@@ -99,15 +99,28 @@ async function getPostContent(projectId, postId) {
   } catch { return null; }
 }
 
+/** Looks up a project's website URL. Cached per event to avoid duplicate queries. */
+async function getWebsiteUrl(projectId, cache) {
+  if (!projectId) return null;
+  if (cache.has(projectId)) return cache.get(projectId);
+  try {
+    const row = await db.prepare('SELECT website FROM projects WHERE id = ?').get(projectId);
+    const url = row?.website ? JSON.parse(row.website).url : null;
+    cache.set(projectId, url);
+    return url;
+  } catch { cache.set(projectId, null); return null; }
+}
+
 /** Formats an event into a detail string (HTML, for Telegram). */
-async function getDetail(event, v) {
+async function getDetail(event, v, websiteUrl) {
   const { resource_type, event_type } = event;
   const rn = v.full_name || v.repo_name;
   if (event_type === 'changed' && resource_type === 'github') {
     return `new commit <code>${v.sha?.slice(0, 7) ?? '?'}</code> in <b>${rn ?? '?'}</b>`;
   }
   if (event_type === 'changed' && resource_type === 'website') {
-    return `content changed\n<code>${v.bh?.slice(0, 8) ?? '?'}</code> → <code>${v.ah?.slice(0, 8) ?? '?'}</code>`;
+    const link = websiteUrl ? `<a href="${websiteUrl}">${websiteUrl}</a>` : '';
+    return `content changed\n<code>${v.bh?.slice(0, 8) ?? '?'}</code> → <code>${v.ah?.slice(0, 8) ?? '?'}</code>${link ? '\n' + link : ''}`;
   }
   if (event_type === 'tag_changed') {
     return `<b>${rn ?? '?'}</b> tag\n<code>${v.ot ?? 'none'}</code> → <code>${v.nt ?? '?'}</code>`;
@@ -161,10 +174,12 @@ async function formatAlert(event, projectName) {
 async function formatAlertHtml(event, projectName) {
   const { resource_type, event_type, value, created_at } = event;
   const ts = created_at ? created_at.replace('T', ' ').slice(0, 16) : '?';
+  const urlCache = new Map();
   let detail = '';
   try {
     const v = typeof value === 'string' ? JSON.parse(value) : value;
-    detail = await getDetail(event, v);
+    const websiteUrl = await getWebsiteUrl(event.project_id, urlCache);
+    detail = await getDetail(event, v, websiteUrl);
   } catch {
     detail = String(value);
   }
