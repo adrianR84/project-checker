@@ -614,4 +614,65 @@ router.get('/:id/extra-info/files/:name', (req, res) => {
   });
 });
 
+// POST /api/projects/:id/snooze-price-alert — snooze or unsnooze a price alert tier
+// Body: { alert_key: string (e.g. "10" or "10,25,50" or "all"), duration: string|null }
+// duration: "30m"|"45m"|"1h"|"2h"|"4h"|"24h" → snooze until; null|"0"|"" → unsnooze
+router.post('/:id/snooze-price-alert', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = await loadProjectOr404(res, id, req.userId);
+  if (!project) return;
+
+  const { alert_key, duration } = req.body ?? {};
+  if (!alert_key) return res.status(400).json({ error: 'alert_key is required' });
+
+  // Resolve "all" to the actual alert tiers from user settings
+  let alertKeys = alert_key.split(',').map(k => k.trim());
+  if (alertKeys.length === 1 && alertKeys[0] === 'all') {
+    const priceAlerts = await db.config.getPriceAlerts(req.userId);
+    alertKeys = (priceAlerts?.alerts || [])
+      .filter(a => a.enabled)
+      .map(a => String(a.price_change));
+  }
+
+  if (!alertKeys.length) return res.json({ ok: true, snoozed_until: null });
+
+  const DURATION_MAP = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 };
+
+  if (!duration || duration === '0' || duration === '') {
+    // Unsnooze: clear the snoozed_until for all specified alert_keys
+    const placeholders = alertKeys.map(() => '?').join(',');
+    await db.prepare(
+      `UPDATE token_prices_alerts SET snoozed_until = NULL WHERE project_id = ? AND price_change IN (${placeholders})`
+    ).run(id, ...alertKeys.map(k => parseFloat(k)));
+    return res.json({ ok: true, snoozed_until: null });
+  }
+
+  const mins = DURATION_MAP[duration];
+  if (!mins) return res.status(400).json({ error: 'Invalid duration. Use: 30m, 45m, 1h, 2h, 4h, 24h' });
+
+  const snoozedUntil = new Date(Date.now() + mins * 60_000).toISOString();
+
+  // Upsert each alert key with the same snooze timestamp (preserves created_at)
+  for (const key of alertKeys) {
+    await db.prepare(`
+      INSERT INTO token_prices_alerts (project_id, price_change, created_at, snoozed_until)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(project_id, price_change) DO UPDATE SET snoozed_until = excluded.snoozed_until
+    `).run(id, parseFloat(key), new Date().toISOString(), snoozedUntil);
+  }
+
+  res.json({ ok: true, snoozed_until: snoozedUntil });
+});
+
+// GET /api/projects/:id/snoozes — list all active snoozes for a project
+router.get('/:id/snoozes', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const project = await loadProjectOr404(res, id, req.userId);
+  if (!project) return;
+  const rows = await db.prepare(
+    'SELECT price_change, snoozed_until FROM token_prices_alerts WHERE project_id = ? AND snoozed_until IS NOT NULL'
+  ).all(id);
+  res.json(rows);
+});
+
 module.exports = router;

@@ -36,6 +36,8 @@ POST   /:id/check-website        run website check immediately
 POST   /:id/check-github         run github check for all active repos
 POST   /:id/check-twitter        run twitter check immediately
 GET    /:id/twitter-posts        list stored posts for project
+POST   /:id/snooze-price-alert  snooze/unsnooze a price alert tier
+GET    /:id/snoozes             list all active snoozes for a project
 ```
 
 ### Dashboard (`/api/dashboard`)

@@ -39,18 +39,18 @@ require('../types'); // JSDoc typedefs only — loaded for editor autocomplete, 
 
 // ─── Price alert throttle helpers ───────────────────────────────────────────────
 
-async function getTokenPricesAlert(projectId, priceChange) {
+async function getPriceAlertState(projectId, priceChange) {
   return db.prepare(
-    'SELECT created_at FROM token_prices_alerts WHERE project_id = ? AND price_change = ?'
+    'SELECT created_at, snoozed_until FROM token_prices_alerts WHERE project_id = ? AND price_change = ?'
   ).get(projectId, priceChange);
 }
 
-async function upsertTokenPricesAlert(projectId, priceChange, createdAt) {
+async function upsertTokenPricesAlert(projectId, priceChange, createdAt, snoozedUntil = null) {
   return db.prepare(`
-    INSERT INTO token_prices_alerts (project_id, price_change, created_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(project_id, price_change) DO UPDATE SET created_at = excluded.created_at
-  `).run(projectId, priceChange, createdAt);
+    INSERT INTO token_prices_alerts (project_id, price_change, created_at, snoozed_until)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(project_id, price_change) DO UPDATE SET created_at = excluded.created_at${snoozedUntil != null ? ', snoozed_until = excluded.snoozed_until' : ''}
+  `).run(projectId, priceChange, createdAt, snoozedUntil);
 }
 
 const now = () => new Date().toISOString();
@@ -379,10 +379,12 @@ async function evaluatePriceAlerts(projectId, projectName) {
   const winning = candidates.reduce((best, c) => c.alert.price_change > best.alert.price_change ? c : best);
 
   // Throttle check
-  const prior = await getTokenPricesAlert(projectId, winning.alert.price_change);
+  const prior = await getPriceAlertState(projectId, winning.alert.price_change);
   if (prior) {
     const elapsed = (Date.now() - new Date(prior.created_at).getTime()) / 1000;
     if (elapsed < winning.alert.price_interval * 60) return;
+    // Snooze check — still within throttle window, but snoozed
+    if (prior.snoozed_until && new Date(prior.snoozed_until) > new Date()) return;
   }
 
   // Determine direction and tier
@@ -432,8 +434,8 @@ async function evaluatePriceAlerts(projectId, projectName) {
 
   //console.log(`[${now()}] Price alert FIRED: ${projectName} [$${priceRow.price_usd}] [${direction.toUpperCase()}-${tier.toUpperCase()}]: (${winning.val >= 0 ? '+' : ''}${winning.val.toFixed(2)}%)`);
   
-  // Persist throttle row
-  await upsertTokenPricesAlert(projectId, winning.alert.price_change, now());
+  // Persist throttle row (preserve existing snooze state)
+  await upsertTokenPricesAlert(projectId, winning.alert.price_change, now(), prior?.snoozed_until ?? null);
 }
 
 /** Runs price alert evaluation for all projects with enabled=1 and token_enabled=1, scheduled every 1 min. */

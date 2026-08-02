@@ -175,12 +175,30 @@ router.get('/token-prices', async (req, res) => {
     JOIN projects p ON p.id = tp.project_id AND p.enabled = 1 AND p.user_id = ?
     ORDER BY p.name
   `).all(req.userId);
+
+  // Fetch all snoozes for these projects in one query
+  const projectIds = rows.map(r => r.project_id);
+  let snoozeRows = [];
+  if (projectIds.length) {
+    const placeholders = projectIds.map(() => '?').join(',');
+    snoozeRows = await db.prepare(
+      `SELECT project_id, price_change, snoozed_until FROM token_prices_alerts WHERE project_id IN (${placeholders}) AND snoozed_until IS NOT NULL`
+    ).all(...projectIds);
+  }
+
+  // Index snoozes by project_id → { [price_change]: snoozed_until }
+  const snoozeByProject = {};
+  for (const s of snoozeRows) {
+    if (!snoozeByProject[s.project_id]) snoozeByProject[s.project_id] = {};
+    snoozeByProject[s.project_id][String(s.price_change)] = s.snoozed_until;
+  }
+
   res.json(rows.map(r => {
     let website_url = null, github_url = null, twitter_url = null;
     try { website_url = r.website  ? JSON.parse(r.website).url  : null; } catch {}
     try { github_url  = r.github   ? JSON.parse(r.github).url  : null; } catch {}
     try { twitter_url = r.twitter  ? JSON.parse(r.twitter).url : null; } catch {}
-    return { ...r, website_url, github_url, twitter_url };
+    return { ...r, website_url, github_url, twitter_url, snoozes: snoozeByProject[r.project_id] || {} };
   }));
 });
 

@@ -756,6 +756,7 @@ async function runMigrations(db) {
   try { add_webshare_config(db); } catch (e) { logger.error('migrations', e); }
   try { add_proxy_stats_table(db); } catch (e) { logger.error('migrations', e); }
   try { add_extra_info_column(db); } catch (e) { logger.error('migrations', e); }
+  try { add_snoozed_until_to_token_prices_alerts(db); } catch (e) { logger.error('migrations', e); }
 }
 
 function add_webshare_config(db) {
@@ -785,6 +786,16 @@ function add_extra_info_column(db) {
     db.exec("ALTER TABLE projects ADD COLUMN extra_info TEXT");
   } catch (err) {
     logger.error('migrations', 'add_extra_info_column failed:', err);
+  }
+}
+
+/** Migration: adds snoozed_until column to token_prices_alerts if missing. */
+function add_snoozed_until_to_token_prices_alerts(db) {
+  if (hasColumn(db, 'token_prices_alerts', 'snoozed_until')) return;
+  try {
+    db.exec("ALTER TABLE token_prices_alerts ADD COLUMN snoozed_until TEXT");
+  } catch (err) {
+    logger.error('migrations', 'add_snoozed_until_to_token_prices_alerts failed:', err);
   }
 }
 

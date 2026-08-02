@@ -200,6 +200,7 @@ async function init() {
       project_id INTEGER NOT NULL,
       price_change REAL NOT NULL,
       created_at TEXT NOT NULL,
+      snoozed_until TEXT,
       PRIMARY KEY (project_id, price_change)
     );
   `);

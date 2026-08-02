@@ -1743,6 +1743,7 @@
                   <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
                   <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                   <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
+                  <th class="cen" title="Snooze price alerts">⏱</th>
                   <th class="cen" title="Track price changes">
                     <span class="sr-only">Track</span>
                     <button class="icon-btn" @click="pricesMaximized = !pricesMaximized">
@@ -1795,6 +1796,17 @@
                   <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                   <td class="num"><b>{{ fmtShortNum(row.liquidity_usd) }}</b></td>
                   <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
+                  <td class="cen" style="position:relative">
+                    <button v-if="row.price_enabled" class="icon-btn" title="Snooze price alerts" @click.stop="toggleSnoozeMenu(row.project_id, $event)">
+                      <span class="icon icon-bell-off" v-if="isSnoozed(row)"></span>
+                      <span class="icon icon-bell" v-else></span>
+                    </button>
+                    <div v-if="snoozeMenuFor === row.project_id" class="popover">
+                      <div style="font-size:0.85rem;font-weight:600;margin-bottom:4px;color:var(--muted)">Snooze alerts</div>
+                      <button v-for="opt in snoozeOptions" :key="opt.value" class="snooze-opt" :class="{ active: isSnoozed(row) && snoozedUntil(row) === opt.value }" @click.stop="setSnooze(row, opt.value)">{{ opt.label }}</button>
+                      <button v-if="isSnoozed(row)" class="snooze-opt unsnooze" @click.stop="setSnooze(row, null)">Unsnooze</button>
+                    </div>
+                  </td>
                   <td class="cen">
                     <input type="checkbox" :checked="!!row.price_enabled" @change.stop="togglePriceEnabled(row, $event)" title="Track price changes" />
                   </td>
@@ -1841,6 +1853,15 @@
         const prices        = ref([]);
         const pricesLoading = ref(false);
         const pricesMaximized = ref(false);
+        const snoozeMenuFor = ref(null); // project_id of open snooze popover
+        const snoozeOptions = [
+          { label: '30m', value: '30m' },
+          { label: '45m', value: '45m' },
+          { label: '1h',  value: '1h'  },
+          { label: '2h',  value: '2h'  },
+          { label: '4h',  value: '4h'  },
+          { label: '24h', value: '24h' },
+        ];
         const logs          = ref([]);
         const statusChanges = ref([]);
         const alertLogs     = ref([]);
@@ -1893,6 +1914,66 @@
             loading.value = false;
           }
           logLoaders[logTab.value]?.(1);
+        }
+
+        /** Close snooze menu when clicking elsewhere */
+        function closeSnoozeMenu() { snoozeMenuFor.value = null; }
+        document.addEventListener('click', closeSnoozeMenu);
+
+        /** Toggle snooze popover for a project */
+        function toggleSnoozeMenu(projectId, e) {
+          e.stopPropagation();
+          snoozeMenuFor.value = snoozeMenuFor.value === projectId ? null : projectId;
+        }
+
+        /** Returns true if any alert tier is currently snoozed for this price row */
+        function isSnoozed(row) {
+          return row.snoozes && Object.values(row.snoozes).some(t => t && new Date(t) > new Date());
+        }
+
+        /** Returns the shortest-duration snooze value for display */
+        function snoozedUntil(row) {
+          if (!row.snoozes) return null;
+          const active = Object.entries(row.snoozes).filter(([, v]) => v && new Date(v) > new Date());
+          if (!active.length) return null;
+          // Return the earliest-expiring snooze's duration key
+          active.sort((a, b) => new Date(a[1]) - new Date(b[1]));
+          const remainingMins = (new Date(active[0][1]) - new Date()) / 60_000;
+          const DURATION_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
+          return DURATION_KEYS.find(d => {
+            const mins = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 }[d];
+            return remainingMins <= mins + 1; // 1-min tolerance
+          }) || null;
+        }
+
+        /** Apply a snooze duration (or unsnooze) to all alert tiers for a row */
+        async function setSnooze(row, duration) {
+          snoozeMenuFor.value = null;
+          const alertKey = 'all'; // backend resolves to actual tiers from user settings
+          try {
+            await req(`/projects/${row.project_id}/snooze-price-alert`, {
+              method: 'POST',
+              body: JSON.stringify({ alert_key: alertKey, duration }),
+            });
+            // Optimistically update reactive prices ref
+            const idx = prices.value.findIndex(p => p.project_id === row.project_id);
+            if (idx !== -1) {
+              const DURATION_MAP = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 };
+              const updated = { ...prices.value[idx] };
+              updated.snoozes = { ...(updated.snoozes || {}) };
+              if (!duration) {
+                Object.keys(updated.snoozes).forEach(k => delete updated.snoozes[k]);
+              } else {
+                const mins = DURATION_MAP[duration];
+                const until = new Date(Date.now() + mins * 60_000).toISOString();
+                const DURATION_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
+                DURATION_KEYS.forEach(k => updated.snoozes[k] = until);
+              }
+              prices.value[idx] = updated;
+            }
+          } catch (err) {
+            console.error('snooze failed:', err);
+          }
         }
 
         /** Load token prices */
@@ -2227,6 +2308,8 @@
           api: window.api, relativeTime, ageFormat, fmtShortNum, fmtPct, copyContract, openIframe,
           scrollToTop, scrollToLogs,
           twitterClick,
+          snoozeMenuFor, snoozeOptions,
+          toggleSnoozeMenu, isSnoozed, snoozedUntil, setSnooze,
         };
       },
     };
