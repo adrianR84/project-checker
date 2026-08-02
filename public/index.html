@@ -1802,7 +1802,7 @@
                       <span class="icon icon-bell" v-else></span>
                     </button>
                     <div v-if="snoozeMenuFor === row.project_id" class="popover">
-                      <div style="font-size:0.85rem;font-weight:600;margin-bottom:4px;color:var(--muted)">Snooze alerts</div>
+                      <div style="font-size:0.9rem;font-weight:800;margin-bottom:4px;color:var(--muted)">Snooze alerts</div>
                       <button v-for="opt in snoozeOptions" :key="opt.value" class="snooze-opt" :class="{ active: isSnoozed(row) && snoozedUntil(row) === opt.value }" @click.stop="setSnooze(row, opt.value)">{{ opt.label }}</button>
                       <button v-if="isSnoozed(row)" class="snooze-opt unsnooze" @click.stop="setSnooze(row, null)">Unsnooze</button>
                     </div>
@@ -1924,6 +1924,15 @@
           return row.snoozes && Object.values(row.snoozes).some(t => t && new Date(t) > new Date());
         }
 
+        /** Parse a duration string (e.g. '2h', '30m') into minutes — parses directly, no hardcoded map */
+        function parseDurationMins(d) {
+          const h = d.match(/^(\d+)h$/);
+          if (h) return parseInt(h[1], 10) * 60;
+          const m = d.match(/^(\d+)m$/);
+          if (m) return parseInt(m[1], 10);
+          return 0;
+        }
+
         /** Returns the shortest-duration snooze value for display */
         function snoozedUntil(row) {
           if (!row.snoozes) return null;
@@ -1932,11 +1941,9 @@
           // Return the earliest-expiring snooze's duration key
           active.sort((a, b) => new Date(a[1]) - new Date(b[1]));
           const remainingMins = (new Date(active[0][1]) - new Date()) / 60_000;
-          const DURATION_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
-          return DURATION_KEYS.find(d => {
-            const mins = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 }[d];
-            return remainingMins <= mins + 1; // 1-min tolerance
-          }) || null;
+          const DURATION_KEYS = snoozeOptions.value.map(o => o.value);
+          const MINS = Object.fromEntries(snoozeOptions.value.map(o => [o.value, parseDurationMins(o.value)]));
+          return DURATION_KEYS.find(d => remainingMins <= (MINS[d] + 1)) || null; // 1-min tolerance
         }
 
         /** Apply a snooze duration (or unsnooze) to all alert tiers for a row */
@@ -1956,8 +1963,7 @@
               if (!snoozed_until) {
                 Object.keys(updated.snoozes).forEach(k => delete updated.snoozes[k]);
               } else {
-                const DURATION_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
-                DURATION_KEYS.forEach(k => updated.snoozes[k] = snoozed_until);
+                snoozeOptions.value.forEach(o => { updated.snoozes[o.value] = snoozed_until; });
               }
               prices.value[idx] = updated;
             }
