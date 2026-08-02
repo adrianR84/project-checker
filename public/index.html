@@ -1745,7 +1745,7 @@
                   <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
                   <th class="cen" title="Snooze price alerts">⏱</th>
                   <th class="cen" title="Track price changes">
-                    <span class="sr-only">Track</span>
+                    <span class="sr-only">T</span>
                     <button class="icon-btn" @click="pricesMaximized = !pricesMaximized">
                       <span :class="pricesMaximized ? 'icon icon-shrink' : 'icon icon-expand'"></span>
                     </button>
@@ -1796,8 +1796,8 @@
                   <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                   <td class="num"><b>{{ fmtShortNum(row.liquidity_usd) }}</b></td>
                   <td class="num"><b>{{ fmtShortNum(row.market_cap) }}</b></td>
-                  <td class="cen" style="position:relative">
-                    <button v-if="row.price_enabled" class="icon-btn" title="Snooze price alerts" @click.stop="toggleSnoozeMenu(row.project_id, $event)">
+                  <td class="cen">
+                    <button v-if="priceRowTint[row.project_id]" class="icon-btn" title="Snooze price alerts" @click.stop="toggleSnoozeMenu(row.project_id, $event)">
                       <span class="icon icon-bell-off" v-if="isSnoozed(row)"></span>
                       <span class="icon icon-bell" v-else></span>
                     </button>
@@ -1951,23 +1951,20 @@
           snoozeMenuFor.value = null;
           const alertKey = 'all'; // backend resolves to actual tiers from user settings
           try {
-            await req(`/projects/${row.project_id}/snooze-price-alert`, {
+            const { snoozed_until } = await req(`/projects/${row.project_id}/snooze-price-alert`, {
               method: 'POST',
               body: JSON.stringify({ alert_key: alertKey, duration }),
             });
-            // Optimistically update reactive prices ref
+            // Apply only what the backend actually set
             const idx = prices.value.findIndex(p => p.project_id === row.project_id);
             if (idx !== -1) {
-              const DURATION_MAP = { '30m': 30, '45m': 45, '1h': 60, '2h': 120, '4h': 240, '24h': 1440 };
               const updated = { ...prices.value[idx] };
               updated.snoozes = { ...(updated.snoozes || {}) };
-              if (!duration) {
+              if (!snoozed_until) {
                 Object.keys(updated.snoozes).forEach(k => delete updated.snoozes[k]);
               } else {
-                const mins = DURATION_MAP[duration];
-                const until = new Date(Date.now() + mins * 60_000).toISOString();
                 const DURATION_KEYS = ['30m', '45m', '1h', '2h', '4h', '24h'];
-                DURATION_KEYS.forEach(k => updated.snoozes[k] = until);
+                DURATION_KEYS.forEach(k => updated.snoozes[k] = snoozed_until);
               }
               prices.value[idx] = updated;
             }

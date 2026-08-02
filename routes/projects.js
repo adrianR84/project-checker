@@ -625,13 +625,13 @@ router.post('/:id/snooze-price-alert', async (req, res) => {
   const { alert_key, duration } = req.body ?? {};
   if (!alert_key) return res.status(400).json({ error: 'alert_key is required' });
 
-  // Resolve "all" to the actual alert tiers from user settings
+  // Resolve "all" to the tiers that actually have a record in token_prices_alerts for this project
   let alertKeys = alert_key.split(',').map(k => k.trim());
   if (alertKeys.length === 1 && alertKeys[0] === 'all') {
-    const priceAlerts = await db.config.getPriceAlerts(req.userId);
-    alertKeys = (priceAlerts?.alerts || [])
-      .filter(a => a.enabled)
-      .map(a => String(a.price_change));
+    const existing = await db.prepare(
+      'SELECT price_change FROM token_prices_alerts WHERE project_id = ?'
+    ).all(id);
+    alertKeys = existing.map(r => String(r.price_change));
   }
 
   if (!alertKeys.length) return res.json({ ok: true, snoozed_until: null });
