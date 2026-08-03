@@ -1027,6 +1027,7 @@
             </div>
 
             <div class="modal-actions">
+              <button @click="$emit('cancel')">Cancel</button>
               <button class="primary" :disabled="eiSaving" @click="eiSave">
                 <span v-if="eiSaving" class="spinner"></span>
                 <span v-else>Save Extra Info</span>
@@ -1604,6 +1605,7 @@
           openModal({
             title: `Edit Project — ${props.project.name}`,
             width: '900px',
+            closable: false,
             render: () => h(ProjectForm, {
               initial: props.project,
               busy: submitting.value,
@@ -2590,6 +2592,7 @@
           openModal({
             title: 'New Project',
             width: w || '900px',
+            closable: false,
             render: () => h(ProjectForm, { initial: null, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
@@ -2598,6 +2601,7 @@
           openModal({
             title: 'Edit Project',
             width: w || '900px',
+            closable: false,
             render: () => h(ProjectForm, { initial: p, startTab: startTab || 'fields', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
@@ -2606,6 +2610,7 @@
           openModal({
             title: `Edit ${p.name}`,
             width: w || '900px',
+            closable: false,
             render: () => h(ProjectForm, { initial: p, startTab: 'repos', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
@@ -2614,6 +2619,7 @@
           openModal({
             title: `Edit ${p.name}`,
             width: '900px',
+            closable: false,
             render: () => h(ProjectForm, { initial: p, startTab: 'extra_info', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
