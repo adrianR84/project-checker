@@ -855,13 +855,15 @@
        Injects: none
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectForm = {
-      props: ['initial', 'busy'],
-      emits: ['submit', 'cancel'],
+      props: ['initial', 'busy', 'startTab'],
+      emits: ['submit', 'cancel', 'ei-saved'],
 
       template: `
         <!-- Tab switcher -->
           <div class="tabs">
             <button :class="['tab', formTab === 'fields' ? 'active' : '']" @click="formTab = 'fields'">Fields</button>
+            <button v-if="hasId" :class="['tab', formTab === 'repos' ? 'active' : '']" @click="formTab = 'repos'">Repos</button>
+            <button v-if="hasId" :class="['tab', formTab === 'extra_info' ? 'active' : '']" @click="formTab = 'extra_info'">Extra Info</button>
             <button :class="['tab', formTab === 'json' ? 'active' : '']" @click="formTab = 'json'">JSON</button>
           </div>
 
@@ -934,7 +936,105 @@
             <span v-if="jsonEditError" class="error-msg">{{ jsonEditError }}</span>
           </div>
 
-          <div class="modal-actions">
+          <!-- Repos tab -->
+          <div v-if="formTab === 'repos' && hasId">
+            <div v-if="repos.length" style="margin-bottom:16px;">
+              <table style="margin:0;">
+                <tbody>
+                  <tr v-for="r in repos" :key="r.full_name">
+                    <td style="white-space:nowrap"><input type="checkbox" :value="r.full_name" v-model="selectedToDelete" /></td>
+                    <td style="width:100%">{{ r.full_name }}</td>
+                    <td style="white-space:nowrap"><button class="secondary outline" @click="removeRepo(r)">×</button></td>
+                  </tr>
+                </tbody>
+              </table>
+              <button v-if="selectedToDelete.length" class="secondary" style="margin-top:8px;" @click="deleteSelected">Delete Selected ({{ selectedToDelete.length }})</button>
+            </div>
+            <div v-else class="muted" style="margin-bottom:16px;">No repos monitored yet.</div>
+
+            <div style="display:flex;gap:6px;margin-bottom:12px;">
+              <input v-model="manualName" type="text" placeholder="owner/repo-name" style="flex:1;" />
+              <button class="secondary" :disabled="!manualName || adding" @click="manualAdd" style="height:45px;">Add</button>
+            </div>
+
+            <div class="form-group">
+              <button class="secondary" :disabled="fetching" @click="fetchOrgsRepos">
+                <span v-if="fetching" class="spinner"></span>
+                <span v-else>↻ Fetch from GitHub</span>
+              </button>
+            </div>
+
+            <fieldset v-if="availableRepos.length">
+              <legend>Add repos from GitHub</legend>
+              <label v-for="r in availableRepos" :key="r.full_name">
+                <input type="checkbox" :value="r" v-model="selected" />
+                {{ r.full_name }} <span class="muted">({{ r.default_branch }}, ★{{ r.stars_count || 0 }})</span>
+              </label>
+            </fieldset>
+
+            <div v-if="selected.length" style="margin-top:8px;">
+              <button class="primary" :disabled="adding" @click="addSelected">
+                <span v-if="adding" class="spinner"></span>
+                <span v-else>Add Selected ({{ selected.length }})</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Extra Info tab -->
+          <div v-if="formTab === 'extra_info' && hasId">
+            <div class="form-group">
+              <div class="form-row-header">
+                <strong>Links</strong>
+                <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiLinks.push({label:'',url:'',note:''})">+ Add Link</button>
+              </div>
+              <div v-for="(link, i) in eiLinks" :key="'l'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+                <input v-model="link.label" placeholder="Label (e.g. Docs)" style="flex:1" />
+                <input v-model="link.url"   placeholder="https://..."       style="flex:2" />
+                <input v-model="link.note"  placeholder="Note (optional)"   style="flex:1" />
+                <button type="button" class="secondary" style="padding:2px 6px" @click="eiLinks.splice(i,1)">×</button>
+              </div>
+              <div v-if="eiLinks.length === 0" style="color:var(--muted-color);font-size:0.85rem">No links yet.</div>
+            </div>
+
+            <div class="form-group" style="margin-top:12px">
+              <div class="form-row-header">
+                <strong>Text Fields</strong>
+                <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiTexts.push({key:'',value:''})">+ Add Field</button>
+              </div>
+              <div v-for="(txt, i) in eiTexts" :key="'t'+i" style="margin-bottom:8px">
+                <div style="display:flex;gap:4px;margin-bottom:2px;align-items:center">
+                  <input v-model="txt.key" placeholder="Field name (e.g. Notes)" style="flex:1" />
+                  <button type="button" class="secondary" style="padding:2px 6px" @click="eiTexts.splice(i,1)">×</button>
+                </div>
+                <textarea v-model="txt.value" placeholder="Value…" rows="2" style="width:100%;resize:vertical"></textarea>
+              </div>
+              <div v-if="eiTexts.length === 0" style="color:var(--muted-color);font-size:0.85rem">No text fields yet.</div>
+            </div>
+
+            <div class="form-group" style="margin-top:12px">
+              <div class="form-row-header">
+                <strong>Files</strong>
+                <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="eiFileInputEl?.click()">+ Upload File</button>
+              </div>
+              <input ref="eiFileInputEl" type="file" style="display:none" @change="eiUploadFile" />
+              <div v-for="(fl, i) in eiFiles" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+                <a :href="'/api/projects/' + initial.id + '/extra-info/files/' + encodeURIComponent(fl.name)" target="_blank" rel="noopener" style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</a>
+                <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
+                <button type="button" class="secondary" style="padding:2px 6px" @click="eiFiles.splice(i,1)">×</button>
+              </div>
+              <div v-if="eiFiles.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
+              <div v-if="eiUploadError" class="error-msg" style="font-size:0.85rem">{{ eiUploadError }}</div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="primary" :disabled="eiSaving" @click="eiSave">
+                <span v-if="eiSaving" class="spinner"></span>
+                <span v-else>Save Extra Info</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="modal-actions" v-if="formTab !== 'extra_info'">
             <button @click="$emit('cancel')">Cancel</button>
             <button class="primary" :disabled="busy" @click="onSubmit()">
               <span v-if="busy" class="spinner"></span>
@@ -955,12 +1055,150 @@
         const formTab = ref('fields');
         const tokenLookupBusy = ref(false);
 
+        const hasId = computed(() => !!(props.initial?.id));
+
+        // ── Repo state ─────────────────────────────────────────────────
+        const repos    = ref([]);
+        const orgRepos = ref([]);
+        const selected = ref([]);
+        const selectedToDelete = ref([]);
+        const fetching = ref(false);
+        const adding   = ref(false);
+        const manualName = ref('');
+        const reposLoaded = ref(false);
+        const availableRepos = computed(() =>
+          orgRepos.value.filter(r => !repos.value.some(m => m.full_name === r.full_name))
+        );
+
+        async function loadRepos() {
+          if (!hasId.value) return;
+          const p = await api.getProject(props.initial.id);
+          repos.value = p.repos || [];
+          reposLoaded.value = true;
+        }
+
+        async function fetchOrgsRepos() {
+          fetching.value = true;
+          try {
+            const all = await api.getOrgRepos(props.initial.id);
+            orgRepos.value = all;
+          } catch (e) { alert('Failed to fetch repos: ' + e.message); }
+          finally { fetching.value = false; }
+        }
+
+        async function addSelected() {
+          adding.value = true;
+          try {
+            await api.addRepos(props.initial.id, selected.value);
+            selected.value = [];
+            orgRepos.value = [];
+            await loadRepos();
+          } catch (e) { alert('Failed to add repos: ' + e.message); }
+          finally { adding.value = false; }
+        }
+
+        async function removeRepo(r) {
+          if (!confirm(`Remove ${r.full_name}?`)) return;
+          try { await api.removeRepo(props.initial.id, r.full_name); await loadRepos(); }
+          catch (e) { alert('Failed to remove repo: ' + e.message); }
+        }
+
+        async function manualAdd() {
+          let name = manualName.value.trim().replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '');
+          if (!name) return;
+          const parts = name.split('/');
+          const owner = parts[0] || '';
+          const repo  = parts[1] || name;
+          try {
+            await api.addRepos(props.initial.id, [{
+              full_name: `${owner}/${repo}`, repo_url: `https://github.com/${owner}/${repo}`,
+              description: '', default_branch: '', pushed_at: null, stars_count: 0, language: null,
+            }]);
+            manualName.value = '';
+            await loadRepos();
+          } catch (e) { alert('Failed to add repo: ' + e.message); }
+        }
+
+        async function deleteSelected() {
+          const toDelete = [...selectedToDelete.value];
+          if (!confirm(`Remove ${toDelete.length} repos?`)) return;
+          try {
+            for (const name of toDelete) await api.removeRepo(props.initial.id, name);
+            selectedToDelete.value = [];
+            await loadRepos();
+          } catch (e) { alert('Failed to remove repos: ' + e.message); }
+        }
+
+        // ── Extra info state ────────────────────────────────────────────
+        const eiLinks  = ref([]);
+        const eiTexts  = ref([]);
+        const eiFiles  = ref([]);
+        const eiSaving = ref(false);
+        const eiUploadError = ref('');
+        const eiFileInputEl = ref(null);
+        const eiLoaded = ref(false);
+
+        function loadExtraInfo() {
+          if (!hasId.value) return;
+          const info = props.initial?.extra_info
+            ? (typeof props.initial.extra_info === 'string' ? JSON.parse(props.initial.extra_info) : props.initial.extra_info)
+            : null;
+          eiLinks.value = info?.links  ? info.links.slice()  : [];
+          eiTexts.value = info?.texts  ? info.texts.slice()  : [];
+          eiFiles.value = info?.files  ? info.files.slice()  : [];
+          eiLoaded.value = true;
+        }
+
+        async function eiUploadFile(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          eiUploadError.value = '';
+          const formData = new FormData();
+          formData.append('file', file);
+          try {
+            const res = await fetch(`/api/projects/${props.initial.id}/extra-info/upload`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${sessionStorage.getItem('api_token') || ''}` },
+              body: formData,
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+            eiFiles.value.push(await res.json());
+          } catch (err) { eiUploadError.value = err.message; }
+          e.target.value = '';
+        }
+
+        async function eiSave() {
+          eiSaving.value = true;
+          eiUploadError.value = '';
+          try {
+            const isValidUrl = (s) => s && typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
+            const links = eiLinks.value.filter(l => isValidUrl(l.url) || (l.label && l.url))
+              .map(l => ({ label: String(l.label||'').trim()||null, url: isValidUrl(l.url) ? l.url.trim() : (l.label ? null : ''), note: String(l.note||'').trim()||null }));
+            const texts = eiTexts.value.filter(t => t.key || t.value)
+              .map(t => ({ key: String(t.key||'').trim()||null, value: String(t.value||'').trim()||null }));
+            await api.updateProject(props.initial.id, { extra_info: { links, texts, files: eiFiles.value.filter(f => f.name && f.path) } });
+            emit('ei-saved');
+            eiSaving.value = false;
+          } catch (err) { eiUploadError.value = err.message; eiSaving.value = false; }
+        }
+
+        // Lazy-load when switching to repos or extra_info tab
+        watch([() => props.initial?.id, formTab], ([id, tab]) => {
+          if (!id) return;
+          if (tab === 'repos'      && !reposLoaded.value)    loadRepos();
+          if (tab === 'extra_info' && !eiLoaded.value)      loadExtraInfo();
+        }, { immediate: true });
+
         // Sync form fields whenever the `initial` prop changes
         // (happens when switching from "create" to "edit" mode)
         watch(
           () => props.initial,
           (v) => {
-            formTab.value = 'fields';
+            formTab.value = props.startTab || 'fields';
+            reposLoaded.value = false;
+            eiLoaded.value = false;
+            repos.value = []; orgRepos.value = []; selected.value = []; selectedToDelete.value = [];
+            eiLinks.value = []; eiTexts.value = []; eiFiles.value = [];
             if (v) {
               const tok = v.token ? (typeof v.token === 'string' ? JSON.parse(v.token) : v.token) : {};
               f.value = {
@@ -1063,165 +1301,10 @@
           });
         }
 
-        return { f, onSubmit, jsonEditText, jsonEditError, formTab, lookupToken, tokenLookupBusy };
-      },
-    };
-
-    /* ── RepoManager component ─────────────────────────────────────────────────
-       Add/remove repos for a project. Lives inside a modal.
-       Props:   projectId (number), githubUrl (string), projectName (string)
-       Emits:   repos-updated (void)
-       Injects: none
-    ───────────────────────────────────────────────────────────────────────── */
-    const RepoManager = {
-      props: ['projectId', 'githubUrl', 'projectName'],
-      emits: ['repos-updated'],
-      template: `
-        <!-- Current repos -->
-          <div v-if="repos.length" style="margin-bottom:16px;">
-            <table style="margin:0;">
-              <tbody>
-                <tr v-for="r in repos" :key="r.full_name">
-                  <td style="white-space:nowrap"><input type="checkbox" :value="r.full_name" v-model="selectedToDelete" /></td>
-                  <td style="width:100%">{{ r.full_name }}</td>
-                  <td style="white-space:nowrap"><button class="secondary outline" @click="removeRepo(r)">×</button></td>
-                </tr>
-              </tbody>
-            </table>
-            <button v-if="selectedToDelete.length" class="secondary" style="margin-top:8px;" @click="deleteSelected">Delete Selected ({{ selectedToDelete.length }})</button>
-          </div>
-          <div v-else class="muted" style="margin-bottom:16px;">No repos monitored yet.</div>
-
-          <!-- Manual add by full name -->
-          <div style="display:flex;gap:6px;margin-bottom:12px;">
-            <input v-model="manualName" type="text" placeholder="owner/repo-name" style="flex:1;" />
-            <button class="secondary" :disabled="!manualName || adding" @click="manualAdd" style="padding:3x 5px; height:45px;">Add</button>
-          </div>
-
-          <!-- Fetch from GitHub -->
-          <div class="form-group">
-            <button class="secondary" :disabled="fetching" @click="fetchOrgsRepos">
-              <span v-if="fetching" class="spinner"></span>
-              <span v-else>↻ Fetch from GitHub</span>
-            </button>
-          </div>
-
-          <!-- Org repo checklist -->
-          <fieldset v-if="availableRepos.length">
-            <legend>Add repos from GitHub</legend>
-            <label v-for="r in availableRepos" :key="r.full_name">
-              <input type="checkbox" :value="r" v-model="selected" />
-              {{ r.full_name }} <span class="muted">({{ r.default_branch }}, ★{{ r.stars_count || 0 }})</span>
-            </label>
-          </fieldset>
-
-          <div v-if="selected.length" style="margin-top:8px;">
-            <button class="primary" :disabled="adding" @click="addSelected">
-              <span v-if="adding" class="spinner"></span>
-              <span v-else>Add Selected ({{ selected.length }})</span>
-            </button>
-          </div>
-
-          <div class="modal-actions" style="margin-top:16px;">
-            <button @click="$emit('repos-updated')">Done</button>
-          </div>
-      `,
-      setup(props, { emit }) {
-        const repos    = ref([]);
-        const orgRepos = ref([]);
-        const selected = ref([]);
-        const selectedToDelete = ref([]);
-        const availableRepos = computed(() =>
-          orgRepos.value.filter(r => !repos.value.some(m => m.full_name === r.full_name))
-        );
-        const fetching = ref(false);
-        const adding   = ref(false);
-        const manualName = ref('');
-
-        async function loadRepos() {
-          const p = await api.getProject(props.projectId);
-          repos.value = p.repos || [];
-        }
-        loadRepos();
-
-        async function fetchOrgsRepos() {
-          fetching.value = true;
-          try {
-            const all = await api.getOrgRepos(props.projectId);
-            orgRepos.value = all;
-          } catch (e) {
-            alert('Failed to fetch repos: ' + e.message);
-          } finally {
-            fetching.value = false;
-          }
-        }
-
-        async function addSelected() {
-          adding.value = true;
-          try {
-            await api.addRepos(props.projectId, selected.value);
-            selected.value = [];
-            orgRepos.value = [];
-            await loadRepos();
-            emit('repos-updated');
-          } catch (e) {
-            alert('Failed to add repos: ' + e.message);
-          } finally {
-            adding.value = false;
-          }
-        }
-
-        async function removeRepo(r) {
-          if (!confirm(`Remove ${r.full_name}?`)) return;
-          try {
-            await api.removeRepo(props.projectId, r.full_name);
-            await loadRepos();
-          } catch (e) {
-            alert('Failed to remove repo: ' + e.message);
-          }
-        }
-
-        async function manualAdd() {
-          let name = manualName.value.trim()
-            .replace(/^https:\/\/github\.com\//, '')
-            .replace(/\.git$/, '');
-          if (!name) return;
-          const parts = name.split('/');
-          const owner = parts[0] || '';
-          const repo = parts[1] || name;
-          try {
-            await api.addRepos(props.projectId, [{
-              full_name: `${owner}/${repo}`,
-              repo_url: `https://github.com/${owner}/${repo}`,
-              description: '',
-              default_branch: '',
-              pushed_at: null,
-              stars_count: 0,
-              language: null,
-            }]);
-            manualName.value = '';
-            await loadRepos();
-            emit('repos-updated');
-          } catch (e) {
-            alert('Failed to add repo: ' + e.message);
-          }
-        }
-
-        async function deleteSelected() {
-          const toDelete = [...selectedToDelete.value];
-          if (!confirm(`Remove ${toDelete.length} repos?`)) return;
-          try {
-            for (const name of toDelete) {
-              await api.removeRepo(props.projectId, name);
-            }
-            selectedToDelete.value = [];
-            await loadRepos();
-          } catch (e) {
-            alert('Failed to remove repos: ' + e.message);
-          }
-        }
-
-        return { repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, manualName, manualAdd, fetchOrgsRepos, addSelected, removeRepo, deleteSelected };
+        return { f, onSubmit, jsonEditText, jsonEditError, formTab, lookupToken, tokenLookupBusy, hasId,
+          repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, manualName,
+          fetchOrgsRepos, addSelected, removeRepo, manualAdd, deleteSelected,
+          eiLinks, eiTexts, eiFiles, eiSaving, eiUploadError, eiFileInputEl, eiSave, eiUploadFile };
       },
     };
 
@@ -1520,6 +1603,7 @@
           }
           openModal({
             title: `Edit Project — ${props.project.name}`,
+            width: '900px',
             render: () => h(ProjectForm, {
               initial: props.project,
               busy: submitting.value,
@@ -2354,87 +2438,6 @@
       `,
     };
 
-    /* ── ExtraInfoBody component ─────────────────────────────────────────────
-       Extra info editor (links/texts/files) — lives inside the AppModal shell.
-       State lives in ProjectsPage; passed as refs (mutations propagate back).
-       Props:   extraInfoProject (ref<object|null>), links/texts/files/saving/uploadError (refs)
-       Emits:   save (void), cancel (void), pick-file (void), upload (event)
-       Injects: none
-    ───────────────────────────────────────────────────────────────────────── */
-    const ExtraInfoBody = {
-      props: ['extraInfoProject', 'links', 'texts', 'files', 'saving', 'uploadError'],
-      emits: ['save', 'cancel', 'pick-file', 'upload'],
-      setup(props) {
-        // Re-export refs from setup so Vue auto-unwraps them in the template.
-        return {
-          extraInfoProject: props.extraInfoProject,
-          links: props.links, texts: props.texts, files: props.files,
-          saving: props.saving, uploadError: props.uploadError,
-        };
-      },
-      template: `
-        <div v-if="extraInfoProject">
-          <!-- Links section -->
-          <div class="form-group">
-            <div class="form-row-header">
-              <strong>Links</strong>
-              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="links.push({label:'',url:'',note:''})">+ Add Link</button>
-            </div>
-            <div v-for="(link, i) in links" :key="'l'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
-              <input v-model="link.label" placeholder="Label (e.g. Docs)" style="flex:1" />
-              <input v-model="link.url"   placeholder="https://..."       style="flex:2" />
-              <input v-model="link.note"  placeholder="Note (optional)"   style="flex:1" />
-              <button type="button" class="secondary" style="padding:2px 6px" @click="links.splice(i,1)">×</button>
-            </div>
-            <div v-if="links.length === 0" style="color:var(--muted-color);font-size:0.85rem">No links yet.</div>
-          </div>
-
-          <!-- Texts section -->
-          <div class="form-group" style="margin-top:12px">
-            <div class="form-row-header">
-              <strong>Text Fields</strong>
-              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="texts.push({key:'',value:''})">+ Add Field</button>
-            </div>
-            <div v-for="(txt, i) in texts" :key="'t'+i" style="margin-bottom:8px">
-              <div style="display:flex;gap:4px;margin-bottom:2px;align-items:center">
-                <input v-model="txt.key" placeholder="Field name (e.g. Notes)" style="flex:1" />
-                <button type="button" class="secondary" style="padding:2px 6px" @click="texts.splice(i,1)">×</button>
-              </div>
-              <textarea v-model="txt.value" placeholder="Value..." rows="2" style="width:100%;resize:vertical"></textarea>
-            </div>
-            <div v-if="texts.length === 0" style="color:var(--muted-color);font-size:0.85rem">No text fields yet.</div>
-          </div>
-
-          <!-- Files section -->
-          <div class="form-group" style="margin-top:12px">
-            <div class="form-row-header">
-              <strong>Files</strong>
-              <button type="button" class="secondary" style="padding:2px 8px;font-size:0.8rem" @click="clickFileInput">+ Upload File</button>
-            </div>
-            <input ref="fileInputEl" type="file" style="display:none" @change="$emit('upload', $event)" />
-            <div v-for="(fl, i) in files" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
-              <a :href="'/api/projects/' + extraInfoProject.id + '/extra-info/files/' + encodeURIComponent(fl.name)" target="_blank" rel="noopener" style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</a>
-              <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
-              <button type="button" class="secondary" style="padding:2px 6px" @click="files.splice(i,1)">×</button>
-            </div>
-            <div v-if="files.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
-            <div v-if="uploadError" class="error-msg" style="font-size:0.85rem">{{ uploadError }}</div>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="$emit('cancel')">Cancel</button>
-          <button class="primary" :disabled="saving" @click="$emit('save')">
-            <span v-if="saving" class="spinner"></span>
-            <span v-else>Save</span>
-          </button>
-        </div>
-      `,
-      methods: {
-        clickFileInput() { this.$refs.fileInputEl?.click(); },
-      },
-    };
-
     /* ── ProjectsPage component ─────────────────────────────────────────────────
        Table list of all projects with Create / Edit / Delete / JSON Import.
        Props:   none
@@ -2442,7 +2445,7 @@
        Injects: openModal, closeModal
     ───────────────────────────────────────────────────────────────────────── */
     const ProjectsPage = {
-      components: { ProjectForm, RepoManager, ImportBody, ExtraInfoBody },
+      components: { ProjectForm, ImportBody },
 
       template: `
         <div class="page">
@@ -2526,7 +2529,7 @@
                   <td><span :class="['badge', p.activity_display ? 'ok' : 'error']">{{ p.activity_display ? '✓' : '✗' }}</span></td>
                   <td class="col-actions">
                     <button v-if="p.github_url" class="secondary" data-tooltip="Manage Repos" @click="openManageRepos(p)"><span class="icon icon-settings"></span></button>
-                    <button class="secondary" data-tooltip="Extra Info" @click="openExtraInfo(p)"><span class="icon icon-folder-plus"></span></button>
+                    <button v-if="p.extra_info && (function(){const e=typeof p.extra_info==='string'?JSON.parse(p.extra_info):p.extra_info;return e&&(e.links?.length||e.texts?.length||e.files?.length);})()" class="secondary" data-tooltip="Extra Info" @click="openExtraInfo(p)"><span class="icon icon-folder-plus"></span></button>
                     <button class="secondary" data-tooltip="Edit" @click="openEdit(p)"><span class="icon icon-edit"></span></button>
                     <button class="secondary" data-tooltip="Delete" @click="onDelete(p)"><span class="icon icon-trash-2"></span></button>
                   </td>
@@ -2551,90 +2554,6 @@
 
         const importText  = ref('');    // raw JSON string in the import textarea
         const importing   = ref(false);
-        const manageProject = ref(null); // project for RepoManager modal
-        const extraInfoProject = ref(null); // project for ExtraInfoModal
-        const eiLinks  = ref([]);
-        const eiTexts  = ref([]);
-        const eiFiles  = ref([]);
-        const eiSaving = ref(false);
-        const eiUploadError = ref('');
-        const eiFileNote = ref('');
-        function openExtraInfo(p) {
-          extraInfoProject.value = p;
-          const info = p.extra_info ? (typeof p.extra_info === 'string' ? JSON.parse(p.extra_info) : p.extra_info) : null;
-          eiLinks.value  = info?.links  ? info.links.slice()  : [];
-          eiTexts.value  = info?.texts  ? info.texts.slice()  : [];
-          eiFiles.value  = info?.files  ? info.files.slice()  : [];
-          openModal({
-            title: `Extra Info — ${p.name}`,
-            width: '900px',
-            render: () => h(ExtraInfoBody, {
-              extraInfoProject, links: eiLinks, texts: eiTexts, files: eiFiles, saving: eiSaving, uploadError: eiUploadError,
-              onSave:        eiSave,
-              onCancel:      () => { closeModal(); extraInfoProject.value = null; },
-              onPickFile:    () => {},  // ExtraInfoBody handles its own file input via ref
-              onUpload:      eiUploadFile,
-            }),
-          });
-        }
-
-        async function eiUploadFile(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          eiUploadError.value = '';
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('note', eiFileNote.value || '');
-          try {
-            const res = await fetch(`/api/projects/${extraInfoProject.value.id}/extra-info/upload`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${sessionStorage.getItem('api_token') || ''}` },
-              body: formData,
-            });
-            if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
-            const meta = await res.json();
-            eiFiles.value.push(meta);
-          } catch (err) {
-            eiUploadError.value = err.message;
-          }
-          eiFileNote.value = '';
-          e.target.value = '';
-        }
-
-        async function eiSave() {
-          eiSaving.value = true;
-          eiUploadError.value = '';
-          try {
-            const isValidUrl = (s) => s && typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
-            const isObject = (v) => v && typeof v === 'object';
-            // Sanitize: strip links with no/empty URL, normalize url to null if not a real URL
-            const links = eiLinks.value
-              .filter(l => isValidUrl(l.url) || (l.label && l.url))
-              .map(l => ({
-                label: String(l.label || '').trim() || null,
-                url:   isValidUrl(l.url) ? l.url.trim() : (l.label ? null : ''),
-                note:  String(l.note || '').trim() || null,
-              }));
-            const texts = eiTexts.value
-              .filter(t => t.key || t.value)
-              .map(t => ({
-                key:   String(t.key || '').trim() || null,
-                value: String(t.value || '').trim() || null,
-              }));
-            const payload = {
-              extra_info: { links, texts, files: eiFiles.value.filter(f => f.name && f.path) },
-            };
-            await api.updateProject(extraInfoProject.value.id, payload);
-            closeModal();
-            extraInfoProject.value = null;
-            await load();
-          } catch (err) {
-            eiUploadError.value = err.message;
-          } finally {
-            eiSaving.value = false;
-          }
-        }
-        const lastGithubImport = ref(null); // import-created project needing repo setup
         const projFilter = ref('');
         const selected = ref([]); // ids of selected projects for bulk ops
 
@@ -2661,33 +2580,41 @@
           }
         }
 
+        async function onEiSaved() {
+          await load();
+          closeModal();
+        }
+
         function openCreate(w) {
           editing.value = null;
           openModal({
             title: 'New Project',
-            width: w || '',
-            render: () => h(ProjectForm, { initial: null, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal }),
+            width: w || '900px',
+            render: () => h(ProjectForm, { initial: null, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
-        function openEdit(p, w) {
+        function openEdit(p, w, startTab) {
           editing.value = p;
           openModal({
             title: 'Edit Project',
-            width: w || '',
-            render: () => h(ProjectForm, { initial: p, busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal }),
+            width: w || '900px',
+            render: () => h(ProjectForm, { initial: p, startTab: startTab || 'fields', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
         function openManageRepos(p, w) {
-          manageProject.value = p;
+          editing.value = p;
           openModal({
-            title: `Manage Repos — ${p.name}`,
-            width: w || '',
-            render: () => h(RepoManager, {
-              projectId: p.id,
-              githubUrl: p.github_url,
-              projectName: p.name,
-              'onRepos-updated': () => { closeModal(); manageProject.value = null; },
-            }),
+            title: `Edit ${p.name}`,
+            width: w || '900px',
+            render: () => h(ProjectForm, { initial: p, startTab: 'repos', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
+          });
+        }
+        function openExtraInfo(p) {
+          editing.value = p;
+          openModal({
+            title: `Edit ${p.name}`,
+            width: '900px',
+            render: () => h(ProjectForm, { initial: p, startTab: 'extra_info', busy: submitting.value, onSubmit: onFormSubmit, onCancel: closeModal, onEiSaved: onEiSaved }),
           });
         }
         function openImport() {
@@ -2711,16 +2638,27 @@
           try {
             if (editing.value) {
               await api.updateProject(editing.value.id, payload);
+              closeModal();
+              editing.value = null;
+              await load();
             } else {
               const created = await api.createProject(payload);
-              if (payload.github_url) {
-                const fresh = projects.value.find(p => p.id === created.id);
-                if (fresh) openManageRepos(fresh);
-              }
+              const fresh = projects.value.find(p => p.id === created.id) || { ...created, repos: [], extra_info: null };
+              editing.value = fresh;
+              await load();
+              openModal({
+                title: `Edit ${fresh.name}`,
+                width: '',
+                render: () => h(ProjectForm, {
+                  initial: fresh,
+                  startTab: payload.github_url ? 'repos' : 'extra_info',
+                  busy: submitting.value,
+                  onSubmit: onFormSubmit,
+                  onCancel: closeModal,
+                  onEiSaved: onEiSaved,
+                }),
+              });
             }
-            closeModal();
-            editing.value   = null;
-            await load();
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -2902,7 +2840,7 @@
                 await api.updateProject(created.id, { extra_info: item.extra_info });
               }
               ok++;
-              if (item.github) lastGithubImport.value = created;
+              ok++;
             } catch (e) {
               failed++;
             }
@@ -2913,11 +2851,6 @@
           importText.value    = '';
           if (failed) error.value = `Imported ${ok}, ${failed} failed.`;
           await load();
-          if (lastGithubImport.value) {
-            const fresh = projects.value.find(p => p.id === lastGithubImport.value.id);
-            if (fresh) openManageRepos(fresh);
-            lastGithubImport.value = null;
-          }
         }
 
         /** Export all projects as JSON (same format as import, with repos) */
@@ -2982,7 +2915,7 @@
           return typeof v === 'string' ? JSON.parse(v) : v;
         }
 
-        // ── Modal bodies (ImportBody, ExtraInfoBody) are template-based
+        // ── Modal bodies (ImportBody) are template-based
         // components defined at module scope. ProjectsPage just renders them
         // via openModal({ render: () => h(Body, props) }).
 
