@@ -596,10 +596,21 @@ router.post('/:id/extra-info/upload', (req, res, next) => {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     res.json({
       name: req.file.originalname,
-      path: req.file.path,
+      path: path.relative(UPLOADS_DIR, req.file.path), // relative path — portable across mounts
       note: req.body.note || '',
     });
   });
+});
+
+// DELETE /api/projects/:id/extra-info/file — delete an uploaded file
+router.delete('/:id/extra-info/file', (req, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { path: relPath } = req.body;
+  if (!relPath) return res.status(400).json({ error: 'path is required' });
+  // relPath is relative to UPLOADS_DIR (new format); absolute paths are from legacy records
+  const absPath = path.isAbsolute(relPath) ? relPath : path.join(UPLOADS_DIR, relPath);
+  try { fs.unlinkSync(absPath); } catch {}
+  res.json({ ok: true });
 });
 
 // GET /api/projects/:id/extra-info/files/:name — serve an uploaded PDF or image

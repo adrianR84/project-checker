@@ -199,6 +199,8 @@
       clearLogs:      ()       => req('/settings/clear-logs',   { method: 'POST' }),
       /** @returns {Promise<void>} */
       clearAlertLogs: ()       => req('/settings/clear-alert-logs', { method: 'POST' }),
+      /** @returns {Promise<void>} */
+      deleteExtraInfoFile: (id, path) => req(`/projects/${id}/extra-info/file`, { method: 'DELETE', body: JSON.stringify({ path }) }),
       /** @returns {Promise<{api_token: string}>} */
       generateApiToken: ()      => req('/settings/generate-api-token', { method: 'POST' }),
 
@@ -1020,7 +1022,7 @@
               <div v-for="(fl, i) in eiFiles" :key="'f'+i" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
                 <a :href="'/api/projects/' + initial.id + '/extra-info/files/' + encodeURIComponent(fl.name)" target="_blank" rel="noopener" style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="fl.name">{{ fl.name }}</a>
                 <input v-model="fl.note" placeholder="Note (optional)" style="flex:1" />
-                <button type="button" class="secondary" style="padding:2px 6px" @click="eiFiles.splice(i,1)">×</button>
+                <button type="button" class="secondary" style="padding:2px 6px" @click="eiDeletedFiles.push(eiFiles.splice(i,1)[0].path)">×</button>
               </div>
               <div v-if="eiFiles.length === 0" style="color:var(--muted-color);font-size:0.85rem">No files yet.</div>
               <div v-if="eiUploadError" class="error-msg" style="font-size:0.85rem">{{ eiUploadError }}</div>
@@ -1138,6 +1140,7 @@
         const eiUploadError = ref('');
         const eiFileInputEl = ref(null);
         const eiLoaded = ref(false);
+        const eiDeletedFiles = ref([]); // paths of files removed by user
 
         function loadExtraInfo() {
           if (!hasId.value) return;
@@ -1177,6 +1180,9 @@
               .map(l => ({ label: String(l.label||'').trim()||null, url: isValidUrl(l.url) ? l.url.trim() : (l.label ? null : ''), note: String(l.note||'').trim()||null }));
             const texts = eiTexts.value.filter(t => t.key || t.value)
               .map(t => ({ key: String(t.key||'').trim()||null, value: String(t.value||'').trim()||null }));
+            // Delete removed files from disk
+            await Promise.all(eiDeletedFiles.value.filter(Boolean).map(p => api.deleteExtraInfoFile(props.initial.id, p)));
+            eiDeletedFiles.value = [];
             await api.updateProject(props.initial.id, { extra_info: { links, texts, files: eiFiles.value.filter(f => f.name && f.path) } });
             emit('ei-saved');
             eiSaving.value = false;
@@ -1305,7 +1311,7 @@
         return { f, onSubmit, jsonEditText, jsonEditError, formTab, lookupToken, tokenLookupBusy, hasId,
           repos, orgRepos, selected, selectedToDelete, availableRepos, fetching, adding, manualName,
           fetchOrgsRepos, addSelected, removeRepo, manualAdd, deleteSelected,
-          eiLinks, eiTexts, eiFiles, eiSaving, eiUploadError, eiFileInputEl, eiSave, eiUploadFile };
+          eiLinks, eiTexts, eiFiles, eiSaving, eiUploadError, eiFileInputEl, eiDeletedFiles, eiSave, eiUploadFile };
       },
     };
 
