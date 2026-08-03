@@ -1,6 +1,7 @@
 // Telegram webhook — receives callback_query button presses from the bot.
 // No auth: Telegram bot API provides its own auth. chat_id validation prevents foreign-bot injection.
 const db = require('../services/db');
+const logger = require('../utils/logger');
 const { parseDuration } = require('../services/notifications');
 
 /**
@@ -12,12 +13,10 @@ const { parseDuration } = require('../services/notifications');
 module.exports = async function telegramWebhook(req, res) {
   const tgCfg = await db.config.getTelegram();
 
-  // ponytail: extract callback_query once and ALWAYS ack — otherwise Telegram shows a perpetual spinner
   const update = req.body;
   const cb = update?.callback_query;
   if (!cb) return res.status(200).end();
 
-  // ponytail: helper that answers the callback with a toast (or silently if no bot token)
   async function ack(text) {
     if (!tgCfg?.bot_token || !cb.id) return;
     await fetch(`https://api.telegram.org/bot${tgCfg.bot_token}/answerCallbackQuery`, {
@@ -87,7 +86,8 @@ module.exports = async function telegramWebhook(req, res) {
       await ack(`❌ Failed: ${err.message}`);
     }
   } else {
-    await ack('Unknown action');
+    // ponytail: debug — show what we actually received
+    await ack(`Unknown: ${cb.data}`);
   }
 
   res.status(200).json({ ok: true });

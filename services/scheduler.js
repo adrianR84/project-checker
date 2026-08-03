@@ -396,19 +396,15 @@ async function evaluatePriceAlerts(projectId, projectName) {
   const plain = formatPriceAlert(projectName, priceRow.price_usd, winning.val, direction, tier);
   const html = formatPriceAlertHtml(projectName, priceRow.price_usd, winning.val, direction, tier, priceRow.chain, priceRow.contract);
 
-  const replyMarkup = {
-    inline_keyboard: [
-      SNOOZE_KEYS.map(d => ({ text: `[${d}]`, callback_data: `snooze_price:${projectId}:${d}` }))
-    ]
-  };
   if (tgCfg?.enabled && tgCfg.bot_token && tgCfg.chat_id && winning.alert.telegram) {
     const r = await (async () => {
       const url = `https://api.telegram.org/bot${tgCfg.bot_token}/sendMessage`;
       try {
+        const keyboard = (SNOOZE_KEYS || []).map(d => ({ text: `[${d}]`, callback_data: `snooze_price:${projectId}:${d}` }));
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: tgCfg.chat_id, text: html, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup })
+          body: JSON.stringify({ chat_id: tgCfg.chat_id, text: html, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: { inline_keyboard: [keyboard] } })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` };
