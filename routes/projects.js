@@ -596,6 +596,7 @@ router.post('/:id/extra-info/upload', (req, res, next) => {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     res.json({
       name: req.file.originalname,
+      path: req.file.path,
       note: req.body.note || '',
     });
   });
