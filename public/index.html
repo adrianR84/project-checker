@@ -1743,9 +1743,8 @@
                   <th class="hide-sm" :class="['sortable', priceSort.col === 'volume_h24' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('volume_h24')">Volume 24h</th>
                   <th :class="['sortable', priceSort.col === 'liquidity_usd' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('liquidity_usd')">Liquidity</th>
                   <th :class="['sortable', priceSort.col === 'market_cap' ? (priceSort.desc ? 'sort-desc' : 'sort-asc') : '']" @click="sortCol('market_cap')">MCap</th>
-                  <th class="cen" title="Snooze price alerts">⏱</th>
+                  <th class="cen" title="Snooze price alerts"><span class="icon icon-bell"></span></th>
                   <th class="cen" title="Track price changes">
-                    <span class="sr-only">T</span>
                     <button class="icon-btn" @click="pricesMaximized = !pricesMaximized">
                       <span :class="pricesMaximized ? 'icon icon-shrink' : 'icon icon-expand'"></span>
                     </button>
