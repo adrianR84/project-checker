@@ -2,6 +2,10 @@
 
 **All agents must obey the rules in this file. Do not commit without the user's consent.**
 
+## Ask First
+
+If anything is unclear — code behavior, file locations, requirements, side effects, or what the user actually wants — **stop and ask**. Do not guess, infer, or assume. State what you're unsure about and wait for clarification before acting. The cost of asking is a single message; the cost of a wrong assumption can be data loss or broken functionality.
+
 ## Styling
 Before creating or styling HTML elements, check [Pico CSS docs via Context7](https://picocss.com/docs) to use Pico's native classes and patterns first.
 
