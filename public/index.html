@@ -1506,7 +1506,7 @@
             <a :href="'https://dexscreener.com/' + token.chain + '/' + token.contract" target="_blank" rel="noopener">{{ token.price_usd != null ? '$' + parseFloat(token.price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—' }}</a>
             <span v-if="token.price_change_h6 != null" :class="['badge', token.price_change_h6 < 0 ? 'error' : 'ok']">6h {{ fmtPct(token.price_change_h6) }}</span>
             <span v-if="token.price_change_h24 != null" :class="['badge', token.price_change_h24 < 0 ? 'error' : 'ok']">24h {{ fmtPct(token.price_change_h24) }}</span>
-            <a v-if="token.market_cap != null" href="#" @click.prevent="openIframe('https://dexscreener.com/' + token.chain + '/' + token.contract + '?embed=1&loadChartSettings=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15', 'DexScreener — ' + token.symbol, '900px')" title="Open DexScreener chart">MCap {{ fmtShortNum(token.market_cap) }}</a>
+            <a v-if="token.market_cap != null" href="#" @click.prevent="openIframe('https://dexscreener.com/' + token.chain + '/' + token.contract + '?embed=1&loadChartSettings=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15', 'DexScreener — ' + token.symbol, '1400px')" title="Open DexScreener chart">MCap {{ fmtShortNum(token.market_cap) }}</a>
             <span v-else>MCap —</span>
           </div>
 
@@ -1888,7 +1888,7 @@
                   <td class="num hide-sm">{{ fmtShortNum(row.volume_h24) }}</td>
                   <td class="num"><b>{{ fmtShortNum(row.liquidity_usd) }}</b></td>
                   <td class="num">
-                    <a v-if="row.market_cap != null" href="#" @click.prevent="openIframe('https://dexscreener.com/' + row.chain + '/' + row.contract + '?embed=1&loadChartSettings=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15', 'DexScreener — ' + row.symbol, '900px')" title="Open DexScreener chart">
+                    <a v-if="row.market_cap != null" href="#" @click.prevent="openIframe('https://dexscreener.com/' + row.chain + '/' + row.contract + '?embed=1&loadChartSettings=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15', 'DexScreener — ' + row.symbol, '1400px')" title="Open DexScreener chart">
                       <b>{{ fmtShortNum(row.market_cap) }}</b>
                     </a>
                     <span v-else>—</span>
