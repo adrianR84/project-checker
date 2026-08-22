@@ -9,6 +9,9 @@ If anything is unclear — code behavior, file locations, requirements, side eff
 ## Styling
 Before creating or styling HTML elements, check [Pico CSS docs via Context7](https://picocss.com/docs) to use Pico's native classes and patterns first.
 
+## Icons
+This project uses [Feather Icons](https://github.com/feathericons/feather/tree/main/icons). When adding or changing any icon, check that URL first to use the correct icon name and SVG markup.
+
 ## Logs
 Dev server output is captured in `logs/output.log`. When user asks to check/read logs, read that file.
 
